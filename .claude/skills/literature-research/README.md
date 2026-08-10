@@ -23,20 +23,18 @@ comparison validity, and benchmark interpretation.
    available in that environment. If your Windows installation exposes Python
    as `py`, use `py scripts/setup.py`.
 
-3. Set `DEEPXIV_TOKEN` in your shell environment (never in the skill, a JSON
-   input file, `.env`, or any script):
+3. Configure the DeepXiv credential once (interactive, no echo):
 
-   PowerShell:
-
-   ```powershell
-   $env:DEEPXIV_TOKEN = "..."
+   ```text
+   python scripts/harness.py configure-token
    ```
 
-   POSIX:
-
-   ```bash
-   export DEEPXIV_TOKEN="..."
-   ```
+   The Harness stores the credential in your user-local configuration directory
+   and re-injects it into the process environment at bootstrap. This is a
+   convenience for persistent local configuration, not a requirement: an
+   explicit `DEEPXIV_TOKEN` environment variable still works and takes
+   precedence. Never put the token in a `.env` file, a JSON input file, the
+   Skill directory, the workspace, or any script.
 
 4. Verify the installation:
 

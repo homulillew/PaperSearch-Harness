@@ -68,6 +68,21 @@ def _bootstrap_runtime() -> None:
 
 _bootstrap_runtime()
 
+# Credential bootstrap: if DEEPXIV_TOKEN is not already in the environment but
+# a user-local credential file exists (written by `configure-token`), inject it
+# into os.environ for this process only. The environment always wins and is
+# never overwritten. This keeps the DeepXiv providers (which read
+# os.environ["DEEPXIV_TOKEN"]) unchanged while removing the shell-inheritance
+# dependency. `configure-token` is handled before this import path is reached
+# because it is dispatched in main(); this line is a no-op for that command.
+from my_search_harness.runtime.credentials import (  # noqa: E402
+    resolve_deepxiv_token,
+)
+
+_token, _token_source = resolve_deepxiv_token()
+if _token is not None and _token_source == "user_credentials":
+    os.environ["DEEPXIV_TOKEN"] = _token
+
 from my_search_harness.domain import (  # noqa: E402
     ArtifactKind,
     CompletionVerdict,
@@ -400,6 +415,7 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     commands.add_parser("doctor")
+    commands.add_parser("configure-token")
 
     create = commands.add_parser("create-run")
     create.add_argument("--input", required=True)
@@ -909,10 +925,40 @@ _WIKI_COMMANDS = {
 }
 
 
+def _configure_token() -> dict[str, object]:
+    """Interactively persist the DeepXiv token to user-local configuration.
+
+    Workspace-independent: the credential is a user-level install setting, not
+    part of any ResearchRun. The token is read via ``getpass`` (no echo) and is
+    never accepted as a CLI argument, printed, or logged. Only a success
+    message and the credential file path are returned.
+    """
+
+    import getpass
+
+    from my_search_harness.runtime.credentials import (
+        deepxiv_token_file,
+        store_deepxiv_token,
+    )
+
+    prompt = "DeepXiv token: "
+    token = getpass.getpass(prompt)
+    if not token or not token.strip():
+        raise AdapterInputError("no token entered")
+    path = store_deepxiv_token(token)
+    return {
+        "saved": True,
+        "path": str(path),
+        "message": "DeepXiv credential saved to user configuration.",
+    }
+
+
 def _execute(
     args: argparse.Namespace,
     runtime_factory: RuntimeFactory,
 ) -> object:
+    if args.command == "configure-token":
+        return _configure_token()
     workspace = Path(args.workspace).expanduser().resolve()
     if args.command == "doctor":
         doctor_path = Path(__file__).resolve().with_name("doctor.py")

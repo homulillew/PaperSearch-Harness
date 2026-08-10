@@ -354,6 +354,24 @@ any previous Wiki. A rejected semantic review is your decision — do not call `
 until the review passes. Either way the run remains CLOSED COMPLETE and the report remains
 valid. See `RUNTIME_API.md` for the input shape.
 
+## DeepXiv credential setup
+
+The DeepXiv credential is a user-level install setting, not part of any
+ResearchRun. If `doctor` reports that the DeepXiv credential is missing, do not
+attempt to persist it through shell profiles, registry changes, `.env` files,
+workspace files, or Skill files. Ask the user to run the interactive
+`configure-token` command once:
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" configure-token
+```
+
+The Harness stores the credential in the user's local configuration directory
+and re-injects it into the process environment at bootstrap, so the DeepXiv
+providers need no changes. An explicit `DEEPXIV_TOKEN` environment variable
+always takes precedence and is never overwritten. After `configure-token`,
+rerun `doctor` to confirm.
+
 ## Handle failures explicitly
 
 The adapter emits one JSON object to stdout. Successful commands return `"ok": true`.
@@ -364,7 +382,8 @@ fails because resource usage is authoritative. Read the error's `state_revision`
 call `view` before retrying. Never replay with a stale revision.
 
 Do not print, persist, or include `DEEPXIV_TOKEN` in JSON input, audit rationale, reports,
-examples, logs, or commits. The runtime reads it only from the environment.
+examples, logs, or commits. The runtime reads it from the environment, which the
+Harness bootstraps from the user-local credential file when the environment is unset.
 
 ## Finish visibly
 

@@ -87,6 +87,9 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
     reference_results = {
         name: (skill / "references" / name).is_file() for name in references
     }
+    from my_search_harness.runtime.credentials import resolve_deepxiv_token
+
+    token, token_source = resolve_deepxiv_token()
     checks: dict[str, object] = {
         "python": {
             "ok": sys.version_info >= (3, 11),
@@ -96,7 +99,10 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
         "deepxiv_sdk": {
             "importable": importlib.util.find_spec("deepxiv_sdk") is not None
         },
-        "deepxiv_token": {"present": bool(os.environ.get("DEEPXIV_TOKEN", "").strip())},
+        "deepxiv_token": {
+            "present": token is not None,
+            "source": token_source,
+        },
         "workspace": {
             "path": str(workspace),
             "writable": _workspace_writable(workspace),

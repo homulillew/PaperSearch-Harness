@@ -55,9 +55,10 @@ def main() -> int:
     )
 
     print(
-        "Standalone runtime ready. Set $env:DEEPXIV_TOKEN (PowerShell) or "
-        "export DEEPXIV_TOKEN (POSIX) in your shell, then run "
-        "python scripts/doctor.py --workspace PATH."
+        "Standalone runtime ready. Configure the DeepXiv credential once with:\n"
+        "    python scripts/harness.py configure-token\n"
+        "Then verify with: python scripts/doctor.py --workspace PATH\n"
+        "An explicit DEEPXIV_TOKEN environment variable still takes precedence."
     )
     return 0
 

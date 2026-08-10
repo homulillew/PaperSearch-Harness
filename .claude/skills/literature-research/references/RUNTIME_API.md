@@ -18,6 +18,20 @@ The adapter writes exactly one JSON object. Success goes to stdout with `"ok": t
 Errors go to stderr with `"ok": false`, an error type, and a safe message; exit status is
 nonzero and no traceback is printed. Credentials are never command arguments.
 
+`configure-token` is a workspace-independent configuration command. It does not take
+`--workspace`, `--run-id`, or `--expected-revision` because the DeepXiv credential is a
+user-level install setting, not part of any ResearchRun. It prompts for the token with
+`getpass` (no echo), stores it in the user's local configuration directory, and returns
+only a success flag and the credential file path — never the token itself:
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" configure-token
+```
+
+The Harness re-injects the stored credential into the process environment at bootstrap,
+so the DeepXiv providers read it from `DEEPXIV_TOKEN` as before. An explicit
+`DEEPXIV_TOKEN` environment variable always takes precedence and is never overwritten.
+
 Commands that accept semantic structures use `--input FILE`. The file must contain one
 JSON object with exactly the documented fields. This is typed command input, not JSON
 Patch or raw state replacement.
