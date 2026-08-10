@@ -1,0 +1,373 @@
+---
+name: literature-research
+description: Conduct deep, recoverable academic literature research with DeepXiv scholarly search, native Web frontier discovery, primary-source reading, explicit synthesis, independent completion checking, and cited report delivery.
+---
+
+# Literature Research
+
+Use this skill when the user asks for an academic literature review, technical-route
+survey, state-of-the-art analysis, research landscape, or evidence-backed technical
+report. Claude is the semantic Researcher; the Python Harness is the deterministic
+runtime for authority, persistence, stable references, provenance, accounting, and
+validation.
+
+Never edit `state.json`, event logs, report artifacts, or repository files directly.
+All authoritative mutations must go through the Python harness entrypoint; host Web
+observations remain ephemeral until promoted with `retain-papers`.
+
+## Harness entrypoint
+
+Invoke the harness through its single Python entrypoint. Resolve the installed
+Skill directory, then run `scripts/harness.py` with the available Python
+interpreter:
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" --workspace PATH COMMAND [OPTIONS]
+```
+
+`harness.py` resolves the bundled Runtime itself and, if a Skill-local `.venv`
+exists (created by `python scripts/setup.py`), switches to that interpreter
+automatically before executing the command. The caller never needs to know the
+venv interpreter path. `CLAUDE_SKILL_DIR` is an optional override of the Skill
+root; otherwise `harness.py` resolves it from its own location. On Windows
+PowerShell, Linux, and macOS the same command works; if the host exposes Python
+as `py` rather than `python`, use that interpreter. See `RUNTIME_API.md` for the
+command schemas.
+
+## Read the protocol before acting
+
+Read only the supporting material needed for the current stage:
+
+- [Research protocol](references/RESEARCH_PROTOCOL.md): contracts, adaptive search,
+  source reading, synthesis, recovery, and the outer loop.
+- [Runtime API](references/RUNTIME_API.md): commands, JSON input shapes, revision
+  handling, and error behavior.
+- [Completion guide](references/COMPLETION_GUIDE.md): the independent completion
+  boundary and PASS / CONTINUE / UNCERTAIN criteria.
+- [Report writing guide](references/REPORT_WRITING_GUIDE.md): the authoritative style
+  and editorial standard used by all semantic writing stages.
+- [Research integrity guide](references/RESEARCH_INTEGRITY_GUIDE.md): evidence-strength,
+  benchmark, comparison, causality, recency, and high-risk claim checks used by the
+  independent Research Integrity Reviewer.
+
+## Start from the request
+
+Treat `$ARGUMENTS` as the user's research request. If it is empty, ask for the topic,
+intended audience, scope, and desired deliverable. Otherwise infer a conservative
+initial Research Contract and state the important assumptions before creating it.
+
+Convert the request into:
+
+1. a precise mission;
+2. independently checkable requirements;
+3. an explicit in-scope / out-of-scope boundary;
+4. a deliverable description;
+5. required artifacts, normally `REPORT` for a written survey.
+
+Do not encode fixed paper counts as completion conditions. Workload expectations can
+guide exploration, but coverage, evidence quality, recency, contradiction handling,
+and requirement satisfaction determine completion.
+
+Run the environment check first:
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" --workspace workspace doctor
+```
+
+Create a run using a JSON file, not shell-escaped inline JSON:
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" --workspace workspace create-run \
+  --input /tmp/research-contract.json
+```
+
+Keep runtime data in the chosen workspace, never inside the skill directory.
+
+## Own the semantic outer loop
+
+The Harness does not prescribe a fixed research finite-state machine. Claude owns an
+adaptive outer loop:
+
+```text
+view current state
+→ identify the highest-value uncertainty or gap
+→ search, inspect, or read evidence for that uncertainty
+→ retain selected papers and synthesize durable research objects
+→ reassess coverage and contradictions against updated State
+→ repeat, request completion, or explain a blocker
+```
+
+Each turn of this loop is one research iteration: it starts from a specific uncertainty,
+acquires evidence for it, and updates State before the next turn. Do not run the loop as
+a pipeline where a discovery phase feeds a fixed analysis phase. Choose the next action
+from the reassessed State, not from the previous step's momentum.
+
+After every state-changing command, use the returned `state_revision` for the next
+command. On a revision conflict, discard the stale plan, call `view`, and reason again.
+
+## Keep discovery inside the research loop
+
+A search call is not a research iteration. For deep research, do not finish a broad
+discovery batch before beginning source reading and synthesis. After each meaningful
+evidence cluster: integrate durable State, reassess current uncertainty, and let that
+updated State choose the next search or read action. Discovery, Primary Source reading,
+synthesis, and reassessment should interleave throughout the run.
+
+The failure mode to avoid is staged batching: search a broad batch → retain all → batch
+analysis → one synthesis → request completion. That collapses the adaptive outer loop
+into a pipeline and lets volume substitute for judgment. A broad discovery sweep may
+contain multiple search calls inside one research iteration, but it must end by returning
+to State reassessment, not by proceeding to a fixed analysis stage.
+
+## Search through independent discovery channels
+
+Use DeepXiv through `search-papers` first. It remains the primary scholarly semantic
+search, pagination, source inspection, and targeted reading path. Begin broadly, learn
+canonical routes and terminology, then expand by mechanism and explicit date windows.
+
+Use Claude Code native `WebSearch` as an independent frontier counter-recall channel,
+not a second authoritative paper database. For explicit latest/current/recent/SOTA
+requests, always perform at least one Web frontier counter-search in addition to a
+DeepXiv recent sweep. Also use it when retained recency is suspiciously stale, recent
+terminology shifts, or a known paper is missing from DeepXiv results.
+
+```text
+foundation and route discovery → DeepXiv recent sweep → emerging-term expansion
+→ native WebSearch counter-search → WebFetch canonical scholarly page
+→ retain selected identity → Harness source verification → gap-driven follow-up
+```
+
+Keep this adaptive. Generate Web queries from actual methods, algorithms, rewards,
+benchmarks, mechanisms, authors, and emerging terms; use `site:arxiv.org` or
+`site:openreview.net` when useful. Prefer native `WebSearch` and `WebFetch`; never call
+search engines through Bash or custom APIs.
+
+```text
+python "<SKILL_DIR>/scripts/harness.py" --workspace workspace search-papers \
+  --run-id RUN --expected-revision REV --query "QUERY" \
+  --limit 20 --offset 0 --date-from YYYY-MM-DD --date-to YYYY-MM-DD
+```
+
+Search output includes provider-reported `total_count`, and hits include publication
+date as well as year when available. Use `total_count`, new unique identities, route
+novelty, and recent-paper novelty to decide whether to page; do not mechanically exhaust
+all results. A first page is discovery input, not proof of coverage, and local date
+sorting of retrieved candidates is not a global latest-paper search.
+
+DeepXiv hits, WebSearch results/snippets, and WebFetch pages are observations, not
+evidence. Use WebSearch to find scholarly URLs and `WebFetch` to verify canonical
+metadata. Follow blogs, labs, repositories, or news to an arXiv, OpenReview, DOI, or
+publisher paper page; never retain the lead or fabricate an unconfirmed field.
+
+Promote an important Web-discovered candidate with the existing `retain-papers` input,
+using only verified metadata. Then use `inspect-source` and `read-source` before formal
+analysis or claims; WebFetch does not bypass evidence access. If DeepXiv cannot inspect a
+retained Web-only paper, record a source coverage gap rather than inventing a fallback.
+
+## Inspect before reading
+
+For a retained paper, call `inspect-source` first to obtain provider-supported sections.
+Then call `read-source` with a targeted locator for methods, experiments, limitations,
+or another specific need. Read the full source only when the structure is unavailable
+or broad context is genuinely necessary.
+
+This is the Primary Evidence Gate: a `PaperAnalysis` with mechanism-level claims,
+empirical results, or detailed comparisons must rest on `inspect-source` /
+`read-source` evidence, not on the abstract or search metadata that selected the
+paper. A paper may be retained on abstract alone, but its detailed analysis may not
+be written from the abstract. If primary-source access fails, record a source coverage
+gap rather than manufacturing analysis from discovery metadata. `SourceContent` is
+ephemeral; convert the evidence that matters into a concise `PaperAnalysis` with
+useful `key_locators`, leaving them empty when no targeted locator applies.
+
+## Synthesize periodically
+
+Synthesis is part of each research iteration, not a final stage. After each meaningful
+cluster of reading, update the structured landscape before choosing the next action:
+
+- `PaperAnalysis` records what a retained paper contributes, shows, and fails to show.
+- `ApproachFamily` groups methods sharing a real mechanism, not merely vocabulary.
+- `Finding` records a supported cross-paper technical judgment.
+- `OpenProblem` records an unresolved field-level question supported by the landscape.
+- `InvestigationGap` records work still required for this run or contract.
+
+An Open Problem belongs to the researched domain. A Gap belongs to the current research
+process. Do not substitute one for the other.
+
+Use source relations (`SUPPORTS`, `CHALLENGES`, `QUALIFIES`) and locators to preserve
+evidence boundaries. Retire or update obsolete semantic objects through explicit
+commands instead of silently changing their meaning.
+
+For a deep technical-route survey, normally seek multiple query formulations, more
+than one representative method per major route where the literature permits it,
+seminal and frontier evidence, competing results, deployment conditions, and explicit
+unknowns. These are exploration heuristics, never mechanical completion thresholds.
+
+For an explicitly deep or comprehensive technical-route survey, a corpus of only a
+few investigated papers is normally insufficient unless the scope is genuinely narrow.
+Tens of deduplicated search candidates across multiple adaptive searches are a normal
+exploration scale for a broad field survey. Before requesting Completion from a much
+smaller corpus, the Researcher must be able to explain from the Contract and current
+landscape why the scope is narrow enough that additional search is unlikely to reveal
+a major route, representative method, disagreement, or recent frontier development.
+This is workload guidance, not a paper-count or Completion threshold.
+
+Before requesting Completion for a latest/recent task, answer from the retained corpus:
+the newest relevant paper date, the searched recent window, the frontier queries used,
+whether emerging terminology triggered follow-up searches, whether pagination added
+recent work, whether native Web counter-search found DeepXiv misses, and whether every
+important Web discovery was retained and source-verified. This is a Researcher self-check;
+the fresh Completion Checker judges only retained state and the structured landscape.
+
+## Resume from authoritative state
+
+When resuming, ignore conversational memory as authority. Recover from:
+
+1. `view` for the current lifecycle, contract, revision, gaps, and landscape;
+2. `inspect` for exact objects behind stable references;
+3. targeted source reads when evidence must be rechecked;
+4. `audit-history` for prior search queries, pagination, filters, and external attempts.
+
+Raw Web results are not recoverable state. Do not repeat searches blindly, but rerun a
+needed Web counter-search after resume when a frontier gap remains unresolved.
+
+## Request independent completion
+
+When the Research Contract appears satisfied, call `request-completion`. Completion is a
+feedback boundary, not a loop counter: a CONTINUE verdict names concrete blocking gaps
+that the Researcher resolves by returning to the loop, and a PASS authorizes Delivery.
+There is no forced number of research iterations before completion is allowed, and a
+CONTINUE does not reset a counter — it returns specific repair work to the loop.
+
+Then create a fresh checker context that has not participated in the research loop and
+follow [COMPLETION_GUIDE.md](references/COMPLETION_GUIDE.md).
+
+The fresh Completion Checker may only:
+
+- call `completion-view`;
+- call `completion-inspect` for exact retained objects;
+- call `completion-read-source` for targeted evidence verification;
+- submit PASS, CONTINUE, or UNCERTAIN.
+
+It must not search, retain papers, mutate research objects, or inherit the Researcher's
+private reasoning. It must not use WebSearch or broad Web discovery. CONTINUE must
+identify concrete blocking gaps; control then returns to Research. UNCERTAIN is used
+when available evidence cannot justify either PASS or a specific repair plan. PASS alone
+authorizes complete Delivery.
+
+## Deliver a report
+
+In DELIVERY, build the report from a fresh `delivery-view` and targeted inspections.
+Load the two authority documents separately:
+
+```text
+${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md
+${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md
+```
+
+Apply the complete Writing Guide to the Narrative Planner, Report Composer, Editorial
+Integrator, fresh Editor, and Reviser. It governs organization, prose, synthesis, and
+readability. Create the independent Research Integrity Reviewer in a fresh context with
+the complete Integrity Guide, Delivery state, manuscript, and targeted inspection/source
+access. The Integrity Guide is its primary rubric; it does not receive the Writing Guide
+as a style rubric and does not perform prose polish.
+
+The semantic stages are:
+
+```text
+Narrative Planner
+→ Report Composer
+→ Editorial Integrator
+→ Fresh Editor
+→ Reviser when needed
+→ Research Integrity Reviewer
+→ deterministic citation renderer
+→ publish-report
+→ validate-delivery
+→ close-run
+```
+
+If integrity review finds a Delivery-only writing or citation repair, revise in Delivery.
+If it finds an unsupported claim or missing research, call `reopen-research` and return
+to the research loop.
+
+The fresh Editor reviews the whole report semantically: sections must be driven by
+research questions or judgments rather than paper order; taxonomy must state its
+classification criterion; each paragraph should make one main judgment and start with
+a self-contained claim; giant paragraphs, abstract-noun chains, bureaucratic or
+translated prose should be repaired. Representative methods must serve synthesis,
+carry the required first-use hyperlink, and lead naturally from evidence to gaps. These
+are editorial judgments, not Python paragraph-length or style validators.
+
+The fresh Integrity Reviewer checks author claims versus independent evidence,
+single-paper evidence versus consensus, correlation versus causation, ablation versus
+causal mechanism, numerical gains versus statistical significance, SOTA and
+generalization scope, benchmark validity, robustness and efficiency dimensions,
+test-time compute/tool budgets, comparison fairness, recency and absolute claims,
+corpus-bounded absence, and citation-to-claim alignment. It returns the existing typed
+integrity result without a numeric score.
+
+Integrity may inspect Delivery state and retained objects, reread targeted sources, and
+review the manuscript. It must not search broadly, retain papers, mutate Research state,
+create Findings, or silently add evidence. Completion asks whether Research State
+satisfies the Contract; Integrity asks whether the report faithfully represents that
+accepted State. Keep these authority boundaries separate.
+
+When a retained primary paper has a canonical URL, hyperlink the first formal occurrence
+of its method or system name to that URL. This navigation link never replaces a structured
+citation. Keep citations close to the technical judgments they support.
+
+Paragraph rhythm, natural Chinese, terminology, title density, and appropriate table use
+are semantic editorial criteria. Do not ask the Harness to encode them as structural
+validators. Preserve experimental conditions and qualifications while improving prose.
+
+Use `render-report` to resolve structured citation tokens deterministically, then pass
+the rendered content to `publish-report`. Only close after `validate-delivery` succeeds.
+
+## Wiki orchestration after closure
+
+After a run closes COMPLETE, project accepted cross-run knowledge into the Wiki. The
+Wiki is a rebuildable, non-authoritative Markdown projection of CLOSED+COMPLETE runs,
+not a run artifact and not a second research runtime: it never enters the lifecycle, is
+not a required artifact, and its failure never breaks a closed run or invalidates the
+report. Only CLOSED+COMPLETE runs are eligible; partial runs are excluded.
+
+Call `wiki-projection` to read the current authoritative projection of eligible runs.
+The projection carries `source_runs` — the `(run_id, state_revision)` identity of every
+eligible run at projection time. Preserve it. Synthesize Wiki pages from that projection
+— pages that synthesize accepted approaches, findings, and open problems across runs,
+each carrying contributing refs to real research entities. Perform the semantic review
+of those pages yourself, against the same projection; this is a Claude-side semantic act,
+not a harness command field.
+
+Then call `publish-wiki` with `source_runs` (preserved from the projection) and the
+reviewed `pages`. Python validates structure and provenance deterministically and
+publishes a versioned local build, recording `source_runs` verbatim in the manifest as
+honest build provenance. A published Wiki may become stale if a newer run closes COMPLETE
+afterwards; that is allowed — the manifest honestly records which run revisions produced
+it. Detect staleness with `is_current()` (or by re-projecting and comparing) and rebuild
+when desired. There is no publish-time exact-current rejection: a stale `source_runs` is
+published, not refused.
+
+Invalid structure or provenance raises `WikiBuildError` before publication, preserving
+any previous Wiki. A rejected semantic review is your decision — do not call `publish-wiki`
+until the review passes. Either way the run remains CLOSED COMPLETE and the report remains
+valid. See `RUNTIME_API.md` for the input shape.
+
+## Handle failures explicitly
+
+The adapter emits one JSON object to stdout. Successful commands return `"ok": true`.
+Failures return nonzero and machine-readable JSON on stderr without a stack trace.
+
+External search and source attempts may advance the revision even when the provider
+fails because resource usage is authoritative. Read the error's `state_revision` or
+call `view` before retrying. Never replay with a stale revision.
+
+Do not print, persist, or include `DEEPXIV_TOKEN` in JSON input, audit rationale, reports,
+examples, logs, or commits. The runtime reads it only from the environment.
+
+## Finish visibly
+
+At handoff, report the run ID, final lifecycle, delivered artifact path, major coverage,
+known limitations, and whether completion was PASS, CONTINUE, or UNCERTAIN. If blocked,
+name the exact missing environment capability or unresolved research gap.
