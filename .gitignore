@@ -55,9 +55,9 @@ Thumbs.db
 desktop.ini
 
 # --- Project runtime artifacts (keep code, ignore generated output) ---
-workspace/output/
-workspace/cache/
-workspace/*.log
+# Research runs produce workspace data (search results, paper analyses, run
+# state, logs). This is user/project data, not source — never commit it.
+workspace/
 *.log
 
 # --- Secrets / local env ---
