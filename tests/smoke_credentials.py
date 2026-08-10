@@ -1,20 +1,21 @@
 """Real local smoke test for the DeepXiv credential flow.
 
-Drives the actual code paths (configure-token, then doctor) with a FAKE token
-and a temporary user-config directory, so the developer's real credential is
-never touched. Uses the Skill venv interpreter so the deepxiv_sdk import check
-passes and `healthy` can be true.
+Drives the actual code paths (configure-token, then doctor, then external
+runtime token loading) with a FAKE token and a temporary home directory, so
+the developer's real credential is never touched. Uses the Skill venv
+interpreter so the deepxiv_sdk import check passes and `healthy` can be true.
 
 `configure-token` is driven in-process (importing harness.main and patching
 `getpass.getpass`) because on Windows `getpass` reads from the console, not
-from a piped stdin. `doctor` is driven as a real subprocess since it does not
-read secrets.
+from a piped stdin. `doctor` and the bootstrap-injection check are driven as
+real subprocesses.
 
 Run:
 
-    ./.venv/Scripts/python.exe tests/smoke_credentials.py
+    ./.venv/Scripts/python.exe tests/smoke_credentials.py   (Windows)
+    ./.venv/bin/python tests/smoke_credentials.py           (POSIX)
 
-Exits 0 on success, nonzero on failure. Cleans up the temp config dir.
+Exits 0 on success, nonzero on failure. Cleans up the temp home dir.
 """
 
 from __future__ import annotations
@@ -30,7 +31,9 @@ import tempfile
 from pathlib import Path
 from unittest import mock
 
-SKILL_DIR = Path(__file__).resolve().parents[1]
+SKILL_DIR = (
+    Path(__file__).resolve().parents[1] / ".claude" / "skills" / "literature-research"
+)
 HARNESS = SKILL_DIR / "scripts" / "harness.py"
 DOCTOR = SKILL_DIR / "scripts" / "doctor.py"
 RUNTIME_SRC = SKILL_DIR / "runtime" / "src"
@@ -51,6 +54,17 @@ def _load_harness():
     return module
 
 
+def _home_env(home: Path) -> dict[str, str]:
+    """Build a subprocess env that isolates Path.home() and clears the token."""
+
+    env = os.environ.copy()
+    env.pop("DEEPXIV_TOKEN", None)
+    env["USERPROFILE"] = str(home)
+    env["HOME"] = str(home)
+    env["CLAUDE_SKILL_DIR"] = str(SKILL_DIR)
+    return env
+
+
 def main() -> int:
     if not VENV_PY.is_file():
         print(f"venv python not found at {VENV_PY}; run scripts/setup.py first", file=sys.stderr)
@@ -58,18 +72,15 @@ def main() -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="lr-smoke-"))
     try:
-        config_root = tmp / "config"
-        config_root.mkdir()
+        home = tmp / "home"
+        home.mkdir()
         workspace = tmp / "ws"
         workspace.mkdir()
 
         # --- In-process: configure-token with a fake token via getpass mock.
-        # We isolate the credential file by setting LOCALAPPDATA / XDG_CONFIG_HOME
-        # in THIS process before importing/calling harness.
-        os.environ["LOCALAPPDATA"] = str(config_root)
-        os.environ["XDG_CONFIG_HOME"] = str(config_root)
-        os.environ["HOME"] = str(tmp / "home")
-        (tmp / "home").mkdir(exist_ok=True)
+        # Isolate Path.home() in THIS process before importing/calling harness.
+        os.environ["USERPROFILE"] = str(home)
+        os.environ["HOME"] = str(home)
         os.environ.pop("DEEPXIV_TOKEN", None)
         os.environ["CLAUDE_SKILL_DIR"] = str(SKILL_DIR)
 
@@ -91,11 +102,11 @@ def main() -> int:
         assert FAKE_TOKEN not in err_buf.getvalue(), "token leaked to stderr!"
         cred_path = Path(payload["result"]["path"])
         assert cred_path.is_file(), "credential file not written"
+        assert cred_path == home / ".literature-research" / "deepxiv-token", cred_path
         print(f"   credential file: {cred_path}")
 
         # --- Subprocess: doctor with the stored credential alone.
-        env = os.environ.copy()
-        env.pop("DEEPXIV_TOKEN", None)  # prove stored credential alone suffices
+        env = _home_env(home)
         print(">> doctor (subprocess, stored credential only)")
         proc = subprocess.run(
             [str(VENV_PY), str(DOCTOR), "--workspace", str(workspace)],
@@ -111,26 +122,42 @@ def main() -> int:
         result = json.loads(proc.stdout)
         checks = result["checks"]
         assert checks["deepxiv_token"]["present"] is True, checks["deepxiv_token"]
-        assert checks["deepxiv_token"]["source"] == "user_credentials", checks["deepxiv_token"]
+        assert "source" not in checks["deepxiv_token"], checks["deepxiv_token"]
         assert result["healthy"] is True, result
         assert FAKE_TOKEN not in proc.stdout, "token leaked to doctor stdout!"
         assert FAKE_TOKEN not in proc.stderr, "token leaked to doctor stderr!"
-        print("   deepxiv_token.present = True, source = user_credentials")
+        print("   deepxiv_token.present = True")
         print("   healthy = True")
 
-        # --- Subprocess: doctor with an env override (env must win, file untouched).
-        print(">> doctor (subprocess, DEEPXIV_TOKEN env override)")
-        env["DEEPXIV_TOKEN"] = "env-override-token"
+        # --- Subprocess: external runtime token loading.
+        # The harness bootstrap must inject the stored token into
+        # os.environ["DEEPXIV_TOKEN"] for the process when the env is unset,
+        # so LocalV1Runtime.from_deepxiv_env() can build the DeepXiv providers.
+        # We do NOT call the real DeepXiv API; we only confirm the bootstrap
+        # makes the token visible to the process before any provider is built.
+        print(">> external runtime token loading (subprocess, stored credential only)")
+        probe = (
+            "import os, sys; "
+            f"sys.path.insert(0, {str(RUNTIME_SRC)!r}); "
+            "import importlib.util; "
+            f"spec = importlib.util.spec_from_file_location('h', {str(HARNESS)!r}); "
+            "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); "
+            "print('DEEPXIV_TOKEN_SET=' + ('yes' if os.environ.get('DEEPXIV_TOKEN') else 'no'))"
+        )
         proc = subprocess.run(
-            [str(VENV_PY), str(DOCTOR), "--workspace", str(workspace)],
+            [str(VENV_PY), "-c", probe],
             capture_output=True,
             text=True,
             env=env,
         )
-        result = json.loads(proc.stdout)
-        assert result["checks"]["deepxiv_token"]["source"] == "environment", result
-        assert cred_path.read_text(encoding="utf-8") == FAKE_TOKEN, "stored file mutated"
-        print("   source = environment (env wins, stored file untouched)")
+        print("stdout:", proc.stdout.strip())
+        print("stderr:", proc.stderr.strip())
+        if proc.returncode != 0:
+            print(f"bootstrap probe failed (exit {proc.returncode})", file=sys.stderr)
+            return 1
+        assert "DEEPXIV_TOKEN_SET=yes" in proc.stdout, proc.stdout
+        assert FAKE_TOKEN not in proc.stdout, "token leaked by bootstrap probe!"
+        print("   DEEPXIV_TOKEN visible to process from stored file")
 
         print("\nSMOKE OK")
         return 0

@@ -29,11 +29,11 @@ comparison validity, and benchmark interpretation.
    python scripts/harness.py configure-token
    ```
 
-   The Harness stores the credential in your user-local configuration directory
-   and re-injects it into the process environment at bootstrap. This is a
-   convenience for persistent local configuration, not a requirement: an
-   explicit `DEEPXIV_TOKEN` environment variable still works and takes
-   precedence. Never put the token in a `.env` file, a JSON input file, the
+   The Harness stores the credential at `~/.literature-research/deepxiv-token`
+   and reads it back when `DEEPXIV_TOKEN` is not already in the process
+   environment. This is a convenience for persistent local configuration, not a
+   requirement: an explicit `DEEPXIV_TOKEN` environment variable still works and
+   takes precedence. Never put the token in a `.env` file, a JSON input file, the
    Skill directory, the workspace, or any script.
 
 4. Verify the installation:

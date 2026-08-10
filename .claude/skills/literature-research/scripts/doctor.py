@@ -89,7 +89,7 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
     }
     from my_search_harness.runtime.credentials import resolve_deepxiv_token
 
-    token, token_source = resolve_deepxiv_token()
+    token = resolve_deepxiv_token()
     checks: dict[str, object] = {
         "python": {
             "ok": sys.version_info >= (3, 11),
@@ -101,7 +101,6 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
         },
         "deepxiv_token": {
             "present": token is not None,
-            "source": token_source,
         },
         "workspace": {
             "path": str(workspace),

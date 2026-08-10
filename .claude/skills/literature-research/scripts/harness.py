@@ -79,8 +79,8 @@ from my_search_harness.runtime.credentials import (  # noqa: E402
     resolve_deepxiv_token,
 )
 
-_token, _token_source = resolve_deepxiv_token()
-if _token is not None and _token_source == "user_credentials":
+_token = resolve_deepxiv_token()
+if _token is not None and not os.environ.get("DEEPXIV_TOKEN", "").strip():
     os.environ["DEEPXIV_TOKEN"] = _token
 
 from my_search_harness.domain import (  # noqa: E402
@@ -949,7 +949,7 @@ def _configure_token() -> dict[str, object]:
     return {
         "saved": True,
         "path": str(path),
-        "message": "DeepXiv credential saved to user configuration.",
+        "message": "DeepXiv credential saved.",
     }
 
 

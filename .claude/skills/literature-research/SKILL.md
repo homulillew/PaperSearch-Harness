@@ -357,17 +357,22 @@ valid. See `RUNTIME_API.md` for the input shape.
 ## DeepXiv credential setup
 
 The DeepXiv credential is a user-level install setting, not part of any
-ResearchRun. If `doctor` reports that the DeepXiv credential is missing, do not
-attempt to persist it through shell profiles, registry changes, `.env` files,
-workspace files, or Skill files. Ask the user to run the interactive
-`configure-token` command once:
+ResearchRun. If `doctor` reports that the DeepXiv credential is missing, ask
+the user to run:
 
 ```text
 python "<SKILL_DIR>/scripts/harness.py" configure-token
 ```
 
-The Harness stores the credential in the user's local configuration directory
-and re-injects it into the process environment at bootstrap, so the DeepXiv
+The command stores the token at:
+
+```text
+~/.literature-research/deepxiv-token
+```
+
+Do not ask the user to modify shell profiles, registry settings, `.env` files,
+workspace files, or Skill files. The Harness reads that file back when
+`DEEPXIV_TOKEN` is not already in the process environment, so the DeepXiv
 providers need no changes. An explicit `DEEPXIV_TOKEN` environment variable
 always takes precedence and is never overwritten. After `configure-token`,
 rerun `doctor` to confirm.
