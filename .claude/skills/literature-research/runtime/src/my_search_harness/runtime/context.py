@@ -112,6 +112,7 @@ class PaperIndexEntry:
     arxiv_id: str | None
     canonical_url: str | None
     research_status: PaperResearchStatus
+    retirement_reason: str | None
     has_analysis: bool
 
 
@@ -196,6 +197,7 @@ class CompletionView:
     findings: tuple[FindingContext, ...]
     open_problems: tuple[OpenProblemContext, ...]
     open_gaps: tuple[GapContext, ...]
+    papers: tuple[PaperIndexEntry, ...]
     representative_paper_refs: tuple[str, ...]
     evidence_diagnostics: tuple[RepresentativePaperEvidence, ...]
     completion_check_ref: str
@@ -414,6 +416,14 @@ class ContextProjectionService:
             for ref in sorted(run.investigation_gaps)
             if run.investigation_gaps[ref].resolution is None
         )
+        # The fresh Checker sees every retained Paper, not only representative
+        # ones — otherwise retained-but-unanalyzed candidates can silently
+        # disappear from Completion judgment (the bad_case). Detailed
+        # PaperAnalysis stays behind completion-inspect; here we expose only
+        # the per-paper closure summary: status, has_analysis, retirement_reason.
+        papers = tuple(
+            self._paper_context(run.papers[ref]) for ref in sorted(run.papers)
+        )
         pending = tuple(
             check for check in run.completion_checks.values() if check.verdict is None
         )
@@ -440,6 +450,7 @@ class ContextProjectionService:
             + len(findings)
             + len(problems)
             + len(gaps)
+            + len(papers)
             + len(representative_refs)
             + len(evidence_diagnostics)
             + len(self._current_contract(run).requirements),
@@ -453,6 +464,7 @@ class ContextProjectionService:
             findings=findings,
             open_problems=problems,
             open_gaps=gaps,
+            papers=papers,
             representative_paper_refs=representative_refs,
             evidence_diagnostics=evidence_diagnostics,
             completion_check_ref=pending[0].id,
@@ -602,6 +614,7 @@ class ContextProjectionService:
             arxiv_id=paper.source.arxiv_id,
             canonical_url=paper.source.canonical_url,
             research_status=paper.research_status,
+            retirement_reason=paper.retirement_reason,
             has_analysis=paper.analysis is not None,
         )
 

@@ -333,9 +333,15 @@ class ResearcherCapabilities:
         expected_revision: int,
         paper_ref: str,
         status: PaperResearchStatus,
+        *,
+        retirement_reason: str | None = None,
     ) -> DomainMutationResult:
         return self._commands.set_paper_research_status(
-            run_id, expected_revision, paper_ref, status
+            run_id,
+            expected_revision,
+            paper_ref,
+            status,
+            retirement_reason=retirement_reason,
         )
 
     def request_completion_check(

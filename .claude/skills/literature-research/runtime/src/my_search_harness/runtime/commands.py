@@ -511,6 +511,21 @@ class ResearchCommands:
             raise CommandRejectedError(
                 f"approach family has dangling paper refs: {sorted(missing)!r}"
             )
+        # Landscape evidence must rest on ACTIVE, analyzed papers: a representative
+        # chosen only by search metadata would let discovery substitute for
+        # primary-source understanding (the failure mode exposed by bad_case).
+        ineligible = {
+            ref
+            for ref in representative_paper_refs
+            if current.papers[ref].research_status
+            is not PaperResearchStatus.ACTIVE
+            or current.papers[ref].analysis is None
+        }
+        if ineligible:
+            raise CommandRejectedError(
+                f"representative papers must be ACTIVE and have a PaperAnalysis; "
+                f"ineligible: {sorted(ineligible)!r}"
+            )
 
         proposed = deepcopy(current)
         if approach_ref is None:
@@ -719,17 +734,44 @@ class ResearchCommands:
         expected_revision: int,
         paper_ref: str,
         status: PaperResearchStatus,
+        *,
+        retirement_reason: str | None = None,
     ) -> DomainMutationResult:
         current = self._load_research(
             run_id, expected_revision, "set_paper_research_status"
         )
         if not isinstance(status, PaperResearchStatus):
             raise CommandRejectedError("status must be a PaperResearchStatus")
+        # A RETIRED paper carries a durable, semantic retirement_reason so a fresh
+        # Completion Checker and a resumed session can see candidate closure. An
+        # ACTIVE paper holds no retirement_reason (persist decisions, not
+        # trajectories: the audit log already records the history).
+        if status is PaperResearchStatus.RETIRED:
+            if not isinstance(retirement_reason, str) or not retirement_reason.strip():
+                raise CommandRejectedError(
+                    "retiring a paper to RETIRED requires a non-empty "
+                    "retirement_reason"
+                )
+        else:
+            retirement_reason = None
+        # A paper still cited by the current Landscape cannot be retired: the
+        # Researcher must first update or retire the referencing ApproachFamily /
+        # Finding / OpenProblem. Auto-removing those references would be a
+        # semantic decision the Harness must not make.
+        if status is PaperResearchStatus.RETIRED:
+            referencing = self._paper_referenced_by(current, paper_ref)
+            if referencing:
+                raise CommandRejectedError(
+                    f"paper {paper_ref!r} is still referenced by semantic "
+                    f"objects {list(referencing)}; update or retire those "
+                    f"before retiring the paper"
+                )
         proposed = deepcopy(current)
         paper = proposed.papers.get(paper_ref)
         if paper is None:
             raise CommandRejectedError(f"paper {paper_ref!r} does not exist")
         paper.research_status = status
+        paper.retirement_reason = retirement_reason
         self._reject_no_change(current, proposed, "paper status mutation")
         return DomainMutationResult(
             state_revision=self._commit(
@@ -737,6 +779,7 @@ class ResearchCommands:
                 proposed,
                 expected_revision,
                 action="paper_status_changed",
+                reason=retirement_reason,
                 details={"paper_ref": paper_ref, "status": status.value},
             )
         )
@@ -786,6 +829,24 @@ class ResearchCommands:
         )
         if not isinstance(requester_rationale, str):
             raise CommandRejectedError("requester_rationale must be a string")
+        # Completion hard gate: an ACTIVE paper without a PaperAnalysis is
+        # unresolved research work. Research State still claims it belongs to
+        # the current corpus, yet no paper-level understanding has been formed.
+        # Requesting Completion in that state is a structural contradiction —
+        # a material candidate could silently disappear, exactly the bad_case.
+        # This is deterministic state consistency, not a paper count or score.
+        unanalyzed_active = [
+            ref
+            for ref, paper in current.papers.items()
+            if paper.research_status is PaperResearchStatus.ACTIVE
+            and paper.analysis is None
+        ]
+        if unanalyzed_active:
+            raise CommandRejectedError(
+                f"cannot request completion: {len(unanalyzed_active)} ACTIVE "
+                f"paper(s) have no PaperAnalysis: {sorted(unanalyzed_active)!r}; "
+                f"analyze or retire them first"
+            )
 
         proposed = deepcopy(current)
         resulting_revision = current.state_revision + 1
@@ -1074,6 +1135,21 @@ class ResearchCommands:
             raise CommandRejectedError(
                 f"landscape item has dangling paper refs: {sorted(missing_papers)!r}"
             )
+        # A Finding / OpenProblem source must point at an ACTIVE, analyzed paper.
+        # Retired papers are closed candidates, not current evidence; unanalyzed
+        # papers would let search metadata ground a landscape claim.
+        ineligible_sources = {
+            source.paper_ref
+            for source in sources
+            if run.papers[source.paper_ref].research_status
+            is not PaperResearchStatus.ACTIVE
+            or run.papers[source.paper_ref].analysis is None
+        }
+        if ineligible_sources:
+            raise CommandRejectedError(
+                f"landscape item sources must point at ACTIVE papers with a "
+                f"PaperAnalysis; ineligible: {sorted(ineligible_sources)!r}"
+            )
 
     @classmethod
     def _validate_gap_metadata(
@@ -1130,6 +1206,28 @@ class ResearchCommands:
             finding.sources = rewrite_sources(finding.sources)
         for problem in run.literature_landscape.open_problems.values():
             problem.sources = rewrite_sources(problem.sources)
+
+    @staticmethod
+    def _paper_referenced_by(run: ResearchRun, paper_ref: str) -> tuple[str, ...]:
+        """Stable refs of semantic objects that still cite this paper.
+
+        A paper still used by the current Landscape (as an ApproachFamily
+        representative, or as a Finding / OpenProblem source) cannot be
+        retired until the Researcher updates or retires those objects first.
+        Rewriting those references is a semantic decision, so the Harness
+        rejects rather than auto-removes them.
+        """
+        refs: list[str] = []
+        for approach in run.literature_landscape.approach_families.values():
+            if paper_ref in approach.representative_papers:
+                refs.append(approach.id)
+        for finding in run.literature_landscape.findings.values():
+            if any(source.paper_ref == paper_ref for source in finding.sources):
+                refs.append(finding.id)
+        for problem in run.literature_landscape.open_problems.values():
+            if any(source.paper_ref == paper_ref for source in problem.sources):
+                refs.append(problem.id)
+        return tuple(sorted(refs))
 
     def _commit(
         self,

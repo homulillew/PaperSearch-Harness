@@ -489,6 +489,10 @@ def _parser() -> argparse.ArgumentParser:
     _add_run_revision(status)
     status.add_argument("--paper-ref", required=True)
     status.add_argument("--status", required=True, choices=["ACTIVE", "RETIRED"])
+    status.add_argument(
+        "--reason",
+        help="retirement_reason; required when --status RETIRED",
+    )
 
     request = commands.add_parser("request-completion")
     _add_run_revision(request)
@@ -696,6 +700,7 @@ def _research_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
             args.expected_revision,
             args.paper_ref,
             PaperResearchStatus(args.status),
+            retirement_reason=args.reason,
         )
     if command == "request-completion":
         return researcher.request_completion_check(
