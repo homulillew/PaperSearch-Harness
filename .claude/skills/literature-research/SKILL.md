@@ -97,10 +97,10 @@ clean and a run can be recovered from authoritative state alone.
 
 ```text
 <workspace>/
-├── runs/<run_id>/
-│   ├── state.json          # authoritative — Harness-owned, never hand-edited
-│   ├── events.jsonl        # authoritative — Harness-owned
-│   └── artifacts/          # authoritative — Harness-owned (report, etc.)
+├── runs/<run_id>/                 # Runtime-owned persisted run data
+│   ├── state.json          # authoritative Research State — never hand-edited
+│   ├── events.jsonl        # Runtime-owned audit history
+│   └── artifacts/          # Runtime-owned delivery artifacts (report, etc.)
 └── scratch/
     ├── research-contract.json      # pre-run: the create-run input
     └── <run_id>/

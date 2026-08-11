@@ -324,7 +324,9 @@ def test_package_skill_excludes_workspace_and_scratch(tmp_path):
 
     # Verify the exclude sets contain the runtime-data dirs.
     assert "workspace" in pkg.EXCLUDE_DIRS
-    assert "scratch" not in pkg.EXCLUDE_DIRS or True  # scratch lives under workspace
+    # scratch/ is not listed separately because it lives under workspace/, which
+    # is already excluded — so packaging it would require it to escape workspace/.
+    assert "scratch" not in pkg.EXCLUDE_DIRS
     assert ".venv" in pkg.EXCLUDE_DIRS
     assert "__pycache__" in pkg.EXCLUDE_DIRS
 
