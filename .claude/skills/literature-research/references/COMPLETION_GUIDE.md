@@ -47,9 +47,29 @@ following:
    for the Contract's stated time-sensitive scope.
 10. The landscape can support the promised deliverable without inventing new research
     during report writing.
+11. Candidate closure holds across the whole retained corpus. `completion-view` exposes
+    every retained paper — not only representative ones — as a per-paper closure summary
+    (`research_status`, `has_analysis`, `retirement_reason`). Judge the corpus, not just
+    the read subset: every ACTIVE paper must have a `PaperAnalysis`, and every RETIRED
+    paper must carry a `retirement_reason` defensible against the current Contract and
+    landscape. The hard gate at `request-completion` already blocks the obvious failure
+    (an ACTIVE paper with no analysis), so a paper reaching the checker as ACTIVE has
+    been analyzed; the checker's job is the semantic judgment the gate cannot make —
+    whether the analyzed set actually supports the landscape, and whether each retired
+    paper's reason is honest (superseded, out of scope, duplicate, primary-source access
+    failed with the gap recorded) rather than a rationalization for skipping work that
+    mattered. For a retired paper whose loss could plausibly change a contract-facing
+    judgment — a frontier/mechanism-novel candidate, a contradictory result, a
+    representative of a route not otherwise covered — use `completion-inspect` /
+    `completion-read-source` to spot-check that the retirement reason survives the
+    evidence. This is risk-based, not exhaustive: a defensible retirement in a
+    well-covered region needs no spot-check; a retirement that would change the
+    landscape if wrong does.
 
 Do not demand a fixed number of papers. A mature narrow topic may need fewer sources than
 a broad fragmented field. Conversely, a large hit count does not establish coverage.
+Candidate closure is about whether each retained paper is closed honestly, not whether
+enough papers were retained.
 
 An empty `key_locators` tuple or a null `LiteratureSource.locator` is not by itself a
 failure. Locators are required where one meaningfully exists for the cited claim; their
@@ -79,6 +99,13 @@ its abstract or search metadata rather than inspected primary source. The last c
 a P0 signal: name the paper and the missing primary-source grounding in the blocking
 gap. A representative paper that has not been analyzed beyond its abstract is also a
 blocking case when the contract requires mechanism-level understanding.
+
+A retired paper whose `retirement_reason` does not survive the evidence is also a
+CONTINUE case — name the paper and why the retirement is indefensible (e.g., it
+represents a route not otherwise covered, or its loss would change a contract-facing
+judgment). The hard gate at `request-completion` already blocks ACTIVE+unanalyzed
+papers, so this case concerns a RETIRED paper whose reason is a rationalization for
+skipping material work, not a structurally unresolved one.
 
 ### UNCERTAIN
 

@@ -138,13 +138,17 @@ meaning with the following commands; do not write raw source text into `scratch/
 ```
 
 `put-approach-family --input FILE` accepts `name`, `core_idea`,
-`representative_paper_refs`, and optional `approach_ref` for update.
+`representative_paper_refs`, and optional `approach_ref` for update. Each representative
+paper must be `ACTIVE` and have a `PaperAnalysis`; a RETIRED or unanalyzed paper is
+rejected, so landscape evidence rests on primary-source understanding rather than search
+metadata.
 
 `merge-approach-family` uses `--target-approach-ref` and `--source-approach-ref`.
 
 `put-finding --input FILE` and `put-open-problem --input FILE` accept `statement`,
 optional `approach_refs`, optional `sources`, and optional existing `finding_ref` or
-`problem_ref`. A source object is:
+`problem_ref`. Each `source.paper_ref` must be `ACTIVE` and have a `PaperAnalysis`; a
+RETIRED or unanalyzed source paper is rejected. A source object is:
 
 ```json
 {
@@ -161,8 +165,14 @@ their targets.
 `approach_refs`, and optional `gap_ref`. `resolve-gap` uses `--gap-ref` and
 `--resolution`; `reopen-gap` uses `--gap-ref`.
 
-`set-paper-status --paper-ref REF --status ACTIVE|RETIRED` changes explicit research
-status.
+`set-paper-status --paper-ref REF --status ACTIVE|RETIRED [--reason TEXT]` changes
+explicit research status. `--status RETIRED` requires a non-empty `--reason`, which is
+persisted as the paper's durable `retirement_reason` (why this run no longer investigates
+or cites it) so a fresh Completion Checker and a resumed session can see candidate
+closure. `--status ACTIVE` clears any prior `retirement_reason`. A paper still cited by
+the landscape — as an ApproachFamily representative or a Finding / OpenProblem source —
+cannot be retired until the referencing object is updated or retired first; the call is
+rejected listing the referencing refs.
 
 All research mutations also require `--run-id` and `--expected-revision`.
 
@@ -176,6 +186,17 @@ completion-read-source --run-id RUN --expected-revision REV --paper-ref PAPER
                        [--locator-kind KIND --locator-value VALUE]
 submit-completion --run-id RUN --expected-revision REV --input FILE
 ```
+
+`request-completion` is rejected if any retained paper is `ACTIVE` without a
+`PaperAnalysis` — the Reading Frontier must be closed first (analyze or retire each
+unresolved candidate). This is a hard gate on corpus closure, not a paper count or
+sufficiency score. The rejection lists the unresolved paper refs.
+
+`completion-view` exposes the contract-facing projection: approach families, findings,
+open problems, open gaps, and a `papers` tuple carrying every retained paper's closure
+summary — `research_status`, `has_analysis`, and `retirement_reason` — not only the
+representative papers. Detailed `PaperAnalysis` stays behind `completion-inspect`; the
+per-paper summary lets the fresh checker judge candidate closure across the whole corpus.
 
 Submission input contains `completion_check_ref`, `verdict`, `reasons`, and optional
 `blocking_gaps`. A new blocking gap contains `description`, `requirement_refs`, and

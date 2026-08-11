@@ -55,6 +55,22 @@ pipeline and lets search volume substitute for judgment. To keep the loop real:
 This is a semantic policy, not a Runtime mechanism. The Harness does not detect loops,
 count iterations, or gate completion on a fixed loop count.
 
+### Candidate Promotion Gate
+
+Retention promotes a search observation into durable State, and it is a semantic
+decision, not a batch dump. Between discovery and `retain-papers`, retain only
+candidates whose loss could plausibly change a contract-facing judgment — a major
+route, a representative method, a competing result, a deployment condition, a recent
+frontier development, or a direct challenge to a current Finding. A paper that merely
+confirms what retained evidence already establishes, or that sits in a crowded region
+of an already-covered route, may stay a search observation.
+
+This is a semantic policy, not a Python score. The Harness has no `CandidateScore`, no
+fixed retention ratio, and no coverage metric. The gate exists so every retained paper
+is one the Researcher is prepared to either deep-read or explicitly retire — never one
+left unresolved because it was retained on momentum. Retention is a commitment to close
+the paper (see Deep Reading Control Loop).
+
 ## Discovery and frontier coverage
 
 Use broad discovery to learn field vocabulary, seminal work, surveys, major mechanism
@@ -184,6 +200,47 @@ metadata, the correct action is to inspect and read the source before writing th
 analysis — or to narrow the analysis to what the abstract can honestly support and
 record the missing depth as an Investigation Gap.
 
+### Deep Reading Control Loop
+
+The Primary Evidence Gate governs how a paper is analyzed; the Deep Reading Control
+Loop governs that every retained paper is eventually closed. A retained paper has
+four states:
+
+```text
+SearchHit (ephemeral observation)
+  → ACTIVE + analysis=None   (durable unresolved candidate)
+  → ACTIVE + analysis         (integrated: PaperAnalysis written)
+  → RETIRED + retirement_reason   (explicitly closed: why this run no longer uses it)
+```
+
+From State N, the loop selects the retained paper whose primary source would most
+reduce the current landscape uncertainty, inspects and reads it against that specific
+need, writes the `PaperAnalysis`, and lets the updated Landscape change what the next
+uncertainty is. Reassess from State N+1; the next read or search is chosen from the
+reassessed landscape, not from the momentum of a discovery batch.
+
+The unresolved candidates — `ACTIVE + analysis is None` — are the **Reading Frontier**.
+It is a derived view of current State, not a persisted queue: the Harness has no
+`ReadingTask`, `ReadingPlan`, `ReadingRound`, or reading subsystem. At any moment the
+Frontier is "every retained paper that is neither integrated nor retired." A material
+candidate on the Frontier cannot silently disappear: it must end `ACTIVE+analyzed` or
+`RETIRED+reason`.
+
+Retiring a paper is a research act. `set-paper-status --status RETIRED --reason TEXT`
+records a durable `retirement_reason` — why this run no longer investigates or cites it
+(superseded by a stronger representative, out of scope on second reading, duplicate of a
+retained primary, primary-source access failed and the gap was recorded, etc.). The
+reason is visible to a fresh Completion Checker and a resumed session, so candidate
+closure is explainable rather than an unexplained gap. A paper still cited by the
+Landscape (as an ApproachFamily representative or a Finding / OpenProblem source) cannot
+be retired until the referencing object is updated or retired first — removing those
+references is a semantic decision the Harness will not make automatically.
+
+Close the Frontier before requesting Completion. The Harness rejects
+`request-completion` while any ACTIVE paper lacks a `PaperAnalysis`; analyze or retire
+each unresolved candidate first. This is deterministic state consistency, not a paper
+count or sufficiency score.
+
 ## Evidence acquisition
 
 Inspect a retained source before reading it. Select method, experiment, results,
@@ -216,6 +273,15 @@ Investigation Gaps describe research work still blocking this run.
 Use `SUPPORTS`, `CHALLENGES`, and `QUALIFIES` deliberately. A source that demonstrates a
 result in a narrow setting may qualify a broad claim rather than support it outright.
 
+Landscape evidence must rest on integrated papers. An ApproachFamily representative and
+a Finding / OpenProblem `source.paper_ref` must point at a paper that is `ACTIVE` and
+has a `PaperAnalysis`; `put-approach-family`, `put-finding`, and `put-open-problem`
+reject a RETIRED or unanalyzed paper at that site. This keeps landscape claims grounded
+in primary-source understanding rather than search metadata. Conversely, a paper still
+cited by the landscape cannot be retired — update or retire the referencing object
+first, since removing those references is a semantic decision the Harness will not make
+automatically.
+
 Synthesize throughout the run, inside each research iteration. Waiting until the end
 creates an unrecoverable pile of ephemeral observations and encourages report-first
 reasoning. Synthesis is what turns a search loop into a research loop.
@@ -244,8 +310,19 @@ from `runs/<run_id>/` alone.
 ## Completion and delivery
 
 The Researcher requests completion only after it can point to structured evidence for
-each contract requirement and explain known limits. A fresh checker then follows
-`COMPLETION_GUIDE.md`; it cannot search or mutate research state.
+each contract requirement and explain known limits. Before requesting completion, close
+the Reading Frontier: every retained paper must be `ACTIVE+analyzed` or
+`RETIRED+reason`. The Harness enforces this as a hard gate — `request-completion` is
+rejected while any ACTIVE paper lacks a `PaperAnalysis`, listing the unresolved
+candidates. Analyze or retire them first. This is deterministic state consistency, not a
+paper count or sufficiency score: the gate asks "is the corpus closed?" not "is the
+corpus large enough?"
+
+A fresh checker then follows `COMPLETION_GUIDE.md`; it cannot search or mutate research
+state. `completion-view` exposes every retained paper — not only representative ones —
+as a per-paper closure summary (`research_status`, `has_analysis`, `retirement_reason`),
+so the checker can judge candidate closure across the whole corpus, not merely whether
+the read papers were enough. Detailed `PaperAnalysis` stays behind `completion-inspect`.
 
 A PASS moves the run to Delivery. Delivery produces a report from current authorized
 state, applies the separate Writing and Research Integrity guides to their respective
