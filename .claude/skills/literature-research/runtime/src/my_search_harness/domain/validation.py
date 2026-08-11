@@ -254,6 +254,23 @@ def _validate_papers(run: ResearchRun) -> set[str]:
         _validate_paper_source(paper.source, f"papers[{paper.id!r}].source")
         if not isinstance(paper.research_status, PaperResearchStatus):
             _fail(f"papers[{paper.id!r}].research_status must be PaperResearchStatus")
+        # Weak structural invariant (safe for old runs: they load reason as None):
+        # a retirement_reason may exist only on a RETIRED paper. The stronger,
+        # mutation-time rules (RETIRED requires a reason, ACTIVE clears it,
+        # reference safety, evidence eligibility, the completion gate) live in
+        # the command layer so they constrain future mutations without rejecting
+        # historical read-only runs on load.
+        if paper.retirement_reason is not None:
+            if not isinstance(paper.retirement_reason, str):
+                _fail(
+                    f"papers[{paper.id!r}].retirement_reason must be a string or None"
+                )
+            if paper.research_status is not PaperResearchStatus.RETIRED:
+                _fail(
+                    f"papers[{paper.id!r}] has retirement_reason but research_status "
+                    f"is {paper.research_status.value}; "
+                    f"retirement_reason requires RETIRED"
+                )
         if paper.analysis is not None:
             _validate_paper_analysis(paper.analysis, f"papers[{paper.id!r}].analysis")
         for kind, normalized in paper_identity_keys(paper.source):

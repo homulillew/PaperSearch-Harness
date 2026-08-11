@@ -165,6 +165,10 @@ class PaperAnalysis:
 class Paper:
     source: PaperSource
     research_status: PaperResearchStatus = PaperResearchStatus.ACTIVE
+    # Durable disposition for a retired candidate: why this run no longer
+    # investigates/uses it. None while ACTIVE. Persisted (not a trajectory) so
+    # a fresh Completion Checker and a resumed session can see candidate closure.
+    retirement_reason: str | None = None
     analysis: PaperAnalysis | None = None
     id: PaperRef = field(default_factory=new_paper_ref)
 

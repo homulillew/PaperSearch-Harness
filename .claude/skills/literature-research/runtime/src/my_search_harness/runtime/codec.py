@@ -84,6 +84,7 @@ def _paper_to_dict(paper: Paper) -> JsonObject:
         "id": paper.id,
         "source": _paper_source_to_dict(paper.source),
         "research_status": paper.research_status.value,
+        "retirement_reason": paper.retirement_reason,
         "analysis": (
             None if paper.analysis is None else _paper_analysis_to_dict(paper.analysis)
         ),
@@ -460,13 +461,21 @@ def _paper_analysis_from_dict(value: object, path: str) -> PaperAnalysis:
 
 
 def _paper_from_dict(value: object, path: str) -> Paper:
-    data = _fields(value, path, {"id", "source", "research_status", "analysis"})
+    data = _fields(
+        value,
+        path,
+        {"id", "source", "research_status", "analysis"},
+        {"retirement_reason"},
+    )
     analysis = data["analysis"]
     return Paper(
         id=_string(data["id"], f"{path}.id"),
         source=_paper_source_from_dict(data["source"], f"{path}.source"),
         research_status=_enum(
             PaperResearchStatus, data["research_status"], f"{path}.research_status"
+        ),
+        retirement_reason=_optional_string(
+            data.get("retirement_reason"), f"{path}.retirement_reason"
         ),
         analysis=(
             None
