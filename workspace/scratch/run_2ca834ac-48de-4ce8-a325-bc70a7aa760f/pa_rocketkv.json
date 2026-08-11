@@ -1,0 +1,32 @@
+{
+  "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+  "summary": "RocketKV is a two-stage decode-phase KV cache compression framework: Stage 1 performs coarse-grained permanent eviction (SnapKV with per-group selection and a larger pooling kernel of 63) to keep most important tokens; Stage 2 performs fine-grained dynamic top-k selection via Hybrid Sparse Attention (HSA), which reduces along both sequence and head dimensions using element-wise page max/min key statistics. An adaptive split factor r = min(0.2+0.06*log2(c), 0.8) allocates the overall compression ratio c across the two stages. A multi-turn variant RocketKV-MT retains full KV history across turns (no storage saving) but filters per turn for decode speed, avoiding permanent-eviction accuracy loss in multi-turn dialogue.",
+  "relevance_to_run": "A 2026 representative that fuses the eviction route (Stage 1, SnapKV) with the dynamic sparse-selection route (Stage 2, Quest/SparQ-style), directly addressing the contract's eviction, sparsity, and cross-route composition themes. It provides the key cross-route insight that single-stage/single-dimension methods hit an accuracy wall at high compression, while two-stage two-dimensional decomposition preserves accuracy to much higher ratios — a concrete competing-result comparison against SnapKV, Quest, SparQ, DuoAttention.",
+  "contributions": [
+    "Observation (Figure 2): across 200 qasper questions, max sequence length reaches 25K but unique Exact-TopK (k=256) indices only reach ~1200 — motivating two-stage eviction-then-selection to close the gap to oracle top-k attention.",
+    "Two-stage framework: coarse permanent eviction (SnapKV, per-group for GQA, pooling kernel 63) then fine dynamic selection (HSA) over the filtered set, where the reduced set makes top-k prediction far easier.",
+    "Hybrid Sparse Attention (HSA): two-dimensional reduction — page-wise element-wise max/min along the sequence (Quest-style) plus head-dimension magnitude sparsity (SparQ-style) — approximating top-k attention scores with both K_max and K_min and a sign-based fetch.",
+    "Adaptive compression decomposition: split factor r = min(0.2+0.06*log2(c), 0.8) balances the two stages; HSA evenly splits its ratio across sequence and head dims.",
+    "RocketKV-MT: multi-turn variant retaining full KV history across turns (no storage saving) but filtering per-turn for decode speed, eliminating permanent-eviction loss in multi-turn settings.",
+    "System integration: compatible with FlashAttention (prefill untouched), tensor parallelism, and disaggregated prefill/decode serving (reduces KV transfer traffic)."
+  ],
+  "key_results": [
+    "Evaluated on Llama3.1-8B-Ins, Mistral-7B-Ins-v0.2, LongChat-7B-v1.5 (GQA + MHA) on LongBench, NIAH, RULER, SCBench; token budgets 256-4096 (single-turn), 1024-16384 (SCBench multi-turn).",
+    "LongBench (Llama3.1-8B-Ins): RocketKV near-lossless at budget >=512, only 1.1% avg drop at 256; consistently beats SnapKV, Quest, SparQ, DuoAttention, with the gap widening at low budgets.",
+    "NIAH (Llama3.1-8B-Ins): 100% accuracy at 256-token budget = >400x compression at 109K max sequence length; SnapKV drops >20% on Mistral/LongChat even at 1024.",
+    "RULER: accuracy loss negligible at short lengths, growing beyond models' effective context; RocketKV's advantage over baselines widens at longer sequences.",
+    "SCBench (multi-turn): RocketKV-MT matches Exact-TopK across all budgets, fixing the multi-turn accuracy gap that plain RocketKV suffers vs SparQ at high budgets.",
+    "Efficiency (Llama3.1-8B-Ins FP16, batch 1): up to 3.7x end-to-end speedup on A100 and 3.3x on H100, up to 32.6% peak memory saving; A100 speedup > H100 because A100 is more memory-bound.",
+    "Storage/traffic analysis (Table 1): at compression ratio c, RocketKV storage = 1/c^r + 2/c^((1+r)/2), traffic = 1/c; RocketKV-MT storage = 1 + 2/c^((1+r)/2) (no first-stage storage saving)."
+  ],
+  "limitations": [
+    "Two-stage pipeline adds implementation complexity (SnapKV + HSA kernels, auxiliary K_max/K_min storage); the Python/gpt-fast prototype is not yet CUDA-optimized, so wall-clock gains could be larger with FlashInfer-style kernels.",
+    "RocketKV (single-turn) still shows an accuracy gap to Exact-TopK on SCBench multi-turn at high budgets; only RocketKV-MT closes it, at the cost of no storage saving.",
+    "Stage-1 SnapKV pooling kernel (63) and the split factor formula are empirically tuned; transfer across models/tasks is not fully validated.",
+    "Evaluated at 7B-8B scale; behavior at much larger models and the interaction with grouped-query vs multi-head attention is partially covered but not exhaustive."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Proposed Method: RocketKV"},
+    {"kind": "section", "value": "Experiments"}
+  ]
+}

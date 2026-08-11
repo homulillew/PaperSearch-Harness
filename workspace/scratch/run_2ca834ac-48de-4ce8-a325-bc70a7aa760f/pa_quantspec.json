@@ -1,0 +1,28 @@
+{
+  "paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+  "summary": "QuantSpec is a self-speculative decoding framework that accelerates both short- and long-context generation by quantizing model weights and the KV cache to INT4. Its core innovation is a hierarchical INT4 KV cache: an INT8 value is decomposed into upper and lower 4-bit halves, so the draft model loads only the upper INT4 (fast, low-precision) while the target model reconstructs INT8 from both halves (high precision) — eliminating the redundant separate draft KV cache. A double full-precision buffer of size 2G (G = quantization group size) keeps the most recent tokens in full precision to maintain a high draft acceptance rate and to handle speculative-decoding rollbacks without repeated quantize/dequantize overhead.",
+  "relevance_to_run": "A 2025 representative of the speculative-decoding × KV-cache interaction route, directly addressing the contract's speculative/parallel decoding interaction with cache. It is grounded in an arithmetic-intensity / roofline analysis that explains when weight quantization vs. KV-cache quantization dominates, and it composes quantization with self-speculative decoding — a cross-route combination distinct from pure eviction or pure compression.",
+  "contributions": [
+    "Arithmetic-intensity / roofline analysis of prefill vs. decoding across (small/large batch) x (short/long context) regimes, classifying which regimes are weight-quantization-bound vs. KV-cache-quantization-bound.",
+    "Hierarchical INT4 KV cache: INT8 = 2^4 * C_U^INT4 + C_L^INT4, letting the draft model use the upper 4 bits and the target model reconstruct INT8 from both halves, removing the redundant draft KV copy.",
+    "Double full-precision buffer (2G) that keeps recent tokens in FP16 for high acceptance rate, defers quantization to every G steps, and cleanly supports speculative-decoding rollback by operating only on the second buffer.",
+    "Self-speculative decoding with shared architecture (draft = INT4 upper bits, target = INT8 reconstruction), improving acceptance rate over big-little speculative decoding."
+  ],
+  "key_results": [
+    "INT8 KV cache perplexity on Llama-2-7B (WikiText2 6.4696 vs FP16 6.4595; C4 7.2620 vs 7.2617) — near-lossless, validating INT8 as the target precision.",
+    "On Llama-2-7B-32K-Instruct and LWM-Text-Chat-128k, QuantSpec achieves up to 2.49x speedup over autoregressive (AR) target generation, vs sparsity-based self-speculative baselines (StreamingLLM, SnapKV).",
+    "At 128k context (LWM-Text-Chat, Multi-LexSum), StreamingLLM and SnapKV hit OOM while QuantSpec runs at 61.22 GB peak memory with 94.31% acceptance and 2.49x speedup.",
+    "At 32k (Llama-2-7B, Multi-LexSum): QuantSpec 2.08x speedup, 25.84 GB vs StreamingLLM 1.84x/32.61GB and SnapKV 1.63x/33.96GB; acceptance 91.16%.",
+    "Quantization strategy: key cache quantized along channel axis, value cache along token axis (per-group, group size G = head dim), minimizing quantization error and maximizing acceptance."
+  ],
+  "limitations": [
+    "Self-speculative: the draft and target share architecture, so speedup is bounded by the acceptance rate and the INT4-vs-INT8 compute ratio; gains are largest in long-context memory-bound regimes.",
+    "The double full-precision buffer adds 2G tokens of FP16 KV per layer, partially offsetting the compression benefit.",
+    "Reported on Llama-2-7B-class models; scaling to much larger models and the interaction with GQA/MoE is not fully characterized.",
+    "Acceptance rate can dip below baselines in some short-context regimes (e.g., 8k PG19 89.88% vs SnapKV 94.39%), though end-to-end speedup still wins."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "LLM Inference Bottlenecks"},
+    {"kind": "section", "value": "Evaluation"}
+  ]
+}

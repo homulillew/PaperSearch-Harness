@@ -7,7 +7,6 @@ __pycache__/
 *.egg-info/
 .eggs/
 build/
-dist/
 develop-eggs/
 downloads/
 parts/
@@ -54,10 +53,10 @@ coverage.xml
 Thumbs.db
 desktop.ini
 
-# --- Project runtime artifacts (keep code, ignore generated output) ---
+# --- Project runtime artifacts ---
 # Research runs produce workspace data (search results, paper analyses, run
-# state, logs). This is user/project data, not source — never commit it.
-workspace/
+# state, logs). This is committed project data — the authoritative record of
+# research runs. Keep it tracked.
 *.log
 
 # --- Secrets / local env ---

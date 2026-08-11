@@ -1,0 +1,11 @@
+{
+  "statement": "KV cache reuse for recurring context (RAG documents, system prompts) can eliminate most re-encoding cost, but naive reuse causes large accuracy drops that require explicit architectural repair. KVLink shows PromptCache-style naive reuse suffers up to ~35% relative accuracy loss because independently encoded documents lose cross-document dependencies and RoPE positions; positional re-encoding (store without RoPE, re-apply global rotations) plus trainable link tokens recover most of the gap to the fine-tuned full-concatenation upper bound, reducing TTFT by 85-96%. LMCache provides the systems substrate (chunk-level transfer, async loading, 400 Gbps CPU bandwidth vs vLLM's 88 Gbps) that makes reuse practical at enterprise scale. The accuracy repair is algorithmic (KVLink); the deployment gain is systemic (LMCache) — both are needed and they are orthogonal.",
+  "approach_refs": [
+    "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907",
+    "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022"
+  ],
+  "sources": [
+    {"paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}},
+    {"paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Evaluation"}}
+  ]
+}

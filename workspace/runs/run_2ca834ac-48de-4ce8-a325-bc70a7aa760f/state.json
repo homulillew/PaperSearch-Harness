@@ -1,0 +1,1715 @@
+{
+  "completion_checks": {
+    "check_b7fb57de-b32a-45ae-aad3-838ef0d586d4": {
+      "basis_contract_revision": 1,
+      "basis_revision": 76,
+      "blocking_gap_refs": [],
+      "completed_at": "2026-08-10T15:08:13.612719+00:00",
+      "id": "check_b7fb57de-b32a-45ae-aad3-838ef0d586d4",
+      "reasons": [
+        "Route coverage is complete: 8 ApproachFamilies span all major KV Cache optimization routes named in the contract \u2014 eviction/token selection (CAKE, LKV, RocketKV), quantization & VQ (VQKV, QuantSpec), low-rank compression (KQ-SVD), sparse/dynamic top-k attention (NSA, RocketKV-HSA), architectural alternatives (NHA), prefix sharing/reuse systems (KVLink, LMCache), speculative decoding x cache (QuantSpec), and system scheduling/offloading (LMCache). Routes are meaningfully distinguished by mechanism, not merely named.",
+        "Deployment conditions and empirical results are preserved: every representative paper's key_results retain model (Llama3.1-8B-Ins, Qwen3-8B, LLaMA3.1-8B), benchmark (LongBench, NIAH, RULER, SCBench), baseline (SnapKV, PyramidKV, KIVI, ASVD, Palu, DuoAttention, AdaKV), hardware (A100, H100, RTX 4090, 8xH100), and throughput/memory metrics (3.7x speedup, 82.8% compression, 85-96% TTFT reduction, 6.6x KV storage reduction).",
+        "Primary-source grounding (P0) is satisfied: all 10 papers have detailed PaperAnalysis with 2 section locators each (Methodology + Experiments variants); evidence_diagnostics show 100% landscape sources have locators. Three read-source spot checks across distinct routes (RocketKV/Experiments, VQKV/Experiment, LKV/Experiments) returned genuine primary paper text with full experimental tables, model configs, and ablations \u2014 no paper rests only on abstract/search metadata.",
+        "Contradictions and non-comparable evidence are not flattened: 8 Findings and 5 OpenProblems capture training-free vs training-aware trade-offs (finding_6c4795be), single-stage vs two-stage compression walls (finding_71985836), lossless-vs-lossy positioning (finding_05245a41), and explicitly flag heterogeneous measurement conditions making cross-method wall-clock comparison unreliable (problem_dcb7c6a4).",
+        "Open problems are explicit and sourced: 5 open problems cover very-long-context scalability, multi-modal KV cache, cross-route composition, training-free quality preservation, and measurement heterogeneity \u2014 all supported by retained-paper locators.",
+        "Frontier recency is satisfied: corpus includes two 2026-dated retained papers (VQKV 2026-03-17, LKV 2026-04-22) alongside 2025 foundational work spanning Feb-Dec 2025, satisfying the 2025-2026 + newest-2026 requirement; the newest retained paper date (April 2026) is reported.",
+        "Open_gaps is empty and the landscape can support the promised Chinese-language deep technical-route survey report without inventing new research during report writing. Accepted boundaries: multi-modal KV cache is acknowledged as unaddressed by the retained corpus (open problem, not a contract blocker since the contract names it as an open problem to identify); evaluation scale is 7B-8B for most algorithmic methods with some 27B/70B/480B system-level results."
+      ],
+      "requested_at": "2026-08-10T14:59:55.255492+00:00",
+      "requester_rationale": "The retained corpus and structured landscape satisfy the Research Contract. Coverage: 10 representative primary-source-analyzed papers span all 7 major KV Cache optimization routes identified in the 2025-2026 literature \u2014 eviction/token selection (LKV, CAKE, RocketKV), quantization (VQKV, QuantSpec), low-rank compression (KQ-SVD), sparse/dynamic top-k attention (NSA, RocketKV-HSA), architectural alternatives (NHA), prefix sharing/reuse systems (KVLink, LMCache), speculative decoding x cache (QuantSpec), and system scheduling/offloading (LMCache). Evidence quality: every PaperAnalysis with mechanism-level claims rests on inspect-source + read-source evidence (Methodology + Experiments), not abstracts. Recency: corpus includes 2026 frontier work (NHA, RocketKV, QuantSpec, KVLink, LMCache) alongside 2025 foundational methods; frontier queries and native Web counter-search were performed per the latest/SOTA requirement. Contradictions handled: cross-route trade-offs (training-free vs training-aware, exact-retrieval vs compression) are captured in Findings and OpenProblems. Synthesis: 7 ApproachFamilies, 8 Findings, 5 OpenProblems. The newest retained paper dates, searched recent window (2025-01 to 2026-08), frontier emerging-term queries, pagination, and native Web counter-search are reflected in retained state. No major route, representative method, or recent frontier development is missing that additional search would likely reveal.",
+      "verdict": "PASS"
+    }
+  },
+  "contract": {
+    "current_revision": 1,
+    "revisions": [
+      {
+        "contract": {
+          "deliverable": {
+            "description": "A Chinese-language deep technical-route survey report covering major KV Cache optimization routes, representative 2025-2026 methods, mechanisms, empirical evidence, cross-route comparisons, and open problems, with structured citations.",
+            "required_artifacts": [
+              "REPORT"
+            ]
+          },
+          "mission": "Map the major technical routes for LLM KV Cache optimization and their latest progress, with emphasis on 2025-2026 developments including the newest 2026 frontier work, and synthesize the mechanisms, empirical evidence, deployment conditions, and open problems of each route.",
+          "requirements": {
+            "requirement_268faaa4-dc0d-472a-a063-87859095c35e": {
+              "id": "requirement_268faaa4-dc0d-472a-a063-87859095c35e",
+              "statement": "Preserve deployment conditions and empirical results (experimental settings, model sizes, benchmarks, long-context lengths, throughput/memory metrics) for representative methods of each major route."
+            },
+            "requirement_2d41e2e8-e4f5-44f9-b405-bf982ad88188": {
+              "id": "requirement_2d41e2e8-e4f5-44f9-b405-bf982ad88188",
+              "statement": "Contrast competing or conflicting results across routes where the literature provides them (e.g., eviction vs. compression trade-offs, lossless vs. lossy, training-free vs. training-aware)."
+            },
+            "requirement_5acc708e-8975-43a8-bbf1-8b531037b8ac": {
+              "id": "requirement_5acc708e-8975-43a8-bbf1-8b531037b8ac",
+              "statement": "Cover the major technical-route / mechanism families for LLM KV Cache optimization (e.g., eviction & token selection, compression & low-rank approximation, quantization, sparsity & structured pruning, architectural alternatives such as linear/sparse attention and hybrid SSM-attention, prefix sharing & caching systems, speculative/parallel decoding interaction with cache)."
+            },
+            "requirement_db8b8300-09f3-4204-b4bc-a049b6b53ead": {
+              "id": "requirement_db8b8300-09f3-4204-b4bc-a049b6b53ead",
+              "statement": "Use primary-source evidence (inspect-source / read-source) for mechanism-level and empirical claims of representative papers, not abstracts alone."
+            },
+            "requirement_eddc105b-988e-4086-b8b1-630ff40a5c92": {
+              "id": "requirement_eddc105b-988e-4086-b8b1-630ff40a5c92",
+              "statement": "Identify open problems and unresolved field-level questions supported by the retained landscape (e.g., very-long-context scalability, retrieval-augmented cache, multi-modal KV cache, training-free quality preservation)."
+            },
+            "requirement_f74cff6e-9f32-4447-a05b-f03c8a5d9d94": {
+              "id": "requirement_f74cff6e-9f32-4447-a05b-f03c8a5d9d94",
+              "statement": "Include developments within the 2025-01-01 to 2026-12-31 window, with explicit inclusion of the newest 2026 frontier work; the newest retained relevant paper date must be reported."
+            }
+          },
+          "scope": "In-scope: peer-reviewed and arXiv primary literature on LLM (Transformer) KV cache optimization published or appearing in 2025-2026, plus seminal pre-2025 work only as route context. Out-of-scope: non-LLM KV cache (e.g., classical DB caching) without an LLM-attention connection; pure inference-engine engineering with no research contribution; training-efficiency work unrelated to serving-time KV cache memory/throughput."
+        },
+        "reason": "Initial contract",
+        "recorded_at": "2026-08-10T13:48:41.813126+00:00",
+        "revision": 1
+      }
+    ]
+  },
+  "delivery_basis": {
+    "completion_check_ref": "check_b7fb57de-b32a-45ae-aad3-838ef0d586d4",
+    "type": "completion_pass"
+  },
+  "id": "run_2ca834ac-48de-4ce8-a325-bc70a7aa760f",
+  "investigation_gaps": {},
+  "lifecycle": "CLOSED",
+  "literature_landscape": {
+    "approach_families": {
+      "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5": {
+        "core_idea": "Reduce the retained KV cache by discarding tokens deemed unimportant, either via heuristic importance scores computed from attention (SnapKV/H2O/PyramidKV/CAKE) or via learned, task-optimized policies (LKV). The central design axes are (a) the per-token importance indicator (cumulative/mean attention, attention variance, learned utility) and (b) the budget allocation across layers/heads (uniform, fixed pyramid, data-driven preference, or globally learned). Eviction is training-free in the heuristic line and training-aware in the learned line; both preserve the standard attention computation over the retained subset.",
+        "id": "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+        "name": "KV Cache Eviction & Token Selection",
+        "representative_papers": [
+          "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+          "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+          "paper_73ca1a25-eebf-4359-af53-ef40a6855748"
+        ]
+      },
+      "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022": {
+        "core_idea": "Treat the KV cache as a managed, movable resource across the memory hierarchy (GPU HBM, CPU DRAM, remote/disk) and across prefill/decode instances. LMCache provides a standardized caching layer with chunk-level (vs page-level) transfers, asynchronous layer-wise loading overlapped with compute, a shared token pool for cross-instance awareness, and adaptive decisions between KV loading and recomputation depending on bandwidth and context length. The route targets deployment-level metrics (TTFT, ITL, throughput, peak memory) and is orthogonal to accuracy-affecting compression; its gains depend on workload prefix overlap and network bandwidth, with a crossover point below which loading is slower than prefilling.",
+        "id": "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022",
+        "name": "System Scheduling & KV Cache Offloading/Disaggregation",
+        "representative_papers": [
+          "paper_b4920f81-b210-4a71-9646-35e3b2691c4e"
+        ]
+      },
+      "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8": {
+        "core_idea": "Accelerate decoding by composing speculative/parallel decoding with KV-cache management. QuantSpec uses self-speculative decoding where the draft model loads only an INT4 (upper 4-bit) KV cache and the target model reconstructs INT8 from both halves via a hierarchical INT4 design, eliminating the redundant draft KV copy; a double full-precision buffer (2G) keeps recent tokens in FP16 for high acceptance and clean rollback. The route is grounded in an arithmetic-intensity/roofline analysis that determines when weight quantization vs. KV-cache quantization dominates, and it is most beneficial in long-context memory-bound regimes. It is a cross-route composition (quantization + speculative) distinct from pure eviction or compression.",
+        "id": "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+        "name": "Speculative Decoding \u00d7 KV Cache",
+        "representative_papers": [
+          "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397"
+        ]
+      },
+      "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0": {
+        "core_idea": "Compress the KV cache by projecting K/V (or their query-aware interactions) into a low-rank subspace, storing only the low-rank factors. KQ-SVD decomposes the query-key interaction KQ^T (not K alone) via truncated SVD, giving a provably optimal closed-form factorization that is robust to K/Q scaling imbalance; it contrasts with K-SVD (compress K alone, ignores Q) and Eigen (joint Q/K/V embedding). The line is training-free but calibration-based (projections learned from a small query set), and trades rank against approximation error of the attention output.",
+        "id": "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0",
+        "name": "KV Cache Low-Rank Compression",
+        "representative_papers": [
+          "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922"
+        ]
+      },
+      "approach_8bb05329-b9c8-4778-88d6-7295f10e1868": {
+        "core_idea": "Replace or hybridize full softmax attention with fixed-size recurrent/linear-attention memory so the KV cache grows sublinearly (or is constant) with sequence length. NHA unifies, within one layer, a gated linear-RNN long-term memory (m slots) with a sliding-window short-term memory (w tokens) under a unified softmax, and varies w per layer to span pure-linear (w=0), hybrid, or full-attention (w=N) without structural changes; it supports chunkwise parallel training and retrofitting pretrained Transformers. This route trades exact long-range retrieval (bounded by m slots) for sublinear memory and near-linear compute, contrasting with eviction/quantization which keep the Transformer but shrink its cache.",
+        "id": "approach_8bb05329-b9c8-4778-88d6-7295f10e1868",
+        "name": "Architectural Alternatives: Linear/SSM-Attention Hybrids",
+        "representative_papers": [
+          "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0"
+        ]
+      },
+      "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5": {
+        "core_idea": "Reduce KV cache memory by lowering the numerical precision of stored K/V vectors: scalar quantization (KIVI: per-channel/per-token INT2/INT4) or vector quantization (VQKV: Residual Simple VQ mapping each vector to codebook indices with on-demand reconstruction). QuantSpec extends this to speculative decoding with a hierarchical INT4 cache (upper/lower 4-bit halves) so the draft model uses INT4 and the target reconstructs INT8. The trade-off is compression ratio vs. reconstruction error and the overhead of codebooks/dequantization; scalar methods are training-free, while VQ requires lightweight codebook training.",
+        "id": "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5",
+        "name": "KV Cache Quantization & Vector Quantization",
+        "representative_papers": [
+          "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+          "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb"
+        ]
+      },
+      "approach_e2e61621-801b-4630-a040-b84da89c1d49": {
+        "core_idea": "Reduce decoding cost by attending to only a subset of KV tokens selected per query, rather than evicting permanently. NSA is natively trainable hierarchical sparse attention (compressed block + fine-grained selected block + sliding window) co-designed with hardware-aligned kernels so sparsity yields real wall-clock speedup. RocketKV's second stage (HSA) does dynamic two-dimensional top-k selection (sequence + head) using page-wise K_max/K_min statistics, and Quest/SparQ are single-dimension precursors. The route is distinct from eviction because selection is per-query and dynamic, and from architecture because it keeps standard attention over a filtered set.",
+        "id": "approach_e2e61621-801b-4630-a040-b84da89c1d49",
+        "name": "Sparse & Dynamic Top-k Attention",
+        "representative_papers": [
+          "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+          "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8"
+        ]
+      },
+      "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907": {
+        "core_idea": "Avoid recomputing KV caches for shared or recurring context (system prompts, retrieved documents, in-context examples) by precomputing, storing, and reusing per-segment KV caches across queries. KVLink enables reuse of independently encoded per-document caches via positional re-encoding (store without RoPE, re-apply global rotations at concat) and trainable link tokens that restore cross-document attention, combined with chunked anchor-token compression. LMCache is the systems substrate: a unified KV caching layer between inference engines (vLLM/SGLang) and heterogeneous storage (GPU/CPU/remote) with chunk-level transfer, async layer-wise loading, and adaptive load-vs-prefill decisions. The route targets the RAG/multi-query and disaggregated-serving settings and is orthogonal to (composable with) compression/eviction.",
+        "id": "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907",
+        "name": "Prefix Sharing & KV Cache Reuse Systems",
+        "representative_papers": [
+          "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+          "paper_b4920f81-b210-4a71-9646-35e3b2691c4e"
+        ]
+      }
+    },
+    "findings": {
+      "finding_05245a41-071d-4d5e-b9be-fd7857726890": {
+        "approach_refs": [
+          "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0",
+          "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+        ],
+        "id": "finding_05245a41-071d-4d5e-b9be-fd7857726890",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiment"
+            },
+            "paper_ref": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Vector quantization of the KV cache achieves high compression ratios (~82-83%) with fidelity closer to the full cache than scalar quantization or low-rank methods at comparable ratios, at the cost of lightweight offline codebook training. VQKV's RSimVQ (multiple residual codebooks + projection matrices, on-demand reconstruction) beats ASVD, Palu, KIVI, and SnapKV on LongBench at matched ratios on LLaMA3.1-8B/3.2-3B, because quantizing whole vectors preserves inter-dimensional structure that scalar quantization destroys. This positions VQ as a middle ground: higher fidelity than scalar quant, no LLM fine-tuning, but not training-free (codebooks trained on 0.1% of OpenWebText)."
+      },
+      "finding_0b767fd6-ef95-4daa-9778-f7c029525282": {
+        "approach_refs": [
+          "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022",
+          "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907"
+        ],
+        "id": "finding_0b767fd6-ef95-4daa-9778-f7c029525282",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Evaluation"
+            },
+            "paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "KV cache reuse for recurring context (RAG documents, system prompts) can eliminate most re-encoding cost, but naive reuse causes large accuracy drops that require explicit architectural repair. KVLink shows PromptCache-style naive reuse suffers up to ~35% relative accuracy loss because independently encoded documents lose cross-document dependencies and RoPE positions; positional re-encoding (store without RoPE, re-apply global rotations) plus trainable link tokens recover most of the gap to the fine-tuned full-concatenation upper bound, reducing TTFT by 85-96%. LMCache provides the systems substrate (chunk-level transfer, async loading, 400 Gbps CPU bandwidth vs vLLM's 88 Gbps) that makes reuse practical at enterprise scale. The accuracy repair is algorithmic (KVLink); the deployment gain is systemic (LMCache) \u2014 both are needed and they are orthogonal."
+      },
+      "finding_0e4f073c-c48c-4e02-ae0b-4bdf7d125bf9": {
+        "approach_refs": [
+          "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+          "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+        ],
+        "id": "finding_0e4f073c-c48c-4e02-ae0b-4bdf7d125bf9",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "LLM Inference Bottlenecks"
+            },
+            "paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Speculative decoding composes multiplicatively with KV-cache quantization for long-context decoding, where the decode phase is memory-bound and KV-cache traffic dominates. QuantSpec's arithmetic-intensity/roofline analysis shows decoding has near-constant, sub-ridge-point arithmetic intensity irrespective of batch size for long contexts, so KV-cache quantization (not weight quantization) is the dominant lever; its hierarchical INT4 design lets the draft model use upper-4-bit KV and the target reconstruct INT8 from both halves, achieving up to 2.49x speedup and running 128K contexts where StreamingLLM/SnapKV OOM. The double full-precision buffer (2G) is the key to keeping acceptance high under speculative rollback. This demonstrates a cross-route composition (quantization + speculative) that is more effective than either alone in the long-context memory-bound regime."
+      },
+      "finding_6b1127e4-eb5f-4ff9-99e0-851321c90091": {
+        "approach_refs": [
+          "approach_8bb05329-b9c8-4778-88d6-7295f10e1868",
+          "approach_e2e61621-801b-4630-a040-b84da89c1d49"
+        ],
+        "id": "finding_6b1127e4-eb5f-4ff9-99e0-851321c90091",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Natively trainable sparse/hybrid attention (co-designed with hardware-aligned kernels) is necessary for sparsity to yield real wall-clock speedup rather than theoretical FLOP reduction, but it requires from-scratch pretraining and does not retrofit off-the-shelf LLMs. NSA's hierarchical sparse attention with arithmetic-intensity-balanced kernels matches or beats full attention at 27B/3B MoE scale while delivering real speedup; NHA's intra-layer linear-RNN + sliding-window hybrid scales near-linearly and matches GSA operator speed, and can retrofit pretrained Transformers with lightweight fine-tuning (4 full-attention layers). The contrast: NSA needs from-scratch training for its full benefit, while NHA offers a retrofit path \u2014 but both show that without kernel-level co-design, sparse FLOP counts do not translate to latency gains."
+      },
+      "finding_6c4795be-dbdb-4de7-8795-dfaea15438cc": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5"
+        ],
+        "id": "finding_6c4795be-dbdb-4de7-8795-dfaea15438cc",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experimentation"
+            },
+            "paper_ref": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Data-driven, content-adaptive per-layer budget allocation consistently beats uniform and fixed-pattern (pyramid) allocation under tight KV budgets, and the advantage narrows as the budget approaches full-cache parity. CAKE's preference-prioritized allocation (attention entropy x variance) beats SnapKV/PyramidKV on LongBench at 128L but the margin shrinks at 1024L; LKV's learned global head-wise budget competition further beats heuristic allocators at strict 15% budget and identifies learned budgeting (not selection) as the dominant driver of fidelity. This indicates allocation policy, not just the eviction indicator, is a first-class design axis, and that learned allocation extracts more from a small budget than hand-crafted heuristics can."
+      },
+      "finding_71985836-4987-447a-b9e1-9c1df2f0b5a2": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_e2e61621-801b-4630-a040-b84da89c1d49"
+        ],
+        "id": "finding_71985836-4987-447a-b9e1-9c1df2f0b5a2",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Proposed Method: RocketKV"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Single-stage, single-dimension KV compression methods hit an accuracy wall at high compression ratios, while two-stage, two-dimensional decomposition preserves accuracy much further. RocketKV shows that combining coarse permanent eviction (SnapKV) with fine dynamic two-dimensional top-k selection (HSA over sequence+head) reaches near-Exact-TopK accuracy at 256-token budgets (>400x compression on NIAH), whereas single-stage SnapKV/Quest/SparQ degrade sharply; the key observation is that unique Exact-TopK indices across decoding steps are far fewer than the sequence length, so evicting first makes the subsequent top-k prediction far easier."
+      },
+      "finding_b90ce2bc-c677-4d0e-b8a1-4252ad93d99f": {
+        "approach_refs": [
+          "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0"
+        ],
+        "id": "finding_b90ce2bc-c677-4d0e-b8a1-4252ad93d99f",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Methodology"
+            },
+            "paper_ref": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Modeling the query-key interaction (KQ^T) rather than the key cache alone yields provably better low-rank KV compression and is robust to K/Q scaling imbalance. KQ-SVD's Theorem 1 bounds attention output error by the error in QK^T (amplified by V) plus the error in V, and Theorem 2 gives the closed-form optimal rank-R factorization of KQ^T via its truncated SVD; empirically KQ-SVD matches Eigen on K/Q/V accuracy but is consistently more accurate on the attention score matrix and MHA output, and unlike Eigen it is invariant to K/Q scaling (Theorem 4), whereas Eigen converges to K-SVD's error under imbalance. This shows query-aware compression is materially better than key-only compression, especially under GQA where shared K amplifies key-only error."
+      },
+      "finding_e6fb40db-8eed-46ad-ae56-d684fa6e5a84": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_e2e61621-801b-4630-a040-b84da89c1d49"
+        ],
+        "id": "finding_e6fb40db-8eed-46ad-ae56-d684fa6e5a84",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Proposed Method: RocketKV"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Permanent KV eviction is unsafe in multi-turn dialogue because token importance shifts across turns, and the fix (retaining full history) sacrifices the storage saving that motivated eviction. RocketKV shows a noticeable accuracy gap to Exact-TopK on SCBench multi-turn at high budgets because tokens evicted in earlier turns become essential later; RocketKV-MT retains all KV tokens across turns (no storage saving) but filters per turn for decode speed, matching Exact-TopK. This is a direct tension within the eviction route: the memory saving and the multi-turn robustness are mutually exclusive under permanent eviction, motivating either non-permanent selection (dynamic top-k) or hierarchical storage (keep history in cheaper tiers)."
+      }
+    },
+    "open_problems": {
+      "problem_5d66ef8c-9fc5-40bb-a56d-ebd32c9c26c0": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_8bb05329-b9c8-4778-88d6-7295f10e1868",
+          "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+        ],
+        "id": "problem_5d66ef8c-9fc5-40bb-a56d-ebd32c9c26c0",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Very-long-context (million-token) scalability remains unsolved within the Transformer-plus-compression paradigm. Eviction/quantization/low-rank methods are evaluated up to ~128K tokens; beyond that, accuracy degrades because models are less robust to sparse/quantized attention outside their effective context, and the retained subset or codebook cannot preserve all needles. Architectural alternatives (NHA's fixed m-slot memory, NSA's sparse blocks) bound exact retrieval by design. No retained method demonstrates lossless million-token single-needle and multi-needle retrieval under aggressive compression, leaving the scaling regime open."
+      },
+      "problem_91f25aa2-e3e3-4cd9-ab94-e25545fdc537": {
+        "approach_refs": [
+          "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022",
+          "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907"
+        ],
+        "id": "problem_91f25aa2-e3e3-4cd9-ab94-e25545fdc537",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Methodology"
+            },
+            "paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Overview of LMCACHE"
+            },
+            "paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Multi-modal and retrieval-augmented KV cache optimization is largely unaddressed as a joint problem. KVLink tackles RAG cache reuse but treats documents as text; LMCache handles storage/movement but is modality-agnostic. How vision/audio encoder KV caches (with different dimensionality, attention patterns, and compression tolerance) should be evicted, quantized, or reused alongside text KV \u2014 and whether cross-modal KV can be jointly compressed \u2014 is not characterized by the retained landscape. The contract explicitly names multi-modal KV cache as an open problem and the retained corpus provides no primary evidence on it."
+      },
+      "problem_94b0d476-3e09-46c2-a651-eed5c12f2fc3": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+          "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5",
+          "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907"
+        ],
+        "id": "problem_94b0d476-3e09-46c2-a651-eed5c12f2fc3",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Methodology"
+            },
+            "paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Proposed Method: RocketKV"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "LLM Inference Bottlenecks"
+            },
+            "paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Cross-route composition (eviction + quantization + reuse + speculative) is promising but its interaction and optimality are under-explored. RocketKV composes eviction with dynamic selection; QuantSpec composes quantization with speculative decoding; KVLink composes reuse with compression. But the joint design space \u2014 e.g., a quantized, evicted, reused KV cache under speculative decoding with multi-turn rollback \u2014 lacks a unified analysis of where the compression budget should be allocated across stages and dimensions, and whether the error compounds or cancels. The adaptive decomposition idea (RocketKV's split factor) is shown for two stages but not generalized across routes."
+      },
+      "problem_ab9dac7d-2fe8-4812-9cd1-02b6e193cf28": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+        ],
+        "id": "problem_ab9dac7d-2fe8-4812-9cd1-02b6e193cf28",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experimentation"
+            },
+            "paper_ref": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiment"
+            },
+            "paper_ref": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Training-free quality preservation under aggressive compression is not reliably achievable across tasks and models. Heuristic eviction (CAKE, SnapKV) is training-free but its gains over baselines are modest and shrink toward full-cache parity; learned methods (LKV, VQKV codebooks) need a training/distillation phase to reach near-lossless at strict budgets. There is no demonstrated training-free method that is near-lossless at very low budgets (e.g., <10%) across diverse long-context tasks and model families, so the training-free-vs-training-aware trade-off remains a live frontier rather than a settled choice."
+      },
+      "problem_dcb7c6a4-9d06-4273-a0e3-091a9b2ed992": {
+        "approach_refs": [
+          "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+          "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022",
+          "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8"
+        ],
+        "id": "problem_dcb7c6a4-9d06-4273-a0e3-091a9b2ed992",
+        "sources": [
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Experiments"
+            },
+            "paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "LLM Inference Bottlenecks"
+            },
+            "paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+            "relation": "SUPPORTS"
+          },
+          {
+            "locator": {
+              "kind": "section",
+              "value": "Evaluation"
+            },
+            "paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
+            "relation": "SUPPORTS"
+          }
+        ],
+        "statement": "Reported efficiency gains are measured under heterogeneous, often favorable conditions, making cross-method wall-clock comparison unreliable. RocketKV reports up to 3.7x speedup on A100 with a Python/gpt-fast prototype (not CUDA-optimized); QuantSpec reports 2.49x with self-speculative acceptance rates that vary by regime; LMCache reports TTFT/ITL gains that depend on workload prefix overlap and network bandwidth (with a crossover point at 256K for 32 Gbps). Benchmarks, batch sizes, context lengths, hardware, and prototype maturity differ across papers, so headline speedups are not directly comparable and deployment conditions must be checked rather than the peak number."
+      }
+    }
+  },
+  "outcome": "COMPLETE",
+  "papers": {
+    "paper_05d6e6d0-933a-4139-b866-37a448b5d5b6": {
+      "analysis": null,
+      "id": "paper_05d6e6d0-933a-4139-b866-37a448b5d5b6",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2507.19823",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2507.19823",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-07-26",
+        "publication_year": 2025,
+        "title": "HCAttention: Extreme KV Cache Compression via Heterogeneous Attention Computing for LLMs"
+      }
+    },
+    "paper_0b7e9bf1-fb53-4372-93b2-31fa454d8279": {
+      "analysis": null,
+      "id": "paper_0b7e9bf1-fb53-4372-93b2-31fa454d8279",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.11761",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.11761",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-12",
+        "publication_year": 2026,
+        "title": "MiniCPM-SALA: Hybridizing Sparse and Linear Attention for Efficient Long-Context Modeling"
+      }
+    },
+    "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50": {
+      "analysis": {
+        "contributions": [
+          "Positional re-encoding: decouple KV states from RoPE rotations at storage time (store W_k x_i, W_v x_i), re-apply global rotations at concatenation, fixing the position mismatch of independently encoded segments at negligible cost.",
+          "Link tokens: K trainable tokens (e.g., K=1 or 5) appended per document with a customized attention map so each link token attends to all preceding documents' tokens plus its own document, implicitly reconnecting independently encoded segments; the LLM is fine-tuned jointly with these tokens.",
+          "Compressed KV cache linking: a modified AnLLMs that compresses fixed-length chunks into multiple anchor tokens (chunk size s=100) with chunk-local + preceding-anchor attention, reducing per-document cache storage while preserving the reuse interface.",
+          "Demonstrates that naive reuse (PromptCache) suffers up to ~35% relative accuracy drop, and that link tokens recover most of the gap to fine-tuned full-concatenation upper bound."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Methodology"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "Backbones: Llama-3.2-1B/3B-Instruct and Llama-3.1-8B-Instruct, fine-tuned 6,000 steps, batch 64, 8xH100.",
+          "On QA (NQ, 2WikiMQA, TriviaQA, HotpotQA, MuSiQue) and summarization (MultiNews, Samsum), KVLink5 consistently beats PromptCache, CacheBlend, and BlockAttention; e.g., on Llama-3.2-1B MuSiQue: KVLink5 19.2% vs BlockAttention 14.3% vs PromptCache 1.4%; approaches the fine-tuned full-concatenation upper bound (19.9%).",
+          "TTFT: reusing precomputed KV cache reduces time-to-first-token by 85%-96% vs standard decoding; at 5,000-token context, ~96% TTFT reduction (10 reused docs of varying length).",
+          "General capability (GSM8K, MMLU, IFEval, ARC, PiQA, SciQ, Winogrande, HellaSwag): KVLink stays within ~3 points of the fine-tuned model, preserving general reasoning/instruction-following.",
+          "With cache compression (Table 3, Llama-3.2-1B): modified AnLLMs compression beats LLMLingua; KVLink5 over BlockAttention adds ~1-3 points under 50%/75% compression (e.g., HotpotQA 52.4/55.4 vs 51.1/54.3 at 75%/50%).",
+          "Link-token count monotonically helps: KVLink0 < KVLink1 < KVLink5 on most QA tasks."
+        ],
+        "limitations": [
+          "Requires fine-tuning the LLM (6,000 steps) with the link-token attention mechanism \u2014 not training-free, unlike PromptCache/CacheBlend.",
+          "Link tokens and the compressed-cache variant require a customized attention mask and a training stage; integration into off-the-shelf serving stacks is non-trivial.",
+          "Storage overhead of per-document KV caches is large (e.g., ~131MB for a 1,000-token Llama3-8B cache vs ~5KB text); the compressed variant mitigates but adds a separate pretraining stage.",
+          "Evaluation contexts are moderate (1,000-5,000 tokens, 10 docs); behavior at very long contexts or very large document banks is not reported."
+        ],
+        "relevance_to_run": "A 2026 representative of the prefix-sharing / cache-reuse route that targets the RAG/multi-query setting where the same documents recur across queries. Directly contrasts PromptCache (naive reuse, large accuracy drop), CacheBlend (partial recomputation), and BlockAttention (fine-tuning for separate encoding), and is composable with compression \u2014 supporting the contract's prefix-sharing route and the cross-route compression interaction.",
+        "summary": "KVLink enables reuse of independently pre-computed per-document KV caches across different queries (e.g., RAG) by (1) storing KV states without RoPE positional embeddings and re-applying global rotary positions at inference (positional re-encoding), and (2) appending a small number of trainable 'link tokens' per document whose customized attention mask lets later documents attend back to earlier ones, restoring cross-document dependencies lost by context-free encoding. It is combined with chunked anchor-token compression (a modified AnLLMs) to cut cache storage/loading overhead."
+      },
+      "id": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.16002",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.16002",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-21",
+        "publication_year": 2025,
+        "title": "KVLink: Accelerating Large Language Models via Efficient KV Cache Reuse"
+      }
+    },
+    "paper_0e60c220-f42d-4d0b-8175-ab38642389ef": {
+      "analysis": null,
+      "id": "paper_0e60c220-f42d-4d0b-8175-ab38642389ef",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2504.15364",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2504.15364",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-04-21",
+        "publication_year": 2025,
+        "title": "KeyDiff: Key Similarity-Based KV Cache Eviction for Long-Context LLM Inference in Resource-Constrained Environments"
+      }
+    },
+    "paper_10aa6522-e95f-456a-ae26-d77802f73304": {
+      "analysis": null,
+      "id": "paper_10aa6522-e95f-456a-ae26-d77802f73304",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2508.09442",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2508.09442",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-08-13",
+        "publication_year": 2025,
+        "title": "Shadow in the Cache: Unveiling and Mitigating Privacy Risks of KV-cache in LLM Inference"
+      }
+    },
+    "paper_19c94b93-7aca-4821-aa98-746f2ebe1c14": {
+      "analysis": null,
+      "id": "paper_19c94b93-7aca-4821-aa98-746f2ebe1c14",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.25080",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.25080",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-28",
+        "publication_year": 2026,
+        "title": "CacheFlow: Efficient LLM Serving with 3D-Parallel KV Cache Restoration"
+      }
+    },
+    "paper_21a69738-3f18-43e6-a029-44227768dff0": {
+      "analysis": null,
+      "id": "paper_21a69738-3f18-43e6-a029-44227768dff0",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.03143",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.03143",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-03",
+        "publication_year": 2026,
+        "title": "TokenDance: Scaling Multi-Agent LLM Serving via Collective KV Cache Sharing"
+      }
+    },
+    "paper_21dd236b-317d-415f-b8c8-47cecad064b7": {
+      "analysis": null,
+      "id": "paper_21dd236b-317d-415f-b8c8-47cecad064b7",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.02888",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.02888",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-04",
+        "publication_year": 2026,
+        "title": "SpecKV: Adaptive Speculative Decoding with Compression-Aware Gamma Selection"
+      }
+    },
+    "paper_22dfe71b-356f-439c-a2fd-88628495c97c": {
+      "analysis": null,
+      "id": "paper_22dfe71b-356f-439c-a2fd-88628495c97c",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2508.13231",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2508.13231",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-08-17",
+        "publication_year": 2025,
+        "title": "Accelerating LLM Inference via Dynamic KV Cache Placement in Heterogeneous Memory System"
+      }
+    },
+    "paper_265af396-cca5-4a01-9039-93a88a9b6ae3": {
+      "analysis": null,
+      "id": "paper_265af396-cca5-4a01-9039-93a88a9b6ae3",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.06997",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.06997",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-07",
+        "publication_year": 2026,
+        "title": "Echo: KV-Cache-Free Associative Recall with Spectral Koopman Operators"
+      }
+    },
+    "paper_32b7ea94-793e-4bca-b702-ebe156e2cd9e": {
+      "analysis": null,
+      "id": "paper_32b7ea94-793e-4bca-b702-ebe156e2cd9e",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2508.16134",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2508.16134",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-08-22",
+        "publication_year": 2025,
+        "title": "CommonKV: Compressing KV Cache with Cross-layer Parameter Sharing"
+      }
+    },
+    "paper_32bd69c0-0f22-43c7-bde6-ac365b4dc3bd": {
+      "analysis": null,
+      "id": "paper_32bd69c0-0f22-43c7-bde6-ac365b4dc3bd",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2407.18003",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2407.18003",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2024-07-25",
+        "publication_year": 2024,
+        "title": "Keep the Cost Down: A Review on Methods to Optimize LLM' s KV-Cache Consumption"
+      }
+    },
+    "paper_347083a9-b748-47b3-9f4a-94a2b5014ab2": {
+      "analysis": null,
+      "id": "paper_347083a9-b748-47b3-9f4a-94a2b5014ab2",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.10238",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.10238",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-10",
+        "publication_year": 2026,
+        "title": "Learning to Evict from Key-Value Cache"
+      }
+    },
+    "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922": {
+      "analysis": {
+        "contributions": [
+          "Theorem 1: bounds the attention output approximation error by ||QK^T - Q K~^T|| (amplified by V W^O) plus ||V W^O - V~ W^O||, motivating compression of the interaction KQ^T rather than K alone.",
+          "Theorem 2: closed-form optimal rank-R factorization of KQ^T via its truncated SVD (Eckart-Young), with A = K^+ U_hat, B = K^T U_hat; stores only K A* in R x T.",
+          "Efficient O(T d^2) computation by SVD-ing K and Q separately then combining on a d x d matrix, avoiding a direct T x T SVD.",
+          "Extends the same query-aware projection idea to the value-output product (Appendix B).",
+          "Theorem 4 (verified in 6.2): KQ-SVD is invariant to K/Q scaling imbalance (beta), whereas Eigen degrades toward K-SVD as imbalance grows \u2014 a robustness advantage."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Methodology"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "Models: Llama2-7B/13B (no GQA), Llama3-8B and Mistral-7B-v0.3 (GQA); C4 dataset, 128 training sequences of 2048 tokens (T_huge=262,144), rank R chosen per layer to keep >=1-epsilon spectral energy (epsilon=0.1).",
+          "K-SVD gives the most accurate K approximation (as expected) but poor Q approximation, leading to higher attention-output error \u2014 especially in GQA models where shared K amplifies the error.",
+          "KQ-SVD matches Eigen on K/Q/V accuracy but is consistently more accurate on the attention score matrix KQ^T and on the MHA output, outperforming K-SVD and Eigen on all four models.",
+          "Unbalance experiment (Figure 2, Llama2-7B): KQ-SVD and K-SVD are scale-invariant (constant error across beta); Eigen converges to K-SVD's error as beta grows (e.g., beta=10), confirming Theorem 4 and exposing Eigen's fragility under K/Q imbalance.",
+          "Evaluation is on relative Frobenius error of K, Q, V, KQ^T, and MHA output, averaged across 32 validation sequences of 2048 tokens."
+        ],
+        "limitations": [
+          "Evaluation is matrix-approximation error (Frobenius), not end-to-end task accuracy or wall-clock/throughput on long-context benchmarks; the downstream quality and speedup implications are not directly reported.",
+          "Requires a calibration set of query vectors (128 sequences) to compute projections \u2014 training-free but not zero-overhead, and projections are static once learned.",
+          "Rank R is chosen per layer from spectral energy; the compression ratio is implicit and not reported as a single headline memory-reduction figure comparable to VQKV's 82%.",
+          "GQA helps KQ-SVD relatively (it models the interaction), but the absolute error in GQA models remains higher than in non-GQA models; behavior at very large scale is not characterized."
+        ],
+        "relevance_to_run": "A 2025-2026 representative of the low-rank compression sub-route, directly addressing the contract's compression/low-rank family. It contrasts with K-SVD (compress K alone, ignores Q) and Eigen (joint Q/K/V embedding), providing a competing-result comparison on the importance of modeling the query-key interaction. Relevant to the lossless-vs-lossy and training-free-vs-training-aware trade-offs (training-free, calibration-based).",
+        "summary": "KQ-SVD is a training-free, provably optimal low-rank KV cache compression method that decomposes the query-key interaction matrix KQ^T (rather than K alone). Motivated by Theorem 1 \u2014 which bounds attention output error by the error in QK^T plus the error in V \u2014 KQ-SVD solves min_{A,B} ||K A B^T Q^T - K Q^T||_F s.t. rank<=R, and Theorem 2 gives the closed-form optimal solution A = K^+ U_hat, B = K^T U_hat where U_hat holds the top-R left singular vectors of KQ^T. Only the low-rank K A* is stored. The same strategy applies to the value-output product. Computation is O(T d^2) via SVDs of K and Q."
+      },
+      "id": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2512.05916",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2512.05916",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-12-05",
+        "publication_year": 2025,
+        "title": "KQ-SVD: Compressing the KV Cache with Provable Guarantees on Attention Fidelity"
+      }
+    },
+    "paper_38ea4a74-ba40-4d17-a16f-10073fa85adb": {
+      "analysis": null,
+      "id": "paper_38ea4a74-ba40-4d17-a16f-10073fa85adb",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.02905",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.02905",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-06",
+        "publication_year": 2026,
+        "title": "eOptShrinkQ: Near-Lossless KV Cache Compression Through Optimal Spectral Denoising and Quantization"
+      }
+    },
+    "paper_394cedf2-562a-4cfa-b54e-f82296361c75": {
+      "analysis": null,
+      "id": "paper_394cedf2-562a-4cfa-b54e-f82296361c75",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2506.15969",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2506.15969",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-06-19",
+        "publication_year": 2025,
+        "title": "LazyEviction: Lagged KV Eviction with Attention Pattern Observation for Efficient Long Reasoning"
+      }
+    },
+    "paper_3a58b8de-8b18-4934-b4f4-ce8dc25e1246": {
+      "analysis": null,
+      "id": "paper_3a58b8de-8b18-4934-b4f4-ce8dc25e1246",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.26412",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.26412",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-29",
+        "publication_year": 2026,
+        "title": "When Hidden States Drift: Can KV Caches Rescue Long-Range Speculative Decoding?"
+      }
+    },
+    "paper_3f50d954-aa2c-45ab-953f-f8a48eb6001a": {
+      "analysis": null,
+      "id": "paper_3f50d954-aa2c-45ab-953f-f8a48eb6001a",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.25475",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.25475",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-25",
+        "publication_year": 2026,
+        "title": "IndexMem: Learned KV-Cache Eviction with Latent Memory for Long-Context LLM Inference"
+      }
+    },
+    "paper_4477571f-208d-45f4-a494-aaa310b58996": {
+      "analysis": null,
+      "id": "paper_4477571f-208d-45f4-a494-aaa310b58996",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2503.10337",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2503.10337",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-03-13",
+        "publication_year": 2025,
+        "title": "KV-Distill: Nearly Lossless Learnable Context Compression for LLMs"
+      }
+    },
+    "paper_44aaa40d-dfe0-478f-9ce6-2b4b6272c83e": {
+      "analysis": null,
+      "id": "paper_44aaa40d-dfe0-478f-9ce6-2b4b6272c83e",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.07234",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.07234",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-08",
+        "publication_year": 2026,
+        "title": "Reformulating KV Cache Eviction Problem for Long-Context LLM Inference"
+      }
+    },
+    "paper_44bd36a6-963e-4a89-af3a-fa8eca3dd718": {
+      "analysis": null,
+      "id": "paper_44bd36a6-963e-4a89-af3a-fa8eca3dd718",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2603.23049",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2603.23049",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-03-24",
+        "publication_year": 2026,
+        "title": "PCR: A Prefetch-Enhanced Cache Reuse System for Low-Latency RAG Serving"
+      }
+    },
+    "paper_44e27e30-625f-4fa8-88c3-84c726305749": {
+      "analysis": null,
+      "id": "paper_44e27e30-625f-4fa8-88c3-84c726305749",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.13556",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.13556",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-15",
+        "publication_year": 2026,
+        "title": "YOCO++: Enhancing YOCO with KV Residual Connections for Efficient LLM Inference"
+      }
+    },
+    "paper_4a5ef094-74f7-453c-93bb-4224464e4ac3": {
+      "analysis": null,
+      "id": "paper_4a5ef094-74f7-453c-93bb-4224464e4ac3",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2503.08879",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2503.08879",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-03-11",
+        "publication_year": 2025,
+        "title": "LLMs Know What to Drop: Self-Attention Guided KV Cache Eviction for Efficient Long-Context Inference"
+      }
+    },
+    "paper_4c508572-697c-435c-800f-2baf0f1d3f3f": {
+      "analysis": null,
+      "id": "paper_4c508572-697c-435c-800f-2baf0f1d3f3f",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2603.15569",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2603.15569",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-03-16",
+        "publication_year": 2026,
+        "title": "Mamba-3: Improved Sequence Modeling using State Space Principles"
+      }
+    },
+    "paper_4d9558d0-bae6-4008-bb94-034c55a1e581": {
+      "analysis": null,
+      "id": "paper_4d9558d0-bae6-4008-bb94-034c55a1e581",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2509.00202",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2509.00202",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-08-29",
+        "publication_year": 2025,
+        "title": "From TLinFormer to TConstFormer: The Leap to Constant-Time Transformer Attention: Achieving O(1) Computation and O(1) KV Cache during Autoregressive Inference"
+      }
+    },
+    "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481": {
+      "analysis": {
+        "contributions": [
+          "Preference-prioritized adaptive allocation: a per-layer preference score P = H^(1/tau1) * V^(1/tau2) from attention entropy H and variance V over a recent observation window, normalized to distribute a global budget B_total across layers (Eq. 6-7).",
+          "Preference-guided cascading cache management: a stage-wise algorithm that maintains the budget during prefilling, reducing peak memory to the target; Theorem 1 proves it is equivalent to the optimal one-shot allocation, and Proposition 1 proves per-layer budgets decrease monotonically across stages.",
+          "Attention-shift tolerant eviction indicator: I[n] = Mean(A) + gamma*Var(A) for non-recent tokens (with a large Omega protecting the most recent W tokens), combining sustained importance and attention variability to avoid prematurely evicting fluctuating-but-important tokens.",
+          "Empirically demonstrates the allocation strategy is a generalizable framework that improves existing eviction indicators (H2O, SnapKV) when swapped in."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Methodology"
+          },
+          {
+            "kind": "section",
+            "value": "Experimentation"
+          }
+        ],
+        "key_results": [
+          "Evaluated on 5 LLMs (7B-70B, MHA and GQA: Llama2-Chat, Gemma-Instruct, Llama3-Instruct, Mistral-v0.3, Qwen2.5-Instruct) on LongBench (16 datasets) and NeedleBench, budgets 64L-2048L, on A100 80GB.",
+          "On LongBench at B_total=128L (Llama2-7B-Chat), CAKE averages 29.29 vs SnapKV 28.09 and PyramidKV 28.20; at 1024L, CAKE 32.98 vs SnapKV 32.50 and PyramidKV 32.55. CAKE matches full-cache performance once B_total > 512L.",
+          "On NeedleBench 32K, CAKE preserves 32K-context capability using only 3.2% of the cache and surpasses full cache on Single-Needle Retrieval; leads on Multi-Needle Retrieval.",
+          "Memory/throughput (Mistral-7B, B_total=1024L): ~48.63% peak-memory reduction vs full cache at 128K context; >10x decoding-latency speedup over full cache at 128K.",
+          "Ablation (Table 2): allocation strategies Avg \u2014 Uniform 28.36, Pyramid 28.69, Random 28.3+/-0.2, P2A 29.29. Eviction indicators (Table 3): Mean 28.82, Var 28.68, Mean*Var 28.6, Mean+Var 29.29 \u2014 additive combination best."
+        ],
+        "limitations": [
+          "Training-free but requires computing attention entropy and variance over a recent window S_w at prefilling, adding a profiling pass; the cascading algorithm mitigates but does not eliminate this overhead.",
+          "Preference score depends on temperature parameters tau1, tau2 that must be tuned per model and memory constraint.",
+          "Gains over SnapKV/PyramidKV are modest in absolute terms (e.g., +0.5-1.2 LongBench points at 128L); the advantage is largest under tight budgets and narrows as budget grows toward full-cache parity.",
+          "Heuristic allocation is static per-input (computed once from prefilling attention); unlike LKV it does not learn cross-task optimal budgets."
+        ],
+        "relevance_to_run": "A 2026 representative of the heuristic-eviction route that advances the layer-wise budget-allocation line (PyramidKV, AdaKV) with a data-driven, content-adaptive allocation plus a shift-tolerant indicator. Directly contrasts LKV (learned allocation) and SnapKV/PyramidKV (heuristic allocation), supporting the contract's eviction route and the training-free vs. training-aware trade-off. Demonstrates compatibility with existing eviction indicators (H2O, SnapKV), positioning allocation as an orthogonal axis.",
+        "summary": "CAKE (Preference-prioritized Adaptive Allocation + Attention-shift tolerant Eviction) is a training-free KV cache eviction method that (1) allocates a global cache budget across layers according to a per-layer preference score combining attention spatial dispersion (entropy) and temporal shift (variance), and (2) evicts tokens using an indicator that combines mean attention (sustained importance) plus variance (attention variability) to tolerate attention shifts. A cascading cache management algorithm reduces peak prefilling memory from O(S*L) to the target budget while provably matching the result of the optimal one-shot allocation (Theorem 1)."
+      },
+      "id": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2503.12491",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2503.12491",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-03-16",
+        "publication_year": 2025,
+        "title": "CAKE: Cascading and Adaptive KV Cache Eviction with Layer Preferences"
+      }
+    },
+    "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769": {
+      "analysis": {
+        "contributions": [
+          "First end-to-end differentiable framework for KV cache eviction that jointly learns head-wise budgets and token selection, bypassing heuristic proxies entirely.",
+          "LKV-H: global 1D budget competition that flattens all L*H heads into a single Soft-TopK selection, enabling cross-layer budget transfer that rigid layer-wise heuristics cannot approximate.",
+          "LKV-T: matrix-free intrinsic token selection predicting utility from KV states alone, avoiding the chicken-and-egg problem of needing attention matrices to evaluate token importance.",
+          "Closed-form Soft-TopK operator with exact budget satisfaction, order preservation, and translation invariance, enabling stable end-to-end gradient flow."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Methodology"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "On LongBench with Llama-3.1-8B-Instruct at strict 15% KV budget, LKV achieves near-lossless performance, outperforming SnapKV, PyramidKV, DuoAttention, and AdaKV.",
+          "Also evaluated on Qwen3-8B (GQA), showing compatibility with grouped-query attention; adds only ~0.1% trainable parameters.",
+          "Training is cost-effective: <2 hours on 8xA100 GPUs via self-distillation on a ~23k sample Loom dataset.",
+          "Analysis identifies learned budgeting (LKV-H) as the dominant driver of fidelity over selection policies, demonstrating data-driven allocation is essential to overcome hand-crafted heuristics."
+        ],
+        "limitations": [
+          "Requires a training/distillation phase (not training-free), though lightweight (~0.1% params, <2 GPU-hours).",
+          "Learned budgets are static once trained (zero-overhead at inference but not dynamically adapted to per-input content); the global budget ratio R is fixed.",
+          "Evaluation limited to 8B-class models; scaling behavior to much larger models or extreme compression ratios below 15% is not reported in the main experiments."
+        ],
+        "relevance_to_run": "Representative of the 2026 frontier in learned KV cache eviction, directly addressing the contract's eviction/token-selection route and the training-free vs. training-aware trade-off. It explicitly contrasts itself against heuristic baselines (SnapKV, PyramidKV, DuoAttention, AdaKV), providing cross-route comparison evidence.",
+        "summary": "LKV formulates KV cache eviction as an end-to-end differentiable optimization problem, replacing heuristic budget allocation and token selection with learned, task-optimized policies. It has two components: LKV-H learns global head-wise budget allocation via a flattened 1D Soft-TopK competition across all layers and heads (enabling cross-layer budget transfer), and LKV-T performs matrix-free intrinsic token selection that predicts token utility from key/value states alone without materializing attention matrices. Training uses self-distillation against a frozen full-cache teacher with KL divergence on outputs plus hidden-state alignment, adding only ~0.1% trainable parameters."
+      },
+      "id": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.06676",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.06676",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-22",
+        "publication_year": 2026,
+        "title": "LKV: End-to-End Learning of Head-wise Budgets and Token Selection for LLM KV Cache Eviction"
+      }
+    },
+    "paper_5607493a-f09d-498d-a3dc-288668a5b5d6": {
+      "analysis": null,
+      "id": "paper_5607493a-f09d-498d-a3dc-288668a5b5d6",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.06766",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.06766",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-10",
+        "publication_year": 2025,
+        "title": "Exploiting Sparsity for Long Context Inference: Million Token Contexts on Commodity GPUs"
+      }
+    },
+    "paper_5f693dda-7e4e-45f5-8b70-bf05561688e9": {
+      "analysis": null,
+      "id": "paper_5f693dda-7e4e-45f5-8b70-bf05561688e9",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2603.27467",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2603.27467",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-03-29",
+        "publication_year": 2026,
+        "title": "TurboAngle: Near-Lossless KV Cache Compression via Uniform Angle Quantization"
+      }
+    },
+    "paper_683c1513-2fd8-480e-a196-690f0be0f1cb": {
+      "analysis": null,
+      "id": "paper_683c1513-2fd8-480e-a196-690f0be0f1cb",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.06370",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.06370",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-07",
+        "publication_year": 2026,
+        "title": "ForkKV: Scaling Multi-LoRA Agent Serving via Copy-on-Write Disaggregated KV Cache"
+      }
+    },
+    "paper_6b32d6f5-bf47-4e6f-bb8b-a9dca866763a": {
+      "analysis": null,
+      "id": "paper_6b32d6f5-bf47-4e6f-bb8b-a9dca866763a",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.07115",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.07115",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-10",
+        "publication_year": 2025,
+        "title": "Online Scheduling for LLM Inference with KV Cache Constraints"
+      }
+    },
+    "paper_6dee8f13-0c24-4c85-8e84-c918dff24413": {
+      "analysis": null,
+      "id": "paper_6dee8f13-0c24-4c85-8e84-c918dff24413",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2503.01586",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2503.01586",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-03-03",
+        "publication_year": 2025,
+        "title": "EliteKV: Scalable KV Cache Compression via RoPE Frequency Selection and Joint Low-Rank Projection"
+      }
+    },
+    "paper_6f3b4226-dc1a-444a-bebb-356640d91fd4": {
+      "analysis": null,
+      "id": "paper_6f3b4226-dc1a-444a-bebb-356640d91fd4",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.04420",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.04420",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-06",
+        "publication_year": 2025,
+        "title": "KVTuner: Sensitivity-Aware Layer-Wise Mixed-Precision KV Cache Quantization for Efficient and Nearly Lossless LLM Inference"
+      }
+    },
+    "paper_73ca1a25-eebf-4359-af53-ef40a6855748": {
+      "analysis": {
+        "contributions": [
+          "Observation (Figure 2): across 200 qasper questions, max sequence length reaches 25K but unique Exact-TopK (k=256) indices only reach ~1200 \u2014 motivating two-stage eviction-then-selection to close the gap to oracle top-k attention.",
+          "Two-stage framework: coarse permanent eviction (SnapKV, per-group for GQA, pooling kernel 63) then fine dynamic selection (HSA) over the filtered set, where the reduced set makes top-k prediction far easier.",
+          "Hybrid Sparse Attention (HSA): two-dimensional reduction \u2014 page-wise element-wise max/min along the sequence (Quest-style) plus head-dimension magnitude sparsity (SparQ-style) \u2014 approximating top-k attention scores with both K_max and K_min and a sign-based fetch.",
+          "Adaptive compression decomposition: split factor r = min(0.2+0.06*log2(c), 0.8) balances the two stages; HSA evenly splits its ratio across sequence and head dims.",
+          "RocketKV-MT: multi-turn variant retaining full KV history across turns (no storage saving) but filtering per-turn for decode speed, eliminating permanent-eviction loss in multi-turn settings.",
+          "System integration: compatible with FlashAttention (prefill untouched), tensor parallelism, and disaggregated prefill/decode serving (reduces KV transfer traffic)."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Proposed Method: RocketKV"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "Evaluated on Llama3.1-8B-Ins, Mistral-7B-Ins-v0.2, LongChat-7B-v1.5 (GQA + MHA) on LongBench, NIAH, RULER, SCBench; token budgets 256-4096 (single-turn), 1024-16384 (SCBench multi-turn).",
+          "LongBench (Llama3.1-8B-Ins): RocketKV near-lossless at budget >=512, only 1.1% avg drop at 256; consistently beats SnapKV, Quest, SparQ, DuoAttention, with the gap widening at low budgets.",
+          "NIAH (Llama3.1-8B-Ins): 100% accuracy at 256-token budget = >400x compression at 109K max sequence length; SnapKV drops >20% on Mistral/LongChat even at 1024.",
+          "RULER: accuracy loss negligible at short lengths, growing beyond models' effective context; RocketKV's advantage over baselines widens at longer sequences.",
+          "SCBench (multi-turn): RocketKV-MT matches Exact-TopK across all budgets, fixing the multi-turn accuracy gap that plain RocketKV suffers vs SparQ at high budgets.",
+          "Efficiency (Llama3.1-8B-Ins FP16, batch 1): up to 3.7x end-to-end speedup on A100 and 3.3x on H100, up to 32.6% peak memory saving; A100 speedup > H100 because A100 is more memory-bound.",
+          "Storage/traffic analysis (Table 1): at compression ratio c, RocketKV storage = 1/c^r + 2/c^((1+r)/2), traffic = 1/c; RocketKV-MT storage = 1 + 2/c^((1+r)/2) (no first-stage storage saving)."
+        ],
+        "limitations": [
+          "Two-stage pipeline adds implementation complexity (SnapKV + HSA kernels, auxiliary K_max/K_min storage); the Python/gpt-fast prototype is not yet CUDA-optimized, so wall-clock gains could be larger with FlashInfer-style kernels.",
+          "RocketKV (single-turn) still shows an accuracy gap to Exact-TopK on SCBench multi-turn at high budgets; only RocketKV-MT closes it, at the cost of no storage saving.",
+          "Stage-1 SnapKV pooling kernel (63) and the split factor formula are empirically tuned; transfer across models/tasks is not fully validated.",
+          "Evaluated at 7B-8B scale; behavior at much larger models and the interaction with grouped-query vs multi-head attention is partially covered but not exhaustive."
+        ],
+        "relevance_to_run": "A 2026 representative that fuses the eviction route (Stage 1, SnapKV) with the dynamic sparse-selection route (Stage 2, Quest/SparQ-style), directly addressing the contract's eviction, sparsity, and cross-route composition themes. It provides the key cross-route insight that single-stage/single-dimension methods hit an accuracy wall at high compression, while two-stage two-dimensional decomposition preserves accuracy to much higher ratios \u2014 a concrete competing-result comparison against SnapKV, Quest, SparQ, DuoAttention.",
+        "summary": "RocketKV is a two-stage decode-phase KV cache compression framework: Stage 1 performs coarse-grained permanent eviction (SnapKV with per-group selection and a larger pooling kernel of 63) to keep most important tokens; Stage 2 performs fine-grained dynamic top-k selection via Hybrid Sparse Attention (HSA), which reduces along both sequence and head dimensions using element-wise page max/min key statistics. An adaptive split factor r = min(0.2+0.06*log2(c), 0.8) allocates the overall compression ratio c across the two stages. A multi-turn variant RocketKV-MT retains full KV history across turns (no storage saving) but filters per turn for decode speed, avoiding permanent-eviction accuracy loss in multi-turn dialogue."
+      },
+      "id": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.14051",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.14051",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-19",
+        "publication_year": 2025,
+        "title": "RocketKV: Accelerating Long-Context LLM Inference via Two-Stage KV Cache Compression"
+      }
+    },
+    "paper_7a58f39a-1e4a-408b-b287-7da315b3bbcc": {
+      "analysis": null,
+      "id": "paper_7a58f39a-1e4a-408b-b287-7da315b3bbcc",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2508.15099",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2508.15099",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-08-20",
+        "publication_year": 2025,
+        "title": "Hydra: A Modular Architecture for Efficient Long-Context Reasoning"
+      }
+    },
+    "paper_7b5dc7ce-563e-42de-ab41-8eb27e7d69dc": {
+      "analysis": null,
+      "id": "paper_7b5dc7ce-563e-42de-ab41-8eb27e7d69dc",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.24168",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.24168",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-22",
+        "publication_year": 2026,
+        "title": "Inference Time Context Sparsity: Illusion or Opportunity?"
+      }
+    },
+    "paper_7d0e0cd0-5065-4eec-9a7e-b83c39304f90": {
+      "analysis": null,
+      "id": "paper_7d0e0cd0-5065-4eec-9a7e-b83c39304f90",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2601.22379",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2601.22379",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-01-29",
+        "publication_year": 2026,
+        "title": "SPLA: Block Sparse Plus Linear Attention for Long Context Modeling"
+      }
+    },
+    "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397": {
+      "analysis": {
+        "contributions": [
+          "Arithmetic-intensity / roofline analysis of prefill vs. decoding across (small/large batch) x (short/long context) regimes, classifying which regimes are weight-quantization-bound vs. KV-cache-quantization-bound.",
+          "Hierarchical INT4 KV cache: INT8 = 2^4 * C_U^INT4 + C_L^INT4, letting the draft model use the upper 4 bits and the target model reconstruct INT8 from both halves, removing the redundant draft KV copy.",
+          "Double full-precision buffer (2G) that keeps recent tokens in FP16 for high acceptance rate, defers quantization to every G steps, and cleanly supports speculative-decoding rollback by operating only on the second buffer.",
+          "Self-speculative decoding with shared architecture (draft = INT4 upper bits, target = INT8 reconstruction), improving acceptance rate over big-little speculative decoding."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "LLM Inference Bottlenecks"
+          },
+          {
+            "kind": "section",
+            "value": "Evaluation"
+          }
+        ],
+        "key_results": [
+          "INT8 KV cache perplexity on Llama-2-7B (WikiText2 6.4696 vs FP16 6.4595; C4 7.2620 vs 7.2617) \u2014 near-lossless, validating INT8 as the target precision.",
+          "On Llama-2-7B-32K-Instruct and LWM-Text-Chat-128k, QuantSpec achieves up to 2.49x speedup over autoregressive (AR) target generation, vs sparsity-based self-speculative baselines (StreamingLLM, SnapKV).",
+          "At 128k context (LWM-Text-Chat, Multi-LexSum), StreamingLLM and SnapKV hit OOM while QuantSpec runs at 61.22 GB peak memory with 94.31% acceptance and 2.49x speedup.",
+          "At 32k (Llama-2-7B, Multi-LexSum): QuantSpec 2.08x speedup, 25.84 GB vs StreamingLLM 1.84x/32.61GB and SnapKV 1.63x/33.96GB; acceptance 91.16%.",
+          "Quantization strategy: key cache quantized along channel axis, value cache along token axis (per-group, group size G = head dim), minimizing quantization error and maximizing acceptance."
+        ],
+        "limitations": [
+          "Self-speculative: the draft and target share architecture, so speedup is bounded by the acceptance rate and the INT4-vs-INT8 compute ratio; gains are largest in long-context memory-bound regimes.",
+          "The double full-precision buffer adds 2G tokens of FP16 KV per layer, partially offsetting the compression benefit.",
+          "Reported on Llama-2-7B-class models; scaling to much larger models and the interaction with GQA/MoE is not fully characterized.",
+          "Acceptance rate can dip below baselines in some short-context regimes (e.g., 8k PG19 89.88% vs SnapKV 94.39%), though end-to-end speedup still wins."
+        ],
+        "relevance_to_run": "A 2025 representative of the speculative-decoding \u00d7 KV-cache interaction route, directly addressing the contract's speculative/parallel decoding interaction with cache. It is grounded in an arithmetic-intensity / roofline analysis that explains when weight quantization vs. KV-cache quantization dominates, and it composes quantization with self-speculative decoding \u2014 a cross-route combination distinct from pure eviction or pure compression.",
+        "summary": "QuantSpec is a self-speculative decoding framework that accelerates both short- and long-context generation by quantizing model weights and the KV cache to INT4. Its core innovation is a hierarchical INT4 KV cache: an INT8 value is decomposed into upper and lower 4-bit halves, so the draft model loads only the upper INT4 (fast, low-precision) while the target model reconstructs INT8 from both halves (high precision) \u2014 eliminating the redundant separate draft KV cache. A double full-precision buffer of size 2G (G = quantization group size) keeps the most recent tokens in full precision to maintain a high draft acceptance rate and to handle speculative-decoding rollbacks without repeated quantize/dequantize overhead."
+      },
+      "id": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.10424",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.10424",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-05",
+        "publication_year": 2025,
+        "title": "QuantSpec: Self-Speculative Decoding with Hierarchical Quantized KV Cache"
+      }
+    },
+    "paper_81c566d8-5919-4a47-95a9-ce88e99fa3d6": {
+      "analysis": null,
+      "id": "paper_81c566d8-5919-4a47-95a9-ce88e99fa3d6",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2412.19442",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2412.19442",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2024-12-27",
+        "publication_year": 2024,
+        "title": "A Survey on Large Language Model Acceleration based on KV Cache Management"
+      }
+    },
+    "paper_8800f36b-ed8e-4040-b47e-4086e9e0a718": {
+      "analysis": null,
+      "id": "paper_8800f36b-ed8e-4040-b47e-4086e9e0a718",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.24022",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.24022",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-20",
+        "publication_year": 2026,
+        "title": "Adaptive KV Cache Reuse for Fast Long-Context LLM Serving"
+      }
+    },
+    "paper_89f605e5-cd4f-4bd7-9aca-97e465c733b1": {
+      "analysis": null,
+      "id": "paper_89f605e5-cd4f-4bd7-9aca-97e465c733b1",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2506.18879",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2506.18879",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-06-23",
+        "publication_year": 2025,
+        "title": "CommVQ: Commutative Vector Quantization for KV Cache Compression"
+      }
+    },
+    "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0": {
+      "analysis": {
+        "contributions": [
+          "Three-level hybrid design: (L1) architectural hybrid of RNN matrix memory + softmax attention; (L2) intra-layer hybrid concatenating long-term (m-slot gated RNN) and short-term (w-window) memory under a unified softmax; (L3) inter-layer hybrid by varying w per layer (w=0 pure linear, w=N full attention).",
+          "Unified softmax fusion over concatenated long+short memory, which gradient analysis shows couples gradient flow between the two memories better than output-level weighted fusion.",
+          "Chunkwise parallel form enabling efficient training (analogous to GSA's associative scan), with linear memory update + shifted sliding-window logits fused in one softmax.",
+          "Pretrained-LLM hybridization: replacing selected full-attention layers of Llama-3-8B / Qwen2.5-7B / Qwen3-30B-A3B with NHA modules + lightweight fine-tuning, reducing reliance on full attention."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Naive Hybrid Attention"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "Pretrained from scratch at 340M/15B tokens and 1.3B/100B tokens with 'one Transformer every 8 layers' stacking. At 1.3B, NHA averages 46.43 on recall-intensive tasks (FDA/SWDE/SQuAD/NQ/TriviaQA/Drop) vs GDN-H 44.88, GSA-H 44.99, Mamba2-H 44.18; and 52.89 commonsense avg, competitive with best hybrids.",
+          "RULER long-context (trained 2K, tested to 8K): NHA 81.4/51.8/21.6 on NIAH-MK (1K/2K/4K) vs GDN-H 59.6/29.4/15.0; strongest extrapolation among hybrids, though Transformer still leads in-length NIAH.",
+          "Pretrained-LLM hybridization: NHA-Llama-3-8B (4 full-attn layers) achieves best recall avg (57.64) among same-scale hybrids with the fewest full-attention layers, closely matching original Llama-3-8B (60.08).",
+          "Scaling to Qwen3-30B-A3B: NHA hybrid (47.25 avg) stays competitive with the original (44.60) on a broad benchmark suite including GPQA/IFVL/HEval/MaQA/MMLU.",
+          "Operator efficiency (H100): NHA scales near-linearly and matches GSA speed across lengths; FlashAttention is faster on short sequences but quadratic on long. NHA-Llama3-8B inference latency/memory grow much slower than Llama3-8B at 1K-token generation.",
+          "Ablation (Table 5): removing long-term memory drops recall 38.60->29.58; removing short-term 36.97; removing token shift 35.76; unified softmax (38.60) beats weighted-sum fusion variants (34.06 fixed, 33.59 learnable)."
+        ],
+        "limitations": [
+          "Requires from-scratch pretraining for the full benefit; the pretrained-LLM hybridization path uses a limited (~10B-token) fine-tuning budget and shows a gap on recall-intensive tasks and MMLU, partly attributed to data distribution shift and 2K training context.",
+          "Long-term memory is fixed-size (m slots), so exact retrieval of arbitrarily old tokens is fundamentally bounded \u2014 pure Transformers still lead on in-length needle-in-a-haystack.",
+          "Reported hybrid ratios use a small number of full-attention layers (e.g., 4); the optimal layer placement and ratio for larger models is not fully characterized.",
+          "Comparison is at 340M/1.3B from scratch and 7B-30B hybridized; the compute cost of from-scratch NHA pretraining at frontier scale is not reported."
+        ],
+        "relevance_to_run": "A 2026 representative of the architectural-alternatives route (linear/SSM + attention hybrids), directly addressing the contract's architectural-alternatives family. It unifies the 'one Transformer every N layers' hybrid pattern into a single intra-layer mechanism and contrasts with NSA (natively trainable sparse) and Mamba-2/GSA/GLA/GDN pure-linear baselines, supporting cross-route comparison between sparse-attention and linear-memory hybrids.",
+        "summary": "Native Hybrid Attention (NHA) is a unified attention architecture that fuses, within a single layer, a fixed-size gated linear-RNN long-term memory (m slots) with a sliding-window short-term memory (w tokens), applying softmax over their concatenated keys. By varying the window size w per layer, the same module can act as pure linear RNN (w=0), intra-layer hybrid (0<w<N), or full attention (w=N), enabling inter-layer hybridization without architectural changes. NHA also supports a chunkwise parallel form for efficient training and can retrofit pretrained Transformers into NHA hybrids with lightweight fine-tuning."
+      },
+      "id": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2510.07019",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2510.07019",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-10-08",
+        "publication_year": 2025,
+        "title": "Native Hybrid Attention for Efficient Sequence Modeling"
+      }
+    },
+    "paper_8c6512b6-2996-425d-9551-d7fb8bf10764": {
+      "analysis": null,
+      "id": "paper_8c6512b6-2996-425d-9551-d7fb8bf10764",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.07223",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.07223",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-06",
+        "publication_year": 2026,
+        "title": "SpecAttn: Co-Designing Sparse Attention with Self-Speculative Decoding"
+      }
+    },
+    "paper_93d049ae-4874-469f-a54b-c923d38dd44a": {
+      "analysis": null,
+      "id": "paper_93d049ae-4874-469f-a54b-c923d38dd44a",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2603.20397",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2603.20397",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-03-20",
+        "publication_year": 2026,
+        "title": "KV Cache Optimization Strategies for Scalable and Efficient LLM Inference"
+      }
+    },
+    "paper_94fbb444-9f99-4f2c-8f3e-2b7c979e67ba": {
+      "analysis": null,
+      "id": "paper_94fbb444-9f99-4f2c-8f3e-2b7c979e67ba",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.03216",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.03216",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-03",
+        "publication_year": 2026,
+        "title": "Token Sparse Attention: Efficient Long-Context Inference with Interleaved Token Selection"
+      }
+    },
+    "paper_a0f8e985-4e28-490b-9965-ec6519b337b3": {
+      "analysis": null,
+      "id": "paper_a0f8e985-4e28-490b-9965-ec6519b337b3",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.11501",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.11501",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-13",
+        "publication_year": 2026,
+        "title": "Quantization Dominates Rank Reduction for KV-Cache Compression"
+      }
+    },
+    "paper_aaa641fb-1d88-4a8d-9326-b9a119f960f2": {
+      "analysis": null,
+      "id": "paper_aaa641fb-1d88-4a8d-9326-b9a119f960f2",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.17613",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.17613",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-17",
+        "publication_year": 2026,
+        "title": "VeriCache: Turning Lossy KV Cache into Lossless LLM Inference"
+      }
+    },
+    "paper_b4920f81-b210-4a71-9646-35e3b2691c4e": {
+      "analysis": {
+        "contributions": [
+          "A standardized KV caching layer between inference engines and heterogeneous storage, compatible with vLLM and SGLang, exposing store/retrieve/lookup interfaces and a shared token pool for cross-instance cache awareness.",
+          "Chunk-level KV transfer (vs vLLM's page-by-page) using high-performance CUDA kernels, achieving 400 Gbps CPU loading bandwidth vs vLLM native 88 Gbps (Table 5).",
+          "Asynchronous, layer-wise KV loading overlapped with prefill/decode compute (request asynchronization), reducing end-to-end delay by 1.46x.",
+          "Adaptive KV-loading-vs-prefill decision: at low network bandwidth (32 Gbps) loading beats prefill only beyond 256K tokens; at 64/128 Gbps it wins across all lengths \u2014 a deployment-condition guideline.",
+          "Efficient PD disaggregation via chunked GPU-buffer transfer between prefetcher and decoder, improving tail TTFT over vLLM's native NIXL page-by-page transfer."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Overview of LMCACHE"
+          },
+          {
+            "kind": "section",
+            "value": "Evaluation"
+          }
+        ],
+        "key_results": [
+          "Models: Llama-3.1-8B/70B-Instruct, Qwen2.5-Coder-32B, Qwen2.5-72B, Qwen3-Coder-480B-A35B (FP8), Sao10K-L3-8B; hardware 8xH100 (GMI Cloud).",
+          "Single-node CPU offloading (multi-round Q&A, 10K-token queries, 500GB CPU DRAM): 1.9-8.1x smaller TTFT and 2.3-14x higher throughput than the strongest baseline across 5 models; 7-92% smaller ITL at QPS=1. Commercial options cannot host Qwen3-Coder-480B.",
+          "Real-trace (companies F and G): 3.7-6.8x smaller TTFT and 19-58% smaller ITL vs basic vLLM at high QPS.",
+          "Centralized remote storage (15 Gbps, TriviaQA): 1.3-3x throughput improvement; remote loading can exceed prefill delay for short contexts / small models, motivating adaptive loading.",
+          "PD disaggregation (8K input / 200 output): 1.53-1.84x lower mean TTFT and 1.12-1.66x lower mean ITL than vLLM native PD disaggregation; significantly better tail (p95) TTFT.",
+          "SGLang integration (Qwen3-32B, TP=2): higher throughput / lower TTFT than SGLang without offloading; comparable to SGLang native offloading but with hierarchical distributed backend support."
+        ],
+        "limitations": [
+          "Gains depend on cache hit ratio, which depends on workload prefix overlap; for low-overlap workloads the CPU/remote storage benefit shrinks.",
+          "Remote-backend loading is bandwidth-bound: at 32 Gbps it only beats prefill beyond 256K tokens, so adaptive gating is required and benefit is not universal.",
+          "Evaluation is system-level (TTFT/ITL/throughput) rather than accuracy-preserving compression; LMCache is orthogonal to (and composable with) accuracy-affecting methods like quantization/eviction.",
+          "Commercial baselines are black-box; internal implementation differences are hypothesized, not verified."
+        ],
+        "relevance_to_run": "A 2025-2026 representative of the prefix-sharing / caching-systems and system/scheduling/offloading route, directly addressing the contract's prefix-sharing and system-scheduling families. It complements algorithmic KV compression (VQKV, RocketKV) by tackling the storage/movement/sharing axis, and provides deployment-condition evidence (TTFT, ITL, throughput, bandwidth) across 8B-480B models \u2014 supporting the contract's deployment-conditions requirement.",
+        "summary": "LMCACHE is a unified, high-performance KV caching layer that sits between paged-memory LLM inference engines (vLLM, SGLang) and heterogeneous storage/network backends (GPU, CPU DRAM, remote disks), making prefix caching, CPU offloading, cross-instance KV sharing, and prefill/decode (PD) disaggregation practical at enterprise scale. Its architecture comprises a KV connector, token processor, storage manager, transfer channel, event manager, and a cache controller with a shared token pool. Key performance techniques include chunk-level (vs page-level) transfers, asynchronous layer-wise loading overlapped with compute, and adaptive decisions between KV loading and prefilling depending on bandwidth and context length."
+      },
+      "id": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2510.09665",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2510.09665",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-10-08",
+        "publication_year": 2025,
+        "title": "LMCache: An Efficient KV Cache Layer for Enterprise-Scale LLM Inference"
+      }
+    },
+    "paper_b8f3a9bb-9f52-41ee-9d2d-55ef8c587ee2": {
+      "analysis": null,
+      "id": "paper_b8f3a9bb-9f52-41ee-9d2d-55ef8c587ee2",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2512.16391",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2512.16391",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-12-18",
+        "publication_year": 2025,
+        "title": "Kascade: A Practical Sparse Attention Method for Long-Context LLM Inference"
+      }
+    },
+    "paper_bd79e18a-2b6f-4c3c-9efd-1c898ff3b81c": {
+      "analysis": null,
+      "id": "paper_bd79e18a-2b6f-4c3c-9efd-1c898ff3b81c",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.27740",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.27740",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-26",
+        "publication_year": 2026,
+        "title": "UNIQUE: Universal Top-k Sparse Attention for Training-free Inference and Sparsity-aware Training"
+      }
+    },
+    "paper_ca867b25-031a-4bf1-b098-6e238f03035c": {
+      "analysis": null,
+      "id": "paper_ca867b25-031a-4bf1-b098-6e238f03035c",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2604.13226",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2604.13226",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-04-14",
+        "publication_year": 2026,
+        "title": "KV Packet: Recomputation-Free Context-Independent KV Caching for LLMs"
+      }
+    },
+    "paper_ce0ba187-94d6-4fce-96ed-b46b586e1597": {
+      "analysis": null,
+      "id": "paper_ce0ba187-94d6-4fce-96ed-b46b586e1597",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2605.09649",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2605.09649",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-05-10",
+        "publication_year": 2026,
+        "title": "Make Each Token Count: Towards Improving Long-Context Performance with KV Cache Eviction"
+      }
+    },
+    "paper_d3f81f2f-54b1-4a9f-8762-ff7e5ea59842": {
+      "analysis": null,
+      "id": "paper_d3f81f2f-54b1-4a9f-8762-ff7e5ea59842",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.09725",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.09725",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-10",
+        "publication_year": 2026,
+        "title": "Efficient Remote Prefix Fetching with GPU-native Media ASICs"
+      }
+    },
+    "paper_e8ea6216-c27b-4ba2-a979-bc39fa86a21e": {
+      "analysis": null,
+      "id": "paper_e8ea6216-c27b-4ba2-a979-bc39fa86a21e",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2512.00504",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2512.00504",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-11-29",
+        "publication_year": 2025,
+        "title": "G-KV: Decoding-Time KV Cache Eviction with Global Attention"
+      }
+    },
+    "paper_e95ad573-3261-4632-b731-b359138a2d0d": {
+      "analysis": null,
+      "id": "paper_e95ad573-3261-4632-b731-b359138a2d0d",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2510.00636",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2510.00636",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-10-01",
+        "publication_year": 2025,
+        "title": "Expected Attention: KV Cache Compression by Estimating Attention from Future Queries Distribution"
+      }
+    },
+    "paper_ecd9a53d-f07f-4c1e-9077-6013ad448f1e": {
+      "analysis": null,
+      "id": "paper_ecd9a53d-f07f-4c1e-9077-6013ad448f1e",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2602.05191",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2602.05191",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-02-05",
+        "publication_year": 2026,
+        "title": "Double-P: Hierarchical Top-P Sparse Attention for Long-Context LLMs"
+      }
+    },
+    "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb": {
+      "analysis": {
+        "contributions": [
+          "Applies Residual Simple Vector Quantization (RSimVQ) \u2014 combining Residual VQ with SimVQ projection matrices \u2014 to KV cache, storing only codebook indices instead of full-precision vectors.",
+          "Integrates VQ compression into both prefilling (batch compression of the prompt KV) and decoding (per-token compression with a sliding local window of full-precision entries).",
+          "On-demand reconstruction from codebooks during attention, keeping codebooks resident while storing only integer codes for the bulk of the cache.",
+          "Achieves high compression ratios (~82-83%) with fidelity closer to full cache than feature-dimension-reduction and scalar-quantization baselines."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Compressing KV with Vector Quantization"
+          },
+          {
+            "kind": "section",
+            "value": "Experiment"
+          }
+        ],
+        "key_results": [
+          "Compression ratio of 82.8% on LLaMA3.1-8B and 82.4% on LLaMA3.2-3B.",
+          "On LongBench, VQKV achieves the closest performance to full-cache models among comparable-ratio methods, outperforming ASVD, Palu, KIVI, and SnapKV.",
+          "Codebook configuration for LLaMA3.1-8B: (N_k, N_v) = (56, 16) codebooks, sizes (S_k, S_v) = (1024, 512); for LLaMA3.2-3B: (N_k, N_v) = (56, 10), sizes (1024, 65536).",
+          "RSimVQ trained on 0.1% of OpenWebText with learning rate 0.001, batch size 65536; initial tokens L_init=4, local window L_local=1024.",
+          "Memory-efficiency test shows VQKV extends maximum generation length beyond full-cache under identical hardware."
+        ],
+        "limitations": [
+          "Requires offline training of RSimVQ codebooks (lightweight, on 0.1% of OpenWebText) \u2014 not purely training-free, though no LLM fine-tuning is needed.",
+          "Codebook size and count must be tuned per model and per K/V cache type, adding configuration complexity.",
+          "Reconstruction introduces lookup overhead; net wall-clock speedup depends on codebook residency and memory-bandwidth trade-offs not fully detailed in the experiment section."
+        ],
+        "relevance_to_run": "A 2026 frontier representative of the vector-quantization sub-route within KV cache compression, directly relevant to the contract's compression/quantization route and the lossless-vs-lossy trade-off. Contrasts scalar quantization (KIVI), low-rank approximation (ASVD, Palu), and eviction (SnapKV) under matched compression ratios.",
+        "summary": "VQKV compresses the KV cache via Residual Simple Vector Quantization (RSimVQ), mapping each KV vector to indices in multiple residual-connected codebooks with an extra projection matrix per codebook. Only codebooks and integer codes are stored, and reconstruction is on-demand from codebooks during attention. It achieves high compression ratios (~82-83%) while preserving fidelity closer to full-cache than scalar quantization (KIVI) or low-rank methods (ASVD, Palu)."
+      },
+      "id": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2603.16435",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2603.16435",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2026-03-17",
+        "publication_year": 2026,
+        "title": "VQKV: High-Fidelity and High-Ratio Cache Compression via Vector-Quantization"
+      }
+    },
+    "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8": {
+      "analysis": {
+        "contributions": [
+          "Hierarchical sparse attention combining three branches: compressed block-level attention (coarse), top-k selected block attention (fine), and sliding-window local attention, fused via learned gating.",
+          "Natively trainable: the sparse pattern is learned during pretraining rather than fixed at inference, so the model adapts to sparsity during training.",
+          "Hardware-aligned kernel design balancing arithmetic intensity so that decoding becomes memory-bandwidth-efficient, achieving real wall-clock speedup rather than theoretical-only FLOP reduction.",
+          "End-to-end pretraining at scale (27B total / 3B active GQA+MoE) demonstrating sparse attention can match or exceed full attention quality."
+        ],
+        "key_locators": [
+          {
+            "kind": "section",
+            "value": "Methodology"
+          },
+          {
+            "kind": "section",
+            "value": "Experiments"
+          }
+        ],
+        "key_results": [
+          "Backbone: 27B total / 3B active parameters, GQA (64 heads, 4 groups) + DeepSeekMoE (72 routed + 2 shared experts, top-6), 30 layers.",
+          "Pretrained on 270B tokens of 8k-length texts, then continued training + SFT on 32k-length texts with YaRN for long-context adaptation.",
+          "NSA consistently achieves lower pretraining loss than the Full Attention baseline trained to convergence under identical settings.",
+          "Matches or improves over Full Attention on general benchmarks (MMLU, MMLU-PRO, CMMLU, BBH, GSM8K, MATH, DROP, MBPP, HumanEval) and long-context benchmarks, while delivering substantial training and inference speedup.",
+          "Hyperparameters: compression block size 32, stride 16, selected block size 64, selected block count 16 (1 initial + 2 local fixed), sliding window 512."
+        ],
+        "limitations": [
+          "Requires natively training the model from scratch with the sparse attention mechanism; not a drop-in training-free method for existing pretrained LLMs.",
+          "The sparse pattern and gating are learned during pretraining, so the benefit is tied to models trained this way rather than retrofitted to off-the-shelf models like Llama/Qwen.",
+          "Reported at a specific 27B/3B MoE scale; transfer of the exact sparse configuration to dense models of other sizes is not fully characterized in the main text."
+        ],
+        "relevance_to_run": "A seminal 2025 work for the sparse-attention architectural route, co-designed with hardware to address the gap between theoretical sparsity and real speedup. It represents the 'natively trainable sparse attention' sub-route and is widely cited by 2026 follow-ups (UNIQUE, SPLA, Token Sparse Attention). Directly relevant to the contract's sparsity and architectural-alternative routes.",
+        "summary": "NSA (Native Sparse Attention) is a hardware-aligned, natively trainable hierarchical sparse attention mechanism that combines coarse-grained token block compression with fine-grained token selection and sliding-window local attention. It is designed to be trained end-to-end from scratch rather than applied as a post-hoc inference trick, and includes arithmetic-intensity-balanced kernel optimizations so that sparse attention is actually faster in practice, not just in FLOP count."
+      },
+      "id": "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2502.11089",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2502.11089",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-02-16",
+        "publication_year": 2025,
+        "title": "Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention"
+      }
+    },
+    "paper_fa7d4129-b5ab-4deb-8f6e-26bc82995a35": {
+      "analysis": null,
+      "id": "paper_fa7d4129-b5ab-4deb-8f6e-26bc82995a35",
+      "research_status": "ACTIVE",
+      "source": {
+        "arxiv_id": "2507.14204",
+        "authors": [],
+        "canonical_url": "https://arxiv.org/abs/2507.14204",
+        "doi": null,
+        "other_identifiers": {},
+        "publication_date": "2025-07-14",
+        "publication_year": 2025,
+        "title": "LaCache: Ladder-Shaped KV Caching for Efficient Long-Context Modeling of Large Language Models"
+      }
+    }
+  },
+  "resources": {
+    "limits": {},
+    "usage": {
+      "paper_search_attempts": 13,
+      "source_inspect_attempts": 10,
+      "source_read_attempts": 29
+    }
+  },
+  "state_revision": 88
+}

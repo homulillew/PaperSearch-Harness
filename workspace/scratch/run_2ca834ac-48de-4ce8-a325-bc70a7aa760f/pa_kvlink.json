@@ -1,0 +1,29 @@
+{
+  "paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+  "summary": "KVLink enables reuse of independently pre-computed per-document KV caches across different queries (e.g., RAG) by (1) storing KV states without RoPE positional embeddings and re-applying global rotary positions at inference (positional re-encoding), and (2) appending a small number of trainable 'link tokens' per document whose customized attention mask lets later documents attend back to earlier ones, restoring cross-document dependencies lost by context-free encoding. It is combined with chunked anchor-token compression (a modified AnLLMs) to cut cache storage/loading overhead.",
+  "relevance_to_run": "A 2026 representative of the prefix-sharing / cache-reuse route that targets the RAG/multi-query setting where the same documents recur across queries. Directly contrasts PromptCache (naive reuse, large accuracy drop), CacheBlend (partial recomputation), and BlockAttention (fine-tuning for separate encoding), and is composable with compression — supporting the contract's prefix-sharing route and the cross-route compression interaction.",
+  "contributions": [
+    "Positional re-encoding: decouple KV states from RoPE rotations at storage time (store W_k x_i, W_v x_i), re-apply global rotations at concatenation, fixing the position mismatch of independently encoded segments at negligible cost.",
+    "Link tokens: K trainable tokens (e.g., K=1 or 5) appended per document with a customized attention map so each link token attends to all preceding documents' tokens plus its own document, implicitly reconnecting independently encoded segments; the LLM is fine-tuned jointly with these tokens.",
+    "Compressed KV cache linking: a modified AnLLMs that compresses fixed-length chunks into multiple anchor tokens (chunk size s=100) with chunk-local + preceding-anchor attention, reducing per-document cache storage while preserving the reuse interface.",
+    "Demonstrates that naive reuse (PromptCache) suffers up to ~35% relative accuracy drop, and that link tokens recover most of the gap to fine-tuned full-concatenation upper bound."
+  ],
+  "key_results": [
+    "Backbones: Llama-3.2-1B/3B-Instruct and Llama-3.1-8B-Instruct, fine-tuned 6,000 steps, batch 64, 8xH100.",
+    "On QA (NQ, 2WikiMQA, TriviaQA, HotpotQA, MuSiQue) and summarization (MultiNews, Samsum), KVLink5 consistently beats PromptCache, CacheBlend, and BlockAttention; e.g., on Llama-3.2-1B MuSiQue: KVLink5 19.2% vs BlockAttention 14.3% vs PromptCache 1.4%; approaches the fine-tuned full-concatenation upper bound (19.9%).",
+    "TTFT: reusing precomputed KV cache reduces time-to-first-token by 85%-96% vs standard decoding; at 5,000-token context, ~96% TTFT reduction (10 reused docs of varying length).",
+    "General capability (GSM8K, MMLU, IFEval, ARC, PiQA, SciQ, Winogrande, HellaSwag): KVLink stays within ~3 points of the fine-tuned model, preserving general reasoning/instruction-following.",
+    "With cache compression (Table 3, Llama-3.2-1B): modified AnLLMs compression beats LLMLingua; KVLink5 over BlockAttention adds ~1-3 points under 50%/75% compression (e.g., HotpotQA 52.4/55.4 vs 51.1/54.3 at 75%/50%).",
+    "Link-token count monotonically helps: KVLink0 < KVLink1 < KVLink5 on most QA tasks."
+  ],
+  "limitations": [
+    "Requires fine-tuning the LLM (6,000 steps) with the link-token attention mechanism — not training-free, unlike PromptCache/CacheBlend.",
+    "Link tokens and the compressed-cache variant require a customized attention mask and a training stage; integration into off-the-shelf serving stacks is non-trivial.",
+    "Storage overhead of per-document KV caches is large (e.g., ~131MB for a 1,000-token Llama3-8B cache vs ~5KB text); the compressed variant mitigates but adds a separate pretraining stage.",
+    "Evaluation contexts are moderate (1,000-5,000 tokens, 10 docs); behavior at very long contexts or very large document banks is not reported."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Methodology"},
+    {"kind": "section", "value": "Experiments"}
+  ]
+}

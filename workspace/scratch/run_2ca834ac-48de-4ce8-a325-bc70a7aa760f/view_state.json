@@ -1,0 +1,8 @@
+﻿python : {"command": null, "error": {"message": "the following arguments are required: --run-id", "type": "AdapterInput
+Error"}, "ok": false}
+At line:3 char:1
++ python "$skillDir\scripts\harness.py" --workspace workspace view 2>&1 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ({"command": nul...}, "ok": false}:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

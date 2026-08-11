@@ -1,0 +1,9 @@
+{
+  "name": "KV Cache Eviction & Token Selection",
+  "core_idea": "Reduce the retained KV cache by discarding tokens deemed unimportant, either via heuristic importance scores computed from attention (SnapKV/H2O/PyramidKV/CAKE) or via learned, task-optimized policies (LKV). The central design axes are (a) the per-token importance indicator (cumulative/mean attention, attention variance, learned utility) and (b) the budget allocation across layers/heads (uniform, fixed pyramid, data-driven preference, or globally learned). Eviction is training-free in the heuristic line and training-aware in the learned line; both preserve the standard attention computation over the retained subset.",
+  "representative_paper_refs": [
+    "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+    "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+    "paper_73ca1a25-eebf-4359-af53-ef40a6855748"
+  ]
+}

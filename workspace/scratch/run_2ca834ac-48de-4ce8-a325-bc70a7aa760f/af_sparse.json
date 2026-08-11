@@ -1,0 +1,8 @@
+{
+  "name": "Sparse & Dynamic Top-k Attention",
+  "core_idea": "Reduce decoding cost by attending to only a subset of KV tokens selected per query, rather than evicting permanently. NSA is natively trainable hierarchical sparse attention (compressed block + fine-grained selected block + sliding window) co-designed with hardware-aligned kernels so sparsity yields real wall-clock speedup. RocketKV's second stage (HSA) does dynamic two-dimensional top-k selection (sequence + head) using page-wise K_max/K_min statistics, and Quest/SparQ are single-dimension precursors. The route is distinct from eviction because selection is per-query and dynamic, and from architecture because it keeps standard attention over a filtered set.",
+  "representative_paper_refs": [
+    "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8",
+    "paper_73ca1a25-eebf-4359-af53-ef40a6855748"
+  ]
+}

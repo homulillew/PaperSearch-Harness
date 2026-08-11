@@ -1,0 +1,11 @@
+{
+  "statement": "Single-stage, single-dimension KV compression methods hit an accuracy wall at high compression ratios, while two-stage, two-dimensional decomposition preserves accuracy much further. RocketKV shows that combining coarse permanent eviction (SnapKV) with fine dynamic two-dimensional top-k selection (HSA over sequence+head) reaches near-Exact-TopK accuracy at 256-token budgets (>400x compression on NIAH), whereas single-stage SnapKV/Quest/SparQ degrade sharply; the key observation is that unique Exact-TopK indices across decoding steps are far fewer than the sequence length, so evicting first makes the subsequent top-k prediction far easier.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_e2e61621-801b-4630-a040-b84da89c1d49"
+  ],
+  "sources": [
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Proposed Method: RocketKV"}},
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}}
+  ]
+}

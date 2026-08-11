@@ -1,0 +1,12 @@
+{
+  "statement": "Training-free quality preservation under aggressive compression is not reliably achievable across tasks and models. Heuristic eviction (CAKE, SnapKV) is training-free but its gains over baselines are modest and shrink toward full-cache parity; learned methods (LKV, VQKV codebooks) need a training/distillation phase to reach near-lossless at strict budgets. There is no demonstrated training-free method that is near-lossless at very low budgets (e.g., <10%) across diverse long-context tasks and model families, so the training-free-vs-training-aware trade-off remains a live frontier rather than a settled choice.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+  ],
+  "sources": [
+    {"paper_ref": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}},
+    {"paper_ref": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experimentation"}},
+    {"paper_ref": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiment"}}
+  ]
+}

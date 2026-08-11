@@ -1,0 +1,27 @@
+{
+  "paper_ref": "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8",
+  "summary": "NSA (Native Sparse Attention) is a hardware-aligned, natively trainable hierarchical sparse attention mechanism that combines coarse-grained token block compression with fine-grained token selection and sliding-window local attention. It is designed to be trained end-to-end from scratch rather than applied as a post-hoc inference trick, and includes arithmetic-intensity-balanced kernel optimizations so that sparse attention is actually faster in practice, not just in FLOP count.",
+  "relevance_to_run": "A seminal 2025 work for the sparse-attention architectural route, co-designed with hardware to address the gap between theoretical sparsity and real speedup. It represents the 'natively trainable sparse attention' sub-route and is widely cited by 2026 follow-ups (UNIQUE, SPLA, Token Sparse Attention). Directly relevant to the contract's sparsity and architectural-alternative routes.",
+  "contributions": [
+    "Hierarchical sparse attention combining three branches: compressed block-level attention (coarse), top-k selected block attention (fine), and sliding-window local attention, fused via learned gating.",
+    "Natively trainable: the sparse pattern is learned during pretraining rather than fixed at inference, so the model adapts to sparsity during training.",
+    "Hardware-aligned kernel design balancing arithmetic intensity so that decoding becomes memory-bandwidth-efficient, achieving real wall-clock speedup rather than theoretical-only FLOP reduction.",
+    "End-to-end pretraining at scale (27B total / 3B active GQA+MoE) demonstrating sparse attention can match or exceed full attention quality."
+  ],
+  "key_results": [
+    "Backbone: 27B total / 3B active parameters, GQA (64 heads, 4 groups) + DeepSeekMoE (72 routed + 2 shared experts, top-6), 30 layers.",
+    "Pretrained on 270B tokens of 8k-length texts, then continued training + SFT on 32k-length texts with YaRN for long-context adaptation.",
+    "NSA consistently achieves lower pretraining loss than the Full Attention baseline trained to convergence under identical settings.",
+    "Matches or improves over Full Attention on general benchmarks (MMLU, MMLU-PRO, CMMLU, BBH, GSM8K, MATH, DROP, MBPP, HumanEval) and long-context benchmarks, while delivering substantial training and inference speedup.",
+    "Hyperparameters: compression block size 32, stride 16, selected block size 64, selected block count 16 (1 initial + 2 local fixed), sliding window 512."
+  ],
+  "limitations": [
+    "Requires natively training the model from scratch with the sparse attention mechanism; not a drop-in training-free method for existing pretrained LLMs.",
+    "The sparse pattern and gating are learned during pretraining, so the benefit is tied to models trained this way rather than retrofitted to off-the-shelf models like Llama/Qwen.",
+    "Reported at a specific 27B/3B MoE scale; transfer of the exact sparse configuration to dense models of other sizes is not fully characterized in the main text."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Methodology"},
+    {"kind": "section", "value": "Experiments"}
+  ]
+}

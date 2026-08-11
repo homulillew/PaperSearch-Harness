@@ -1,0 +1,28 @@
+{
+  "paper_ref": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
+  "summary": "CAKE (Preference-prioritized Adaptive Allocation + Attention-shift tolerant Eviction) is a training-free KV cache eviction method that (1) allocates a global cache budget across layers according to a per-layer preference score combining attention spatial dispersion (entropy) and temporal shift (variance), and (2) evicts tokens using an indicator that combines mean attention (sustained importance) plus variance (attention variability) to tolerate attention shifts. A cascading cache management algorithm reduces peak prefilling memory from O(S*L) to the target budget while provably matching the result of the optimal one-shot allocation (Theorem 1).",
+  "relevance_to_run": "A 2026 representative of the heuristic-eviction route that advances the layer-wise budget-allocation line (PyramidKV, AdaKV) with a data-driven, content-adaptive allocation plus a shift-tolerant indicator. Directly contrasts LKV (learned allocation) and SnapKV/PyramidKV (heuristic allocation), supporting the contract's eviction route and the training-free vs. training-aware trade-off. Demonstrates compatibility with existing eviction indicators (H2O, SnapKV), positioning allocation as an orthogonal axis.",
+  "contributions": [
+    "Preference-prioritized adaptive allocation: a per-layer preference score P = H^(1/tau1) * V^(1/tau2) from attention entropy H and variance V over a recent observation window, normalized to distribute a global budget B_total across layers (Eq. 6-7).",
+    "Preference-guided cascading cache management: a stage-wise algorithm that maintains the budget during prefilling, reducing peak memory to the target; Theorem 1 proves it is equivalent to the optimal one-shot allocation, and Proposition 1 proves per-layer budgets decrease monotonically across stages.",
+    "Attention-shift tolerant eviction indicator: I[n] = Mean(A) + gamma*Var(A) for non-recent tokens (with a large Omega protecting the most recent W tokens), combining sustained importance and attention variability to avoid prematurely evicting fluctuating-but-important tokens.",
+    "Empirically demonstrates the allocation strategy is a generalizable framework that improves existing eviction indicators (H2O, SnapKV) when swapped in."
+  ],
+  "key_results": [
+    "Evaluated on 5 LLMs (7B-70B, MHA and GQA: Llama2-Chat, Gemma-Instruct, Llama3-Instruct, Mistral-v0.3, Qwen2.5-Instruct) on LongBench (16 datasets) and NeedleBench, budgets 64L-2048L, on A100 80GB.",
+    "On LongBench at B_total=128L (Llama2-7B-Chat), CAKE averages 29.29 vs SnapKV 28.09 and PyramidKV 28.20; at 1024L, CAKE 32.98 vs SnapKV 32.50 and PyramidKV 32.55. CAKE matches full-cache performance once B_total > 512L.",
+    "On NeedleBench 32K, CAKE preserves 32K-context capability using only 3.2% of the cache and surpasses full cache on Single-Needle Retrieval; leads on Multi-Needle Retrieval.",
+    "Memory/throughput (Mistral-7B, B_total=1024L): ~48.63% peak-memory reduction vs full cache at 128K context; >10x decoding-latency speedup over full cache at 128K.",
+    "Ablation (Table 2): allocation strategies Avg — Uniform 28.36, Pyramid 28.69, Random 28.3+/-0.2, P2A 29.29. Eviction indicators (Table 3): Mean 28.82, Var 28.68, Mean*Var 28.6, Mean+Var 29.29 — additive combination best."
+  ],
+  "limitations": [
+    "Training-free but requires computing attention entropy and variance over a recent window S_w at prefilling, adding a profiling pass; the cascading algorithm mitigates but does not eliminate this overhead.",
+    "Preference score depends on temperature parameters tau1, tau2 that must be tuned per model and memory constraint.",
+    "Gains over SnapKV/PyramidKV are modest in absolute terms (e.g., +0.5-1.2 LongBench points at 128L); the advantage is largest under tight budgets and narrows as budget grows toward full-cache parity.",
+    "Heuristic allocation is static per-input (computed once from prefilling attention); unlike LKV it does not learn cross-task optimal budgets."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Methodology"},
+    {"kind": "section", "value": "Experimentation"}
+  ]
+}

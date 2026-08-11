@@ -1,0 +1,10 @@
+{
+  "statement": "Vector quantization of the KV cache achieves high compression ratios (~82-83%) with fidelity closer to the full cache than scalar quantization or low-rank methods at comparable ratios, at the cost of lightweight offline codebook training. VQKV's RSimVQ (multiple residual codebooks + projection matrices, on-demand reconstruction) beats ASVD, Palu, KIVI, and SnapKV on LongBench at matched ratios on LLaMA3.1-8B/3.2-3B, because quantizing whole vectors preserves inter-dimensional structure that scalar quantization destroys. This positions VQ as a middle ground: higher fidelity than scalar quant, no LLM fine-tuning, but not training-free (codebooks trained on 0.1% of OpenWebText).",
+  "approach_refs": [
+    "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5",
+    "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0"
+  ],
+  "sources": [
+    {"paper_ref": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiment"}}
+  ]
+}

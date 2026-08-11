@@ -1,0 +1,13 @@
+{
+  "statement": "Reported efficiency gains are measured under heterogeneous, often favorable conditions, making cross-method wall-clock comparison unreliable. RocketKV reports up to 3.7x speedup on A100 with a Python/gpt-fast prototype (not CUDA-optimized); QuantSpec reports 2.49x with self-speculative acceptance rates that vary by regime; LMCache reports TTFT/ITL gains that depend on workload prefix overlap and network bandwidth (with a crossover point at 256K for 32 Gbps). Benchmarks, batch sizes, context lengths, hardware, and prototype maturity differ across papers, so headline speedups are not directly comparable and deployment conditions must be checked rather than the peak number.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+    "approach_43d9a955-b29f-44b5-8d6a-5cd91bf62022"
+  ],
+  "sources": [
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}},
+    {"paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "LLM Inference Bottlenecks"}},
+    {"paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Evaluation"}}
+  ]
+}

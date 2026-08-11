@@ -1,0 +1,10 @@
+{
+  "statement": "Modeling the query-key interaction (KQ^T) rather than the key cache alone yields provably better low-rank KV compression and is robust to K/Q scaling imbalance. KQ-SVD's Theorem 1 bounds attention output error by the error in QK^T (amplified by V) plus the error in V, and Theorem 2 gives the closed-form optimal rank-R factorization of KQ^T via its truncated SVD; empirically KQ-SVD matches Eigen on K/Q/V accuracy but is consistently more accurate on the attention score matrix and MHA output, and unlike Eigen it is invariant to K/Q scaling (Theorem 4), whereas Eigen converges to K-SVD's error under imbalance. This shows query-aware compression is materially better than key-only compression, especially under GQA where shared K amplifies key-only error.",
+  "approach_refs": [
+    "approach_8b0d2b1f-ecc0-4070-8016-219deec663f0"
+  ],
+  "sources": [
+    {"paper_ref": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Methodology"}},
+    {"paper_ref": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "mission": "Map the major technical routes for LLM KV Cache optimization and their latest progress, with emphasis on 2025-2026 developments including the newest 2026 frontier work, and synthesize the mechanisms, empirical evidence, deployment conditions, and open problems of each route.",
+  "requirements": [
+    "Cover the major technical-route / mechanism families for LLM KV Cache optimization (e.g., eviction & token selection, compression & low-rank approximation, quantization, sparsity & structured pruning, architectural alternatives such as linear/sparse attention and hybrid SSM-attention, prefix sharing & caching systems, speculative/parallel decoding interaction with cache).",
+    "Include developments within the 2025-01-01 to 2026-12-31 window, with explicit inclusion of the newest 2026 frontier work; the newest retained relevant paper date must be reported.",
+    "Preserve deployment conditions and empirical results (experimental settings, model sizes, benchmarks, long-context lengths, throughput/memory metrics) for representative methods of each major route.",
+    "Contrast competing or conflicting results across routes where the literature provides them (e.g., eviction vs. compression trade-offs, lossless vs. lossy, training-free vs. training-aware).",
+    "Identify open problems and unresolved field-level questions supported by the retained landscape (e.g., very-long-context scalability, retrieval-augmented cache, multi-modal KV cache, training-free quality preservation).",
+    "Use primary-source evidence (inspect-source / read-source) for mechanism-level and empirical claims of representative papers, not abstracts alone."
+  ],
+  "scope": "In-scope: peer-reviewed and arXiv primary literature on LLM (Transformer) KV cache optimization published or appearing in 2025-2026, plus seminal pre-2025 work only as route context. Out-of-scope: non-LLM KV cache (e.g., classical DB caching) without an LLM-attention connection; pure inference-engine engineering with no research contribution; training-efficiency work unrelated to serving-time KV cache memory/throughput.",
+  "deliverable_description": "A Chinese-language deep technical-route survey report covering major KV Cache optimization routes, representative 2025-2026 methods, mechanisms, empirical evidence, cross-route comparisons, and open problems, with structured citations.",
+  "required_artifacts": ["REPORT"]
+}

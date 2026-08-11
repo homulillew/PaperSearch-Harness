@@ -1,0 +1,10 @@
+{
+  "statement": "Speculative decoding composes multiplicatively with KV-cache quantization for long-context decoding, where the decode phase is memory-bound and KV-cache traffic dominates. QuantSpec's arithmetic-intensity/roofline analysis shows decoding has near-constant, sub-ridge-point arithmetic intensity irrespective of batch size for long contexts, so KV-cache quantization (not weight quantization) is the dominant lever; its hierarchical INT4 design lets the draft model use upper-4-bit KV and the target reconstruct INT8 from both halves, achieving up to 2.49x speedup and running 128K contexts where StreamingLLM/SnapKV OOM. The double full-precision buffer (2G) is the key to keeping acceptance high under speculative rollback. This demonstrates a cross-route composition (quantization + speculative) that is more effective than either alone in the long-context memory-bound regime.",
+  "approach_refs": [
+    "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+    "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5"
+  ],
+  "sources": [
+    {"paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "LLM Inference Bottlenecks"}}
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "System Scheduling & KV Cache Offloading/Disaggregation",
+  "core_idea": "Treat the KV cache as a managed, movable resource across the memory hierarchy (GPU HBM, CPU DRAM, remote/disk) and across prefill/decode instances. LMCache provides a standardized caching layer with chunk-level (vs page-level) transfers, asynchronous layer-wise loading overlapped with compute, a shared token pool for cross-instance awareness, and adaptive decisions between KV loading and recomputation depending on bandwidth and context length. The route targets deployment-level metrics (TTFT, ITL, throughput, peak memory) and is orthogonal to accuracy-affecting compression; its gains depend on workload prefix overlap and network bandwidth, with a crossover point below which loading is slower than prefilling.",
+  "representative_paper_refs": [
+    "paper_b4920f81-b210-4a71-9646-35e3b2691c4e"
+  ]
+}

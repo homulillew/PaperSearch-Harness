@@ -1,0 +1,26 @@
+{
+  "paper_ref": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
+  "summary": "LKV formulates KV cache eviction as an end-to-end differentiable optimization problem, replacing heuristic budget allocation and token selection with learned, task-optimized policies. It has two components: LKV-H learns global head-wise budget allocation via a flattened 1D Soft-TopK competition across all layers and heads (enabling cross-layer budget transfer), and LKV-T performs matrix-free intrinsic token selection that predicts token utility from key/value states alone without materializing attention matrices. Training uses self-distillation against a frozen full-cache teacher with KL divergence on outputs plus hidden-state alignment, adding only ~0.1% trainable parameters.",
+  "relevance_to_run": "Representative of the 2026 frontier in learned KV cache eviction, directly addressing the contract's eviction/token-selection route and the training-free vs. training-aware trade-off. It explicitly contrasts itself against heuristic baselines (SnapKV, PyramidKV, DuoAttention, AdaKV), providing cross-route comparison evidence.",
+  "contributions": [
+    "First end-to-end differentiable framework for KV cache eviction that jointly learns head-wise budgets and token selection, bypassing heuristic proxies entirely.",
+    "LKV-H: global 1D budget competition that flattens all L*H heads into a single Soft-TopK selection, enabling cross-layer budget transfer that rigid layer-wise heuristics cannot approximate.",
+    "LKV-T: matrix-free intrinsic token selection predicting utility from KV states alone, avoiding the chicken-and-egg problem of needing attention matrices to evaluate token importance.",
+    "Closed-form Soft-TopK operator with exact budget satisfaction, order preservation, and translation invariance, enabling stable end-to-end gradient flow."
+  ],
+  "key_results": [
+    "On LongBench with Llama-3.1-8B-Instruct at strict 15% KV budget, LKV achieves near-lossless performance, outperforming SnapKV, PyramidKV, DuoAttention, and AdaKV.",
+    "Also evaluated on Qwen3-8B (GQA), showing compatibility with grouped-query attention; adds only ~0.1% trainable parameters.",
+    "Training is cost-effective: <2 hours on 8xA100 GPUs via self-distillation on a ~23k sample Loom dataset.",
+    "Analysis identifies learned budgeting (LKV-H) as the dominant driver of fidelity over selection policies, demonstrating data-driven allocation is essential to overcome hand-crafted heuristics."
+  ],
+  "limitations": [
+    "Requires a training/distillation phase (not training-free), though lightweight (~0.1% params, <2 GPU-hours).",
+    "Learned budgets are static once trained (zero-overhead at inference but not dynamically adapted to per-input content); the global budget ratio R is fixed.",
+    "Evaluation limited to 8B-class models; scaling behavior to much larger models or extreme compression ratios below 15% is not reported in the main experiments."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Methodology"},
+    {"kind": "section", "value": "Experiments"}
+  ]
+}

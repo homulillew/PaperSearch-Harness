@@ -1,0 +1,10 @@
+{
+  "statement": "Permanent KV eviction is unsafe in multi-turn dialogue because token importance shifts across turns, and the fix (retaining full history) sacrifices the storage saving that motivated eviction. RocketKV shows a noticeable accuracy gap to Exact-TopK on SCBench multi-turn at high budgets because tokens evicted in earlier turns become essential later; RocketKV-MT retains all KV tokens across turns (no storage saving) but filters per turn for decode speed, matching Exact-TopK. This is a direct tension within the eviction route: the memory saving and the multi-turn robustness are mutually exclusive under permanent eviction, motivating either non-permanent selection (dynamic top-k) or hierarchical storage (keep history in cheaper tiers).",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_e2e61621-801b-4630-a040-b84da89c1d49"
+  ],
+  "sources": [
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Proposed Method: RocketKV"}}
+  ]
+}

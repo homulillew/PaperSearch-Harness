@@ -1,0 +1,27 @@
+{
+  "paper_ref": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
+  "summary": "VQKV compresses the KV cache via Residual Simple Vector Quantization (RSimVQ), mapping each KV vector to indices in multiple residual-connected codebooks with an extra projection matrix per codebook. Only codebooks and integer codes are stored, and reconstruction is on-demand from codebooks during attention. It achieves high compression ratios (~82-83%) while preserving fidelity closer to full-cache than scalar quantization (KIVI) or low-rank methods (ASVD, Palu).",
+  "relevance_to_run": "A 2026 frontier representative of the vector-quantization sub-route within KV cache compression, directly relevant to the contract's compression/quantization route and the lossless-vs-lossy trade-off. Contrasts scalar quantization (KIVI), low-rank approximation (ASVD, Palu), and eviction (SnapKV) under matched compression ratios.",
+  "contributions": [
+    "Applies Residual Simple Vector Quantization (RSimVQ) — combining Residual VQ with SimVQ projection matrices — to KV cache, storing only codebook indices instead of full-precision vectors.",
+    "Integrates VQ compression into both prefilling (batch compression of the prompt KV) and decoding (per-token compression with a sliding local window of full-precision entries).",
+    "On-demand reconstruction from codebooks during attention, keeping codebooks resident while storing only integer codes for the bulk of the cache.",
+    "Achieves high compression ratios (~82-83%) with fidelity closer to full cache than feature-dimension-reduction and scalar-quantization baselines."
+  ],
+  "key_results": [
+    "Compression ratio of 82.8% on LLaMA3.1-8B and 82.4% on LLaMA3.2-3B.",
+    "On LongBench, VQKV achieves the closest performance to full-cache models among comparable-ratio methods, outperforming ASVD, Palu, KIVI, and SnapKV.",
+    "Codebook configuration for LLaMA3.1-8B: (N_k, N_v) = (56, 16) codebooks, sizes (S_k, S_v) = (1024, 512); for LLaMA3.2-3B: (N_k, N_v) = (56, 10), sizes (1024, 65536).",
+    "RSimVQ trained on 0.1% of OpenWebText with learning rate 0.001, batch size 65536; initial tokens L_init=4, local window L_local=1024.",
+    "Memory-efficiency test shows VQKV extends maximum generation length beyond full-cache under identical hardware."
+  ],
+  "limitations": [
+    "Requires offline training of RSimVQ codebooks (lightweight, on 0.1% of OpenWebText) — not purely training-free, though no LLM fine-tuning is needed.",
+    "Codebook size and count must be tuned per model and per K/V cache type, adding configuration complexity.",
+    "Reconstruction introduces lookup overhead; net wall-clock speedup depends on codebook residency and memory-bandwidth trade-offs not fully detailed in the experiment section."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Compressing KV with Vector Quantization"},
+    {"kind": "section", "value": "Experiment"}
+  ]
+}

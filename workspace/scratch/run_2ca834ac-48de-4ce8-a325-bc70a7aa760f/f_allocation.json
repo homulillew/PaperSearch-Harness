@@ -1,0 +1,10 @@
+{
+  "statement": "Data-driven, content-adaptive per-layer budget allocation consistently beats uniform and fixed-pattern (pyramid) allocation under tight KV budgets, and the advantage narrows as the budget approaches full-cache parity. CAKE's preference-prioritized allocation (attention entropy x variance) beats SnapKV/PyramidKV on LongBench at 128L but the margin shrinks at 1024L; LKV's learned global head-wise budget competition further beats heuristic allocators at strict 15% budget and identifies learned budgeting (not selection) as the dominant driver of fidelity. This indicates allocation policy, not just the eviction indicator, is a first-class design axis, and that learned allocation extracts more from a small budget than hand-crafted heuristics can.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5"
+  ],
+  "sources": [
+    {"paper_ref": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experimentation"}},
+    {"paper_ref": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}}
+  ]
+}

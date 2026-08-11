@@ -1,0 +1,11 @@
+{
+  "statement": "Natively trainable sparse/hybrid attention (co-designed with hardware-aligned kernels) is necessary for sparsity to yield real wall-clock speedup rather than theoretical FLOP reduction, but it requires from-scratch pretraining and does not retrofit off-the-shelf LLMs. NSA's hierarchical sparse attention with arithmetic-intensity-balanced kernels matches or beats full attention at 27B/3B MoE scale while delivering real speedup; NHA's intra-layer linear-RNN + sliding-window hybrid scales near-linearly and matches GSA operator speed, and can retrofit pretrained Transformers with lightweight fine-tuning (4 full-attention layers). The contrast: NSA needs from-scratch training for its full benefit, while NHA offers a retrofit path — but both show that without kernel-level co-design, sparse FLOP counts do not translate to latency gains.",
+  "approach_refs": [
+    "approach_e2e61621-801b-4630-a040-b84da89c1d49",
+    "approach_8bb05329-b9c8-4778-88d6-7295f10e1868"
+  ],
+  "sources": [
+    {"paper_ref": "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}},
+    {"paper_ref": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}}
+  ]
+}

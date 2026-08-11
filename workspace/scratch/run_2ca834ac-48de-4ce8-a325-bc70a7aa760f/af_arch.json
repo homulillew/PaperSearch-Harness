@@ -1,0 +1,7 @@
+{
+  "name": "Architectural Alternatives: Linear/SSM-Attention Hybrids",
+  "core_idea": "Replace or hybridize full softmax attention with fixed-size recurrent/linear-attention memory so the KV cache grows sublinearly (or is constant) with sequence length. NHA unifies, within one layer, a gated linear-RNN long-term memory (m slots) with a sliding-window short-term memory (w tokens) under a unified softmax, and varies w per layer to span pure-linear (w=0), hybrid, or full-attention (w=N) without structural changes; it supports chunkwise parallel training and retrofitting pretrained Transformers. This route trades exact long-range retrieval (bounded by m slots) for sublinear memory and near-linear compute, contrasting with eviction/quantization which keep the Transformer but shrink its cache.",
+  "representative_paper_refs": [
+    "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0"
+  ]
+}

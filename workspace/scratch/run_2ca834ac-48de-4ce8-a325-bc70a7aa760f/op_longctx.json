@@ -1,0 +1,12 @@
+{
+  "statement": "Very-long-context (million-token) scalability remains unsolved within the Transformer-plus-compression paradigm. Eviction/quantization/low-rank methods are evaluated up to ~128K tokens; beyond that, accuracy degrades because models are less robust to sparse/quantized attention outside their effective context, and the retained subset or codebook cannot preserve all needles. Architectural alternatives (NHA's fixed m-slot memory, NSA's sparse blocks) bound exact retrieval by design. No retained method demonstrates lossless million-token single-needle and multi-needle retrieval under aggressive compression, leaving the scaling regime open.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5",
+    "approach_8bb05329-b9c8-4778-88d6-7295f10e1868"
+  ],
+  "sources": [
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}},
+    {"paper_ref": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Experiments"}}
+  ]
+}

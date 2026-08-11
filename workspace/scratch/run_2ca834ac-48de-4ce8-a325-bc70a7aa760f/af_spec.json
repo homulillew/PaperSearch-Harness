@@ -1,0 +1,7 @@
+{
+  "name": "Speculative Decoding × KV Cache",
+  "core_idea": "Accelerate decoding by composing speculative/parallel decoding with KV-cache management. QuantSpec uses self-speculative decoding where the draft model loads only an INT4 (upper 4-bit) KV cache and the target model reconstructs INT8 from both halves via a hierarchical INT4 design, eliminating the redundant draft KV copy; a double full-precision buffer (2G) keeps recent tokens in FP16 for high acceptance and clean rollback. The route is grounded in an arithmetic-intensity/roofline analysis that determines when weight quantization vs. KV-cache quantization dominates, and it is most beneficial in long-context memory-bound regimes. It is a cross-route composition (quantization + speculative) distinct from pure eviction or compression.",
+  "representative_paper_refs": [
+    "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397"
+  ]
+}

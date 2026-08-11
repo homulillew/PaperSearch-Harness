@@ -1,0 +1,30 @@
+{
+  "paper_ref": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
+  "summary": "LMCACHE is a unified, high-performance KV caching layer that sits between paged-memory LLM inference engines (vLLM, SGLang) and heterogeneous storage/network backends (GPU, CPU DRAM, remote disks), making prefix caching, CPU offloading, cross-instance KV sharing, and prefill/decode (PD) disaggregation practical at enterprise scale. Its architecture comprises a KV connector, token processor, storage manager, transfer channel, event manager, and a cache controller with a shared token pool. Key performance techniques include chunk-level (vs page-level) transfers, asynchronous layer-wise loading overlapped with compute, and adaptive decisions between KV loading and prefilling depending on bandwidth and context length.",
+  "relevance_to_run": "A 2025-2026 representative of the prefix-sharing / caching-systems and system/scheduling/offloading route, directly addressing the contract's prefix-sharing and system-scheduling families. It complements algorithmic KV compression (VQKV, RocketKV) by tackling the storage/movement/sharing axis, and provides deployment-condition evidence (TTFT, ITL, throughput, bandwidth) across 8B-480B models — supporting the contract's deployment-conditions requirement.",
+  "contributions": [
+    "A standardized KV caching layer between inference engines and heterogeneous storage, compatible with vLLM and SGLang, exposing store/retrieve/lookup interfaces and a shared token pool for cross-instance cache awareness.",
+    "Chunk-level KV transfer (vs vLLM's page-by-page) using high-performance CUDA kernels, achieving 400 Gbps CPU loading bandwidth vs vLLM native 88 Gbps (Table 5).",
+    "Asynchronous, layer-wise KV loading overlapped with prefill/decode compute (request asynchronization), reducing end-to-end delay by 1.46x.",
+    "Adaptive KV-loading-vs-prefill decision: at low network bandwidth (32 Gbps) loading beats prefill only beyond 256K tokens; at 64/128 Gbps it wins across all lengths — a deployment-condition guideline.",
+    "Efficient PD disaggregation via chunked GPU-buffer transfer between prefetcher and decoder, improving tail TTFT over vLLM's native NIXL page-by-page transfer."
+  ],
+  "key_results": [
+    "Models: Llama-3.1-8B/70B-Instruct, Qwen2.5-Coder-32B, Qwen2.5-72B, Qwen3-Coder-480B-A35B (FP8), Sao10K-L3-8B; hardware 8xH100 (GMI Cloud).",
+    "Single-node CPU offloading (multi-round Q&A, 10K-token queries, 500GB CPU DRAM): 1.9-8.1x smaller TTFT and 2.3-14x higher throughput than the strongest baseline across 5 models; 7-92% smaller ITL at QPS=1. Commercial options cannot host Qwen3-Coder-480B.",
+    "Real-trace (companies F and G): 3.7-6.8x smaller TTFT and 19-58% smaller ITL vs basic vLLM at high QPS.",
+    "Centralized remote storage (15 Gbps, TriviaQA): 1.3-3x throughput improvement; remote loading can exceed prefill delay for short contexts / small models, motivating adaptive loading.",
+    "PD disaggregation (8K input / 200 output): 1.53-1.84x lower mean TTFT and 1.12-1.66x lower mean ITL than vLLM native PD disaggregation; significantly better tail (p95) TTFT.",
+    "SGLang integration (Qwen3-32B, TP=2): higher throughput / lower TTFT than SGLang without offloading; comparable to SGLang native offloading but with hierarchical distributed backend support."
+  ],
+  "limitations": [
+    "Gains depend on cache hit ratio, which depends on workload prefix overlap; for low-overlap workloads the CPU/remote storage benefit shrinks.",
+    "Remote-backend loading is bandwidth-bound: at 32 Gbps it only beats prefill beyond 256K tokens, so adaptive gating is required and benefit is not universal.",
+    "Evaluation is system-level (TTFT/ITL/throughput) rather than accuracy-preserving compression; LMCache is orthogonal to (and composable with) accuracy-affecting methods like quantization/eviction.",
+    "Commercial baselines are black-box; internal implementation differences are hypothesized, not verified."
+  ],
+  "key_locators": [
+    {"kind": "section", "value": "Overview of LMCACHE"},
+    {"kind": "section", "value": "Evaluation"}
+  ]
+}

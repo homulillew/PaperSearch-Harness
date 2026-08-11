@@ -1,0 +1,14 @@
+{
+  "statement": "Cross-route composition (eviction + quantization + reuse + speculative) is promising but its interaction and optimality are under-explored. RocketKV composes eviction with dynamic selection; QuantSpec composes quantization with speculative decoding; KVLink composes reuse with compression. But the joint design space — e.g., a quantized, evicted, reused KV cache under speculative decoding with multi-turn rollback — lacks a unified analysis of where the compression budget should be allocated across stages and dimensions, and whether the error compounds or cancels. The adaptive decomposition idea (RocketKV's split factor) is shown for two stages but not generalized across routes.",
+  "approach_refs": [
+    "approach_2c2ebcc9-1f69-40e7-ac30-147e271a4cc5",
+    "approach_af307b6c-da29-4772-8c9f-9ac8e86984f5",
+    "approach_6e012d0e-6d07-4856-9e1f-d6b7d573bcb8",
+    "approach_f19eca7d-fab5-4114-9791-c7c2a07cc907"
+  ],
+  "sources": [
+    {"paper_ref": "paper_73ca1a25-eebf-4359-af53-ef40a6855748", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Proposed Method: RocketKV"}},
+    {"paper_ref": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "LLM Inference Bottlenecks"}},
+    {"paper_ref": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50", "relation": "SUPPORTS", "locator": {"kind": "section", "value": "Methodology"}}
+  ]
+}

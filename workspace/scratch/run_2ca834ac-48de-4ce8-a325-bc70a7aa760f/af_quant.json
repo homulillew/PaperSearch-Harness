@@ -1,0 +1,8 @@
+{
+  "name": "KV Cache Quantization & Vector Quantization",
+  "core_idea": "Reduce KV cache memory by lowering the numerical precision of stored K/V vectors: scalar quantization (KIVI: per-channel/per-token INT2/INT4) or vector quantization (VQKV: Residual Simple VQ mapping each vector to codebook indices with on-demand reconstruction). QuantSpec extends this to speculative decoding with a hierarchical INT4 cache (upper/lower 4-bit halves) so the draft model uses INT4 and the target reconstructs INT8. The trade-off is compression ratio vs. reconstruction error and the overhead of codebooks/dequantization; scalar methods are training-free, while VQ requires lightweight codebook training.",
+  "representative_paper_refs": [
+    "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
+    "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397"
+  ]
+}

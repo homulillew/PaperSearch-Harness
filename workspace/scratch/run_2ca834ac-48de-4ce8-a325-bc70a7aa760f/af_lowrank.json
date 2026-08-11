@@ -1,0 +1,7 @@
+{
+  "name": "KV Cache Low-Rank Compression",
+  "core_idea": "Compress the KV cache by projecting K/V (or their query-aware interactions) into a low-rank subspace, storing only the low-rank factors. KQ-SVD decomposes the query-key interaction KQ^T (not K alone) via truncated SVD, giving a provably optimal closed-form factorization that is robust to K/Q scaling imbalance; it contrasts with K-SVD (compress K alone, ignores Q) and Eigen (joint Q/K/V embedding). The line is training-free but calibration-based (projections learned from a small query set), and trades rank against approximation error of the attention output.",
+  "representative_paper_refs": [
+    "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Prefix Sharing & KV Cache Reuse Systems",
+  "core_idea": "Avoid recomputing KV caches for shared or recurring context (system prompts, retrieved documents, in-context examples) by precomputing, storing, and reusing per-segment KV caches across queries. KVLink enables reuse of independently encoded per-document caches via positional re-encoding (store without RoPE, re-apply global rotations at concat) and trainable link tokens that restore cross-document attention, combined with chunked anchor-token compression. LMCache is the systems substrate: a unified KV caching layer between inference engines (vLLM/SGLang) and heterogeneous storage (GPU/CPU/remote) with chunk-level transfer, async layer-wise loading, and adaptive load-vs-prefill decisions. The route targets the RAG/multi-query and disaggregated-serving settings and is orthogonal to (composable with) compression/eviction.",
+  "representative_paper_refs": [
+    "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
+    "paper_b4920f81-b210-4a71-9646-35e3b2691c4e"
+  ]
+}
