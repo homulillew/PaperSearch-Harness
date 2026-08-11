@@ -35,7 +35,16 @@ precedence and is never overwritten.
 
 Commands that accept semantic structures use `--input FILE`. The file must contain one
 JSON object with exactly the documented fields. This is typed command input, not JSON
-Patch or raw state replacement.
+Patch or raw state replacement. Write every input file inside the chosen `--workspace`:
+pre-run inputs (before a `run_id` exists) go in `<workspace>/scratch/`, and per-run inputs
+go in `<workspace>/scratch/<run_id>/inputs/`. Never point `--input` at `/tmp`, the project
+root, the repository root, or anywhere under the Skill directory.
+
+The adapter writes exactly one JSON object to stdout and nothing else. Capturing that
+output to a file is an explicit caller choice, not the default; when you do, write it to
+`<workspace>/scratch/<run_id>/captures/`. The `scratch/` tree is disposable working area,
+not a second knowledge store — deleting it must not change `state.json`, `events.jsonl`,
+or `artifacts/`.
 
 ## Environment and observation
 
@@ -111,7 +120,8 @@ read-source --run-id RUN --expected-revision REV --paper-ref PAPER
             [--locator-kind KIND --locator-value VALUE]
 ```
 
-Source output is ephemeral. Persist selected meaning with the following commands.
+Source output is ephemeral and stays in context, never on disk. Persist selected
+meaning with the following commands; do not write raw source text into `scratch/`.
 
 `put-paper-analysis --input FILE`:
 

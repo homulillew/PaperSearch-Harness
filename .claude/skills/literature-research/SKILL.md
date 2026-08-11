@@ -74,14 +74,56 @@ Run the environment check first:
 python "<SKILL_DIR>/scripts/harness.py" --workspace workspace doctor
 ```
 
-Create a run using a JSON file, not shell-escaped inline JSON:
+Create a run using a JSON file, not shell-escaped inline JSON. Write the
+contract file inside the chosen workspace, never to `/tmp` or the Skill
+directory:
 
 ```text
 python "<SKILL_DIR>/scripts/harness.py" --workspace workspace create-run \
-  --input /tmp/research-contract.json
+  --input workspace/scratch/research-contract.json
 ```
 
-Keep runtime data in the chosen workspace, never inside the skill directory.
+All research work files stay inside the chosen workspace. Nothing the
+Researcher writes — command inputs, captured stdout, or scratch notes —
+belongs in the project root, the repository root, or the Skill directory.
+See the Filesystem discipline section below for the exact layout.
+
+## Filesystem discipline
+
+All research work files are confined to the chosen `--workspace`. The Harness
+owns authoritative state; the Researcher owns disposable working files. Keep
+the two apart so the project root, repository root, and Skill directory stay
+clean and a run can be recovered from authoritative state alone.
+
+```text
+<workspace>/
+├── runs/<run_id>/
+│   ├── state.json          # authoritative — Harness-owned, never hand-edited
+│   ├── events.jsonl        # authoritative — Harness-owned
+│   └── artifacts/          # authoritative — Harness-owned (report, etc.)
+└── scratch/
+    ├── research-contract.json      # pre-run: the create-run input
+    └── <run_id>/
+        ├── inputs/                 # JSON files passed via --input
+        └── captures/               # explicit stdout captures (not default)
+```
+
+Rules:
+
+- Write every `--input FILE` inside the workspace. Pre-run inputs (before a
+  `run_id` exists) go in `<workspace>/scratch/`; per-run inputs go in
+  `<workspace>/scratch/<run_id>/inputs/`.
+- The Harness writes one JSON object to stdout and nothing else. Capturing
+  that output to a file is an explicit Researcher choice, not the default;
+  when you do, put it in `<workspace>/scratch/<run_id>/captures/`. Never
+  capture into the project root or the repository root.
+- `scratch/` is disposable working area, not a second knowledge store. Source
+  output is ephemeral: convert the evidence that matters into a `PaperAnalysis`
+  and discard the raw text. Deleting `scratch/` must not change `state.json`,
+  `events.jsonl`, or `artifacts/`.
+- Do not write research files to `/tmp`, the project root, the repository
+  root, or anywhere under `<SKILL_DIR>`. The Skill directory ships read-only
+  instructions and the Runtime; it never holds run data.
 
 ## Own the semantic outer loop
 
@@ -229,7 +271,10 @@ When resuming, ignore conversational memory as authority. Recover from:
 4. `audit-history` for prior search queries, pagination, filters, and external attempts.
 
 Raw Web results are not recoverable state. Do not repeat searches blindly, but rerun a
-needed Web counter-search after resume when a frontier gap remains unresolved.
+needed Web counter-search after resume when a frontier gap remains unresolved. The
+`scratch/` directory is disposable: if it is missing or deleted, recover from the
+authoritative `runs/<run_id>/` state alone — `view`, `inspect`, and `audit-history`
+rebuild the working context without any scratch file.
 
 ## Request independent completion
 

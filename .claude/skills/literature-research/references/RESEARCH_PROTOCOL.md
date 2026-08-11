@@ -231,6 +231,13 @@ The run workspace is authoritative. Conversation history, scratch notes, and sea
 output are not. Resume by viewing state, inspecting stable references, reading current
 open gaps, and consulting `audit-history` for external attempt parameters.
 
+Authoritative state lives only in `<workspace>/runs/<run_id>/` (`state.json`,
+`events.jsonl`, `artifacts/`). Everything else is disposable: command inputs and any
+explicit stdout captures belong in `<workspace>/scratch/`, never in the project root,
+the repository root, or the Skill directory. `scratch/` is working area, not a second
+knowledge store — deleting it must not change authoritative state, and a run can be
+recovered from `runs/<run_id>/` alone.
+
 ## Completion and delivery
 
 The Researcher requests completion only after it can point to structured evidence for

@@ -59,6 +59,11 @@ desktop.ini
 # research runs. Keep it tracked.
 *.log
 
+# --- Build output ---
+# dist/ is a local packaging artifact produced by scripts/package_skill.py.
+# It is never committed; rebuild it locally when needed.
+dist/
+
 # --- Secrets / local env ---
 .env
 .env.*
