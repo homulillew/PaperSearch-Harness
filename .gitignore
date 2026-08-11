@@ -29,6 +29,7 @@ ENV/
 .mypy_cache/
 .pytest_cache/
 .pytest-tmp/
+.pytest_tmp/
 .ruff_cache/
 .tox/
 .nox/
