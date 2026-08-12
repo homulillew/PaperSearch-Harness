@@ -173,6 +173,106 @@ If canonical Web discovery and retention succeed but DeepXiv source inspection f
 record a primary-source provider coverage gap. Do not add a source fallback in this
 workflow; source-provider expansion requires a separate architecture decision.
 
+## External Discovery Failure Closure
+
+A tool invocation is not a usable discovery outcome, and a usable discovery outcome is
+not the same as the research objective being satisfied. When DeepXiv or native
+`WebSearch` fails or returns a clearly inconclusive result, do not treat "a tool was
+called" as "the discovery objective is done." Close the failure loop explicitly:
+
+```text
+failure / inconclusive outcome
+→ diagnose only enough to understand whether recovery is possible
+→ bounded recovery (semantic, not a fixed retry count)
+→ reassess the original research uncertainty
+├── resolved → continue (no Gap)
+└── unresolved
+    → contract-material?
+      ├── no  → continue (no Gap)
+      └── yes → put-investigation-gap (describe the research consequence)
+```
+
+A failed tool call does **not** automatically create an InvestigationGap. Only an
+**unresolved, contract-material research consequence** becomes a Gap — one that could
+change a current Contract requirement, a major route, a representative method, a
+contradiction, or a frontier / recency judgment. If a semantic-equivalent query or
+another genuinely equivalent discovery path resolves the original uncertainty, continue
+without a Gap.
+
+When a Gap is warranted, describe the **research consequence**, never the tool log:
+
+> Correct: "Independent frontier recall for the 2026 KV-cache literature remains
+> unresolved; current recent coverage has not been independently counter-checked for
+> potentially missed frontier work."
+>
+> Wrong: "WebSearch failed." / "DeepXiv returned INVALID_RESPONSE."
+
+Tool-failure history stays in the host observation stream and the DeepXiv audit log
+(`audit-history`), never in `ResearchRun`. Persist decisions, not trajectories.
+
+### DeepXiv failure handling
+
+A failed `search-papers` attempt surfaces the provider's already-sanitized
+`failure_kind` and `reason` in the error JSON and in the `paper_search_attempt` audit
+event. Use the `failure_kind` for semantic diagnosis. These are semantic guidelines,
+not a fixed retry count — **retry is diagnostic, not ritual**:
+
+```text
+AUTHENTICATION   → do not retry as research; fix credentials / configuration
+RATE_LIMIT        → query reformulation will not repair it; use another discovery path
+UNAVAILABLE       → a bounded retry may be reasonable; if it persists, use another path
+INVALID_RESPONSE  → provider response/contract anomaly; at most one confirming retry,
+                    then a materially different semantic formulation; optionally a
+                    known-good control query to distinguish query-sensitive failure
+                    from provider-wide failure
+OTHER             → one lightweight diagnostic recovery when justified
+```
+
+Never form "retry N times because N is the rule." If the original query fails but a
+semantic-equivalent query succeeds and resolves the uncertainty, no Gap is needed.
+
+### WebSearch failure handling
+
+Native `WebSearch` is a host capability outside the Harness. Do not manufacture Python
+`WebSearchFailureKind`, `WebSearchAttempt`, `WebSearchStatus`, `ProviderHealth`, or
+`DiscoveryChannelState` for it. Judge only: **did WebSearch produce a usable discovery
+outcome?** Clearly inconclusive signals include no actual result entries, no usable
+source URLs, tool wrapper/meta text instead of results, or a known-target control query
+that also produces no usable result. An inconclusive WebSearch outcome means "the
+discovery channel is currently inconclusive/unavailable," **not** "no relevant
+literature exists." Keep diagnosis small:
+
+```text
+normal frontier query
+→ unexpected empty / malformed outcome
+→ materially different query formulation
+→ if still suspicious, one known-target control query when useful
+→ if the known target also cannot be discovered → stop reformulating,
+  treat the channel as unavailable/inconclusive
+```
+
+No fixed query count. If WebSearch later recovers or another genuinely equivalent
+discovery path closes the uncertainty, `resolve-investigation-gap` with a resolution
+that describes the **research closure** (e.g. "Independent frontier counter-recall was
+completed using usable WebSearch results across the current 2026 route terminology; all
+material candidates were assessed and the evidence did not change the frontier
+judgment"), not "WebSearch works now."
+
+### WebSearch vs WebFetch semantic boundary
+
+```text
+WebSearch              = candidate discovery / recall
+WebFetch(known URL)    = canonical verification
+```
+
+`WebSearch failed` + `WebFetch(existing arXiv URL) succeeded` does **not** mean
+independent frontier recall succeeded — fetching an already-known URL does not answer
+"are there material candidates we do not already know?" But this is not "WebFetch can
+never be used for discovery": if WebFetch actually visits a search/listing/index page
+and can reveal previously-unknown candidates, treat it by its actual semantic as a
+discovery observation. **Judge the action by whether it can reveal unknown candidates,
+not by the tool name.**
+
 ## Primary Evidence Gate
 
 Search results, abstracts, and provider/Web metadata are **discovery only**. They

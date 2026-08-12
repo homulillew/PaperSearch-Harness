@@ -164,8 +164,19 @@ def _emit(stream: TextIO, payload: Mapping[str, object]) -> None:
     stream.write("\n")
 
 
-def _safe_message(exc: Exception) -> str:
-    message = str(exc) or exc.__class__.__name__
+def _safe_message(value: Exception | str) -> str:
+    """Redact the DeepXiv token from any error message or reason string.
+
+    Accepts either an Exception (its ``str()`` form) or an already-extracted
+    reason string. The adapter already sanitizes provider responses into a
+    safe description before raising, but a defensive redaction here ensures
+    a token that somehow reached the message can never leak through the CLI
+    error JSON.
+    """
+    if isinstance(value, str):
+        message = value
+    else:
+        message = str(value) or value.__class__.__name__
     token = os.environ.get("DEEPXIV_TOKEN")
     if token:
         message = message.replace(token, "[REDACTED]")
@@ -1057,20 +1068,29 @@ def main(
         _emit(stdout, {"ok": True, "command": command, "result": result})
         return 0
     except Exception as exc:
+        error_payload: dict[str, object] = {
+            "type": exc.__class__.__name__,
+            "message": _safe_message(exc),
+        }
+        # Provider attempt failures carry an already-sanitized failure_kind
+        # and reason (the adapter's safe description, not the raw provider
+        # response). Surface them so the caller can diagnose without
+        # re-running the attempt. state_revision is threaded separately
+        # below for any error that carries it.
+        failure_kind = getattr(exc, "failure_kind", None)
+        if failure_kind is not None:
+            error_payload["failure_kind"] = str(failure_kind)
+        reason = getattr(exc, "reason", None)
+        if reason:
+            error_payload["reason"] = _safe_message(reason)
+        if hasattr(exc, "state_revision"):
+            error_payload["state_revision"] = exc.state_revision
         _emit(
             stderr,
             {
                 "ok": False,
                 "command": command,
-                "error": {
-                    "type": exc.__class__.__name__,
-                    "message": _safe_message(exc),
-                    **(
-                        {"state_revision": exc.state_revision}
-                        if hasattr(exc, "state_revision")
-                        else {}
-                    ),
-                },
+                "error": error_payload,
             },
         )
         return 2

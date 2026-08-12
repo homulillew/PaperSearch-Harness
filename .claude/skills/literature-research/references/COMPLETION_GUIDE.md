@@ -19,7 +19,10 @@ blocking gaps so a Researcher can perform it.
 
 The checker may challenge current knowledge, but does not repair it. It evaluates the
 knowledge and evidence exposed through its completion capabilities; it does not audit
-the Researcher's search procedure.
+the Researcher's search procedure. It must not audit WebSearch logs, rerun WebSearch,
+or judge tool implementation details — it sees only Research State, the Completion
+projection, and the evidence actions allowed above. Frontier coverage is judged from
+open Gaps and retained evidence, not from the attempt history.
 
 ## Evaluation criteria
 
@@ -44,7 +47,13 @@ following:
 9. For latest/current/recent requests, the retained corpus and structured landscape
    demonstrate reasonable frontier coverage. Recent primary work supports the relevant
    route, trend, comparison, or open-problem claims, and the evidence is recent enough
-   for the Contract's stated time-sensitive scope.
+   for the Contract's stated time-sensitive scope. An **attempted** counter-recall is
+   not the same as **usable** frontier coverage: the checker must not PASS merely
+   because a WebSearch or DeepXiv call was made. If State carries an open,
+   contract-material independent frontier recall gap, that gap blocks PASS regardless of
+   how many discovery calls were logged — judge from the Gap and the retained evidence,
+   not from the attempt history. If the uncertainty was resolved by a usable equivalent
+   discovery path and the Gap is closed (`resolve-gap`), judge normally.
 10. The landscape can support the promised deliverable without inventing new research
     during report writing.
 11. Candidate closure holds across the whole retained corpus. `completion-view` exposes

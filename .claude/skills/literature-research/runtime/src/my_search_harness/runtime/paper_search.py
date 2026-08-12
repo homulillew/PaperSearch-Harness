@@ -62,17 +62,31 @@ class PaperSearchRejectedError(RuntimeError):
 
 
 class PaperSearchAttemptError(RuntimeError):
-    """An accounted provider attempt failed after its revision was committed."""
+    """An accounted provider attempt failed after its revision was committed.
+
+    Carries the provider's already-sanitized failure reason (the same safe
+    message the adapter raised in ``PaperSearchProviderError``) so callers,
+    the audit log, and the CLI error JSON can diagnose the failure without
+    ever touching the raw provider response or HTTP body. The reason is a
+    human-readable description of *what* the provider returned or how it
+    failed (e.g. "invalid paper search provider response: top-level status
+    must be success"), not a tool-failure trajectory and not Research State.
+    """
 
     def __init__(
         self,
         *,
         state_revision: int,
         failure_kind: ProviderFailureKind,
+        reason: str | None = None,
     ) -> None:
-        super().__init__(f"paper search attempt failed: {failure_kind.value}")
+        message = f"paper search attempt failed: {failure_kind.value}"
+        if reason:
+            message = f"{message}: {reason}"
+        super().__init__(message)
         self.state_revision = state_revision
         self.failure_kind = failure_kind
+        self.reason = reason
 
 
 class PaperSearchProvider(Protocol):
@@ -179,6 +193,13 @@ class PaperSearchService:
                 date_to=date_to,
             )
         except PaperSearchProviderError as exc:
+            # The adapter already produced a sanitized, token-free reason in
+            # the PaperSearchProviderError message (e.g. "invalid paper search
+            # provider response: top-level status must be success"). Propagate
+            # that same safe description into the audit record and the attempt
+            # error so it survives past the attempt boundary — without ever
+            # persisting the raw provider response or HTTP body.
+            safe_reason = str(exc) or None
             self._audit_attempt(
                 attempted,
                 outcome="FAILURE",
@@ -188,12 +209,18 @@ class PaperSearchService:
                 offset=offset,
                 date_from=date_from,
                 date_to=date_to,
+                reason=safe_reason,
             )
             raise PaperSearchAttemptError(
                 state_revision=attempted.state_revision,
                 failure_kind=exc.failure_kind,
+                reason=safe_reason,
             ) from None
         except Exception:
+            # An unrecognized failure has no adapter-sanitized message; do
+            # not surface the raw exception text (which may carry provider
+            # internals) as a reason. Record the attempt as OTHER and let the
+            # CLI's _safe_message redaction handle the error text.
             self._audit_attempt(
                 attempted,
                 outcome="FAILURE",
@@ -217,6 +244,11 @@ class PaperSearchService:
             or not isinstance(page.hits, tuple)
             or not all(isinstance(hit, PaperSearchHit) for hit in page.hits)
         ):
+            # The provider returned a structurally invalid page that the
+            # adapter did not itself reject with a field-specific reason.
+            # Use a fixed, safe description rather than echoing the page
+            # object (which could carry provider internals).
+            safe_reason = "provider returned a structurally invalid search page"
             self._audit_attempt(
                 attempted,
                 outcome="FAILURE",
@@ -226,10 +258,12 @@ class PaperSearchService:
                 offset=offset,
                 date_from=date_from,
                 date_to=date_to,
+                reason=safe_reason,
             )
             raise PaperSearchAttemptError(
                 state_revision=attempted.state_revision,
                 failure_kind=ProviderFailureKind.INVALID_RESPONSE,
+                reason=safe_reason,
             )
         self._audit_attempt(
             attempted,
@@ -262,6 +296,7 @@ class PaperSearchService:
         date_to: str | None,
         hit_count: int | None = None,
         total_count: int | None = None,
+        reason: str | None = None,
     ) -> None:
         details: dict[str, AuditScalar] = {
             "query": query,
@@ -285,6 +320,7 @@ class PaperSearchService:
                 action="paper_search_attempt",
                 outcome=outcome,
                 provider_outcome=provider_outcome,
+                reason=reason,
                 details=details,
             ),
         )
