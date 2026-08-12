@@ -624,24 +624,28 @@ def validate_transition(before: ResearchRun, after: ResearchRun) -> None:
 def _validate_transition_paper_dispositions(
     before: ResearchRun, after: ResearchRun
 ) -> None:
-    """Defense-in-depth: a paper that *this transition* moves to RETIRED must
-    carry a non-empty retirement_reason, and the resulting Landscape must not
-    still cite it.
+    """Defense-in-depth: a paper whose disposition-related state *this
+    transition changes* and that ends RETIRED must carry a non-empty
+    retirement_reason, and the resulting Landscape must not still cite it.
 
-    Only newly-RETIRED papers are checked — a paper that was already RETIRED in
-    ``before`` is historical state and is not re-litigated here (that would break
-    unrelated mutations on a legacy run). This is the global safety net behind
-    the command-level ``set_paper_research_status`` gate.
+    "Disposition-related state" is at least ``research_status`` and
+    ``retirement_reason``. A paper whose disposition state did not change is
+    historical state and is not re-litigated here — so a legacy
+    RETIRED+reason=None paper survives an unrelated mutation, but mutating a
+    RETIRED paper's reason to None (or retiring an ACTIVE paper) is caught.
+    This is the global safety net behind the command-level
+    ``set_paper_research_status`` gate.
     """
     for ref, after_paper in after.papers.items():
         if after_paper.research_status is not PaperResearchStatus.RETIRED:
             continue
         before_paper = before.papers.get(ref)
-        was_retired = (
-            before_paper is not None
-            and before_paper.research_status is PaperResearchStatus.RETIRED
+        disposition_changed = (
+            before_paper is None
+            or before_paper.research_status is not PaperResearchStatus.RETIRED
+            or before_paper.retirement_reason != after_paper.retirement_reason
         )
-        if was_retired:
+        if not disposition_changed:
             continue
         reason = after_paper.retirement_reason
         if not isinstance(reason, str) or not reason.strip():
@@ -660,20 +664,20 @@ def _validate_transition_paper_dispositions(
 def _validate_transition_landscape_evidence(
     before: ResearchRun, after: ResearchRun
 ) -> None:
-    """Defense-in-depth: a Landscape object that *this transition* creates or
+    """Defense-in-depth: a Landscape semantic object that *this transition*
     changes may only cite ACTIVE+analyzed papers.
 
-    Only new or changed ApproachFamilies / Findings / OpenProblems are checked —
-    unchanged objects are historical state and are not re-litigated (that would
-    break unrelated mutations on a legacy run). This is the global safety net
-    behind the command-level eligibility gates.
+    "Changed" is full-object inequality (``before_object != after_object``),
+    not a single-field diff — so renaming an ApproachFamily, weakening a
+    Finding statement, or swapping any source all count and trigger a full
+    re-check of the object's current paper evidence refs. Unchanged objects
+    are historical state and are not re-litigated (that would break unrelated
+    mutations on a legacy run). This is the global safety net behind the
+    command-level eligibility gates.
     """
     for ref, after_approach in after.literature_landscape.approach_families.items():
         before_approach = before.literature_landscape.approach_families.get(ref)
-        if before_approach is not None and (
-            before_approach.representative_papers
-            == after_approach.representative_papers
-        ):
+        if before_approach is not None and before_approach == after_approach:
             continue
         _require_eligible_evidence(
             after, after_approach.representative_papers, "representative"
@@ -681,16 +685,14 @@ def _validate_transition_landscape_evidence(
 
     for ref, after_finding in after.literature_landscape.findings.items():
         before_finding = before.literature_landscape.findings.get(ref)
-        if before_finding is not None and before_finding.sources == after_finding.sources:
+        if before_finding is not None and before_finding == after_finding:
             continue
         source_refs = {source.paper_ref for source in after_finding.sources}
         _require_eligible_evidence(after, source_refs, "source")
 
     for ref, after_problem in after.literature_landscape.open_problems.items():
         before_problem = before.literature_landscape.open_problems.get(ref)
-        if before_problem is not None and (
-            before_problem.sources == after_problem.sources
-        ):
+        if before_problem is not None and before_problem == after_problem:
             continue
         source_refs = {source.paper_ref for source in after_problem.sources}
         _require_eligible_evidence(after, source_refs, "source")

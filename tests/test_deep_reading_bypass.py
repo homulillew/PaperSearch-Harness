@@ -63,6 +63,7 @@ from my_search_harness.domain.validation import (  # noqa: E402
 )
 from my_search_harness.runtime.codec import run_from_dict, run_to_dict  # noqa: E402
 from my_search_harness.runtime.commands import (  # noqa: E402
+    CommandRejectedError,
     CreateRunRequest,
     PutLandscapeFinding,
     PutPaperAnalysis,
@@ -249,16 +250,12 @@ def test_reconcile_paper_identity_does_not_change_status(tmp_path):
 
 
 def test_merge_rejects_ineligible_primary(tmp_path):
-    """If a duplicate paper is a Landscape source/representative and the merge
-    would rewrite that ref onto a primary that is not eligible formal evidence
-    (ACTIVE+analyzed), the merge is rejected. The caller must set the primary's
-    disposition separately first.
-
-    The merge carries the duplicate's analysis onto the primary, so an
-    unanalyzed primary becomes analyzed — that path is fine. The real bypass is
-    a RETIRED primary: reconcile never changes research_status, so merging a
-    referenced duplicate onto a RETIRED primary would leave the Landscape
-    citing a retired paper. That must be rejected.
+    """A RETIRED primary + ACTIVE duplicate is rejected by the
+    disposition-conflict guard before the eligibility guard even runs. This
+    is the concrete shape of "identity merge must not silently resolve a
+    candidate disposition conflict": merging an unresolved ACTIVE candidate
+    into a RETIRED primary would drop it. The caller must align statuses
+    explicitly first.
     """
 
     runtime = _make_runtime(tmp_path / "ws")
@@ -269,16 +266,14 @@ def test_merge_rejects_ineligible_primary(tmp_path):
     rev = retained.state_revision
     p1, p2 = refs
 
-    # Analyze P2 and make it a representative. Then retire P1 (with a reason).
-    # P1 is RETIRED; merging P2 onto P1 would rewrite the ApproachFamily ref
-    # to a RETIRED paper — ineligible. The merge must be rejected.
+    # P2 is ACTIVE+analyzed and referenced by an ApproachFamily; P1 is retired.
     rev = _put_analysis(runtime, run_id, rev, p2).state_revision
     rev = _put_approach_family(runtime, run_id, rev, [p2]).state_revision
     rev = _set_status(
         runtime, run_id, rev, p1, PaperResearchStatus.RETIRED, reason="out of scope"
     ).state_revision
 
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(CommandRejectedError) as exc_info:
         runtime.researcher.reconcile_paper_identity(
             run_id,
             rev,
@@ -287,7 +282,104 @@ def test_merge_rejects_ineligible_primary(tmp_path):
             duplicate_paper_ref=p2,
         )
     msg = str(exc_info.value).lower()
-    assert "not active" in msg or "not active with" in msg, msg
+    assert "conflicting candidate dispositions" in msg, msg
+
+
+def test_merge_rejects_active_primary_retired_duplicate(tmp_path):
+    """The symmetric case: an ACTIVE primary + RETIRED duplicate is also a
+    disposition conflict. Merging would bury a RETIRED disposition (with its
+    reason) under an ACTIVE primary — silent disappearance of the retirement
+    record. Rejected; the caller must align statuses first."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1", "P2"])
+    refs = list(retained.paper_refs)
+    rev = retained.state_revision
+    p1, p2 = refs
+
+    # Analyze and retire P2 (with a reason). P1 stays ACTIVE+unanalyzed.
+    rev = _put_analysis(runtime, run_id, rev, p2).state_revision
+    rev = _set_status(
+        runtime, run_id, rev, p2, PaperResearchStatus.RETIRED, reason="superseded"
+    ).state_revision
+
+    with pytest.raises(CommandRejectedError) as exc_info:
+        runtime.researcher.reconcile_paper_identity(
+            run_id,
+            rev,
+            p1,
+            PaperSource(title="merged", doi="10.0/merged"),
+            duplicate_paper_ref=p2,
+        )
+    assert "conflicting candidate dispositions" in str(exc_info.value).lower()
+
+
+def test_merge_allows_matching_active_statuses(tmp_path):
+    """ACTIVE + ACTIVE is not a disposition conflict; the merge proceeds (other
+    invariants still apply)."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1", "P2"])
+    refs = list(retained.paper_refs)
+    rev = retained.state_revision
+    p1, p2 = refs
+
+    # Both ACTIVE; analyze P2 so the merge carries an analysis onto P1.
+    rev = _put_analysis(runtime, run_id, rev, p2).state_revision
+
+    result = runtime.researcher.reconcile_paper_identity(
+        run_id,
+        rev,
+        p1,
+        PaperSource(title="merged", doi="10.0/merged"),
+        duplicate_paper_ref=p2,
+    )
+    assert result.removed_paper_ref == p2
+    paper = _inspect_paper(runtime, run_id, result.state_revision, p1)
+    assert paper.research_status == "ACTIVE"
+    assert paper.analysis is not None
+
+
+def test_merge_allows_matching_retired_statuses(tmp_path):
+    """RETIRED + RETIRED (both with reasons) is mechanically possible when the
+    other invariants permit it — identity merge remains an identity operation,
+    not a disposition decision. Different retirement_reason values do not block
+    the merge; only status equality matters."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1", "P2"])
+    refs = list(retained.paper_refs)
+    rev = retained.state_revision
+    p1, p2 = refs
+
+    # Retire both with different reasons. Neither is referenced by the Landscape
+    # (no ApproachFamily/Finding cites them), so retirement is allowed.
+    rev = _set_status(
+        runtime, run_id, rev, p1, PaperResearchStatus.RETIRED, reason="out of scope"
+    ).state_revision
+    rev = _set_status(
+        runtime, run_id, rev, p2, PaperResearchStatus.RETIRED, reason="superseded"
+    ).state_revision
+
+    result = runtime.researcher.reconcile_paper_identity(
+        run_id,
+        rev,
+        p1,
+        PaperSource(title="merged", doi="10.0/merged"),
+        duplicate_paper_ref=p2,
+    )
+    assert result.removed_paper_ref == p2
+    # Primary keeps its own disposition; reconcile does not interpret semantic
+    # retirement meaning.
+    paper = _inspect_paper(runtime, run_id, result.state_revision, p1)
+    assert paper.research_status == "RETIRED"
+    assert paper.retirement_reason == "out of scope"
 
 
 # ===========================================================================
@@ -312,7 +404,7 @@ def test_finding_mutation_rejects_retired_source(tmp_path):
         runtime, run_id, rev, ref, PaperResearchStatus.RETIRED, reason="superseded"
     ).state_revision
 
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(CommandRejectedError) as exc_info:
         _put_finding_mutation(runtime, run_id, rev, [{"paper_ref": ref}])
     assert "ACTIVE" in str(exc_info.value) or "active" in str(exc_info.value).lower()
 
@@ -329,7 +421,7 @@ def test_finding_mutation_rejects_unanalyzed_source(tmp_path):
     rev = retained.state_revision
 
     # P1 is ACTIVE + analysis=None.
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(CommandRejectedError) as exc_info:
         _put_finding_mutation(runtime, run_id, rev, [{"paper_ref": ref}])
     msg = str(exc_info.value).lower()
     assert "active" in msg or "analysis" in msg
@@ -352,8 +444,77 @@ def test_finding_mutation_accepts_analyzed_active_source(tmp_path):
 
 
 # ===========================================================================
-# 5 & 6. legacy RETIRED + reason=None: loads, but blocks request-completion
+# PutPaperAnalysis only allowed on ACTIVE Paper
 # ===========================================================================
+
+
+def test_put_paper_analysis_allowed_on_active(tmp_path):
+    """A PutPaperAnalysis mutation on an ACTIVE paper succeeds — the happy path."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1"])
+    ref = retained.paper_refs[0]
+    rev = retained.state_revision
+
+    result = _put_analysis(runtime, run_id, rev, ref)
+    paper = _inspect_paper(runtime, run_id, result.state_revision, ref)
+    assert paper.analysis is not None
+    assert paper.analysis.summary == "analysis"
+
+
+def test_put_paper_analysis_rejected_on_retired(tmp_path):
+    """A PutPaperAnalysis mutation on a RETIRED paper is rejected — deep
+    reading produces analysis only for ACTIVE papers. The caller must
+    reactivate explicitly with set-paper-status first."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1"])
+    ref = retained.paper_refs[0]
+    rev = retained.state_revision
+
+    # Analyze then retire P1 (so it carries a historical analysis).
+    rev = _put_analysis(runtime, run_id, rev, ref).state_revision
+    rev = _set_status(
+        runtime, run_id, rev, ref, PaperResearchStatus.RETIRED, reason="superseded"
+    ).state_revision
+
+    with pytest.raises(CommandRejectedError) as exc_info:
+        _put_analysis(runtime, run_id, rev, ref)
+    msg = str(exc_info.value).lower()
+    assert "reactivate" in msg, msg
+
+
+def test_retired_paper_with_historical_analysis_still_loads(tmp_path):
+    """A RETIRED paper that carries a historical PaperAnalysis (written before
+    retirement) is valid state — it loads normally. The new PutPaperAnalysis
+    gate only blocks *new* analysis writes, not existing state."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1"])
+    ref = retained.paper_refs[0]
+    rev = retained.state_revision
+
+    # Analyze then retire — the analysis persists on the RETIRED paper.
+    rev = _put_analysis(runtime, run_id, rev, ref).state_revision
+    rev = _set_status(
+        runtime, run_id, rev, ref, PaperResearchStatus.RETIRED, reason="superseded"
+    ).state_revision
+
+    # Reload from persisted state — must load without error.
+    run = runtime._repository.load(run_id)  # type: ignore[attr-defined]
+    validate_run(run)
+    paper = run.papers[ref]
+    assert paper.research_status is PaperResearchStatus.RETIRED
+    assert paper.analysis is not None  # historical analysis preserved
+
+
+
 
 
 def _legacy_retired_without_reason_run() -> dict:
@@ -415,7 +576,7 @@ def test_legacy_retired_without_reason_blocks_completion(tmp_path):
 
     runtime = _make_runtime(tmp_path / "ws")
     rev = _view(runtime, run_id).state_revision
-    with pytest.raises(Exception) as exc_info:
+    with pytest.raises(CommandRejectedError) as exc_info:
         _request_completion(runtime, run_id, rev)
     msg = str(exc_info.value)
     assert "RETIRED" in msg
@@ -593,6 +754,71 @@ def test_transition_blocks_changed_landscape_ineligible(tmp_path):
         finding.sources = {
             LiteratureSource(paper_ref=p2, relation=SourceRelation.SUPPORTS)
         }
+    after.state_revision = before.state_revision + 1
+    with pytest.raises(DomainValidationError) as exc_info:
+        validate_transition(before, after)
+    assert "not ACTIVE" in str(exc_info.value) or "not active" in str(
+        exc_info.value
+    ).lower()
+
+
+def test_transition_blocks_reason_cleared_on_retired(tmp_path):
+    """Mutating a RETIRED paper's retirement_reason to None is a disposition
+    change — validate_transition rejects it even though the paper was already
+    RETIRED. (Legacy RETIRED+reason=None untouched by an unrelated mutation
+    is still allowed — see test_transition_ignores_unchanged_invalid_legacy_state.)
+    """
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1"])
+    ref = retained.paper_refs[0]
+    rev = retained.state_revision
+
+    # Retire P1 with a valid reason.
+    rev = _put_analysis(runtime, run_id, rev, ref).state_revision
+    rev = _set_status(
+        runtime, run_id, rev, ref, PaperResearchStatus.RETIRED, reason="superseded"
+    ).state_revision
+
+    before = runtime._repository.load(run_id)  # type: ignore[attr-defined]
+    after = copy.deepcopy(before)
+    # Clear the reason — a disposition-state change on an already-RETIRED paper.
+    after.papers[ref].retirement_reason = None
+    after.state_revision = before.state_revision + 1
+    with pytest.raises(DomainValidationError) as exc_info:
+        validate_transition(before, after)
+    assert "retirement_reason" in str(exc_info.value)
+
+
+def test_transition_blocks_renamed_approach_with_ineligible_rep(tmp_path):
+    """Full-object inequality: renaming an ApproachFamily (a non-evidence
+    field change) still triggers the eligibility re-check on its
+    representative_papers. The change need not touch the paper refs."""
+
+    runtime = _make_runtime(tmp_path / "ws")
+    run_id = _create_run(runtime)
+    rev = _view(runtime, run_id).state_revision
+    retained = _retain(runtime, run_id, rev, ["P1", "P2"])
+    refs = list(retained.paper_refs)
+    rev = retained.state_revision
+    p1, p2 = refs
+
+    # Analyze P1, make an approach family with P1 as representative.
+    rev = _put_analysis(runtime, run_id, rev, p1).state_revision
+    rev = _put_approach_family(runtime, run_id, rev, [p1], name="Original").state_revision
+
+    before = runtime._repository.load(run_id)  # type: ignore[attr-defined]
+    after = copy.deepcopy(before)
+    # Strip P1's analysis (ACTIVE + unanalyzed now) AND rename the approach
+    # family. The rename makes before_approach != after_approach, so the
+    # eligibility re-check fires on representative_papers — which now cite an
+    # unanalyzed ACTIVE paper. (We do NOT retire P1, so the paper-disposition
+    # check does not fire first.)
+    after.papers[p1].analysis = None
+    for approach in after.literature_landscape.approach_families.values():
+        approach.name = "Renamed"
     after.state_revision = before.state_revision + 1
     with pytest.raises(DomainValidationError) as exc_info:
         validate_transition(before, after)

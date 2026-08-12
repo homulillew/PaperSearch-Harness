@@ -284,6 +284,18 @@ class ResearchCommands:
                     )
                 if not isinstance(mutation.analysis, PaperAnalysis):
                     raise CommandRejectedError("analysis must be a PaperAnalysis")
+                # Deep reading produces a PaperAnalysis only for an ACTIVE
+                # paper — a RETIRED paper is a closed candidate and must be
+                # reactivated explicitly with set-paper-status before its
+                # analysis can be updated. A historical RETIRED paper that
+                # already carries an analysis (from before retirement) is left
+                # untouched; this gate only blocks *new* analysis writes.
+                if paper.research_status is not PaperResearchStatus.ACTIVE:
+                    raise CommandRejectedError(
+                        f"cannot put PaperAnalysis for paper {mutation.paper_ref!r} "
+                        f"in {paper.research_status.value} state; reactivate the "
+                        f"paper explicitly before updating PaperAnalysis"
+                    )
                 paper.analysis = deepcopy(mutation.analysis)
                 continue
 
@@ -406,6 +418,19 @@ class ResearchCommands:
             if duplicate is None:
                 raise CommandRejectedError(
                     f"paper {duplicate_paper_ref!r} does not exist"
+                )
+            # Identity reconciliation must not silently resolve a candidate
+            # disposition conflict. If the primary and duplicate carry different
+            # research_status values, merging would either drop an unresolved
+            # ACTIVE candidate into a RETIRED primary or bury a RETIRED
+            # disposition under an ACTIVE primary. The caller must align the two
+            # statuses explicitly with set-paper-status first; reconcile only
+            # reconciles identity, not disposition.
+            if primary.research_status is not duplicate.research_status:
+                raise CommandRejectedError(
+                    "identity reconciliation cannot resolve conflicting candidate "
+                    "dispositions; align paper statuses explicitly with "
+                    "set-paper-status before merging"
                 )
 
         final_keys = set(paper_identity_keys(source))
