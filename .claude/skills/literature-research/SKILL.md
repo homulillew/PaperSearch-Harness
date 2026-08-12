@@ -178,6 +178,11 @@ deep-read or explicitly retire — never one that sits unresolved because it was
 on momentum. Retaining a paper is a commitment to close it (see Inspect before reading);
 promote only what is worth that commitment.
 
+If a newly material search result resolves to an already-RETIRED Paper, `retain-papers`
+does not reactivate it automatically. Re-examine whether the updated State makes further
+investigation necessary, and if it does, explicitly set the paper back to `ACTIVE` with
+`set-paper-status` before deep-reading or citing it again.
+
 ## Search through independent discovery channels
 
 Use DeepXiv through `search-papers` first. It remains the primary scholarly semantic
@@ -299,8 +304,10 @@ A landscape object may only cite a paper that is `ACTIVE` and has a `PaperAnalys
 `put-finding` / `put-open-problem` reject a `source.paper_ref` in the same state. This
 keeps landscape evidence grounded in primary-source understanding rather than search
 metadata. Conversely, a paper still cited by the landscape cannot be retired — update
-or retire the referencing ApproachFamily / Finding / OpenProblem first, since removing
-those references is a semantic decision the Harness must not make for you.
+the referencing ApproachFamily (re-issue `put-approach-family` with a revised
+`representative_paper_refs`) or retire the referencing Finding / OpenProblem
+(`retire-finding` / `retire-open-problem`) first, since removing those references is a
+semantic decision the Harness must not make for you.
 
 For a deep technical-route survey, normally seek multiple query formulations, more
 than one representative method per major route where the literature permits it,

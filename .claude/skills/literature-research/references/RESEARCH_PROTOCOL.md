@@ -71,6 +71,11 @@ is one the Researcher is prepared to either deep-read or explicitly retire — n
 left unresolved because it was retained on momentum. Retention is a commitment to close
 the paper (see Deep Reading Control Loop).
 
+If a newly material search result resolves to an already-RETIRED Paper, `retain-papers`
+does not reactivate it automatically. Re-examine whether the updated State makes further
+investigation necessary, and if it does, explicitly set the paper back to `ACTIVE` with
+`set-paper-status` before deep-reading or citing it again.
+
 ## Discovery and frontier coverage
 
 Use broad discovery to learn field vocabulary, seminal work, surveys, major mechanism
@@ -278,8 +283,10 @@ a Finding / OpenProblem `source.paper_ref` must point at a paper that is `ACTIVE
 has a `PaperAnalysis`; `put-approach-family`, `put-finding`, and `put-open-problem`
 reject a RETIRED or unanalyzed paper at that site. This keeps landscape claims grounded
 in primary-source understanding rather than search metadata. Conversely, a paper still
-cited by the landscape cannot be retired — update or retire the referencing object
-first, since removing those references is a semantic decision the Harness will not make
+cited by the landscape cannot be retired — update the referencing ApproachFamily
+(re-issue `put-approach-family` with a revised `representative_paper_refs`) or retire
+the referencing Finding / OpenProblem (`retire-finding` / `retire-open-problem`) first,
+since removing those references is a semantic decision the Harness will not make
 automatically.
 
 Synthesize throughout the run, inside each research iteration. Waiting until the end

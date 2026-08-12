@@ -184,7 +184,6 @@ class ResearcherCapabilities:
         *,
         duplicate_paper_ref: str | None = None,
         reconciled_analysis: PaperAnalysis | None = None,
-        research_status: PaperResearchStatus | None = None,
     ) -> PaperReconciliationResult:
         return self._commands.reconcile_paper_identity(
             run_id,
@@ -193,7 +192,6 @@ class ResearcherCapabilities:
             source,
             duplicate_paper_ref=duplicate_paper_ref,
             reconciled_analysis=reconciled_analysis,
-            research_status=research_status,
         )
 
     def put_approach_family(

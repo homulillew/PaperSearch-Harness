@@ -616,3 +616,112 @@ def validate_transition(before: ResearchRun, after: ResearchRun) -> None:
     removed_gaps = set(before.investigation_gaps) - set(after.investigation_gaps)
     if removed_gaps:
         _fail(f"investigation gaps cannot be deleted: {sorted(removed_gaps)!r}")
+
+    _validate_transition_paper_dispositions(before, after)
+    _validate_transition_landscape_evidence(before, after)
+
+
+def _validate_transition_paper_dispositions(
+    before: ResearchRun, after: ResearchRun
+) -> None:
+    """Defense-in-depth: a paper that *this transition* moves to RETIRED must
+    carry a non-empty retirement_reason, and the resulting Landscape must not
+    still cite it.
+
+    Only newly-RETIRED papers are checked — a paper that was already RETIRED in
+    ``before`` is historical state and is not re-litigated here (that would break
+    unrelated mutations on a legacy run). This is the global safety net behind
+    the command-level ``set_paper_research_status`` gate.
+    """
+    for ref, after_paper in after.papers.items():
+        if after_paper.research_status is not PaperResearchStatus.RETIRED:
+            continue
+        before_paper = before.papers.get(ref)
+        was_retired = (
+            before_paper is not None
+            and before_paper.research_status is PaperResearchStatus.RETIRED
+        )
+        if was_retired:
+            continue
+        reason = after_paper.retirement_reason
+        if not isinstance(reason, str) or not reason.strip():
+            _fail(
+                f"transition retired paper {ref!r} without a non-empty "
+                f"retirement_reason"
+            )
+        referencing = _paper_referenced_by(after.literature_landscape, ref)
+        if referencing:
+            _fail(
+                f"transition retired paper {ref!r} but it is still referenced by "
+                f"semantic objects {sorted(referencing)!r}"
+            )
+
+
+def _validate_transition_landscape_evidence(
+    before: ResearchRun, after: ResearchRun
+) -> None:
+    """Defense-in-depth: a Landscape object that *this transition* creates or
+    changes may only cite ACTIVE+analyzed papers.
+
+    Only new or changed ApproachFamilies / Findings / OpenProblems are checked —
+    unchanged objects are historical state and are not re-litigated (that would
+    break unrelated mutations on a legacy run). This is the global safety net
+    behind the command-level eligibility gates.
+    """
+    for ref, after_approach in after.literature_landscape.approach_families.items():
+        before_approach = before.literature_landscape.approach_families.get(ref)
+        if before_approach is not None and (
+            before_approach.representative_papers
+            == after_approach.representative_papers
+        ):
+            continue
+        _require_eligible_evidence(
+            after, after_approach.representative_papers, "representative"
+        )
+
+    for ref, after_finding in after.literature_landscape.findings.items():
+        before_finding = before.literature_landscape.findings.get(ref)
+        if before_finding is not None and before_finding.sources == after_finding.sources:
+            continue
+        source_refs = {source.paper_ref for source in after_finding.sources}
+        _require_eligible_evidence(after, source_refs, "source")
+
+    for ref, after_problem in after.literature_landscape.open_problems.items():
+        before_problem = before.literature_landscape.open_problems.get(ref)
+        if before_problem is not None and (
+            before_problem.sources == after_problem.sources
+        ):
+            continue
+        source_refs = {source.paper_ref for source in after_problem.sources}
+        _require_eligible_evidence(after, source_refs, "source")
+
+
+def _require_eligible_evidence(
+    run: ResearchRun, paper_refs: set[str], role: str
+) -> None:
+    for paper_ref in paper_refs:
+        paper = run.papers.get(paper_ref)
+        if paper is None:
+            _fail(f"landscape {role} cites unknown paper {paper_ref!r}")
+        if (
+            paper.research_status is not PaperResearchStatus.ACTIVE
+            or paper.analysis is None
+        ):
+            _fail(
+                f"landscape {role} cites paper {paper_ref!r} which is not ACTIVE "
+                f"with a PaperAnalysis"
+            )
+
+
+def _paper_referenced_by(landscape: LiteratureLandscape, paper_ref: str) -> set[str]:
+    refs: set[str] = set()
+    for approach in landscape.approach_families.values():
+        if paper_ref in approach.representative_papers:
+            refs.add(approach.id)
+    for finding in landscape.findings.values():
+        if any(source.paper_ref == paper_ref for source in finding.sources):
+            refs.add(finding.id)
+    for problem in landscape.open_problems.values():
+        if any(source.paper_ref == paper_ref for source in problem.sources):
+            refs.add(problem.id)
+    return refs

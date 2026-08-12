@@ -371,9 +371,15 @@ class ResearchCommands:
         *,
         duplicate_paper_ref: str | None = None,
         reconciled_analysis: PaperAnalysis | None = None,
-        research_status: PaperResearchStatus | None = None,
     ) -> PaperReconciliationResult:
-        """Enrich or explicitly merge Papers using caller-supplied semantics."""
+        """Enrich or explicitly merge Papers using caller-supplied semantics.
+
+        Identity reconciliation only — this command never changes a Paper's
+        research_status or retirement_reason. Candidate disposition (retire /
+        reactivate) belongs to ``set_paper_research_status`` so the Deep Reading
+        invariants (RETIRED requires reason, referenced paper cannot be retired,
+        landscape evidence must be ACTIVE+analyzed) cannot be bypassed here.
+        """
 
         current = self._load_expected(run_id, expected_revision)
         self._require_lifecycle(
@@ -386,12 +392,6 @@ class ResearchCommands:
         ):
             raise CommandRejectedError(
                 "reconciled_analysis must be a PaperAnalysis or None"
-            )
-        if research_status is not None and not isinstance(
-            research_status, PaperResearchStatus
-        ):
-            raise CommandRejectedError(
-                "research_status must be a PaperResearchStatus or None"
             )
 
         proposed = deepcopy(current)
@@ -456,8 +456,6 @@ class ResearchCommands:
         primary.source = reconciled_source
         if reconciled_analysis is not None:
             primary.analysis = deepcopy(reconciled_analysis)
-        if research_status is not None:
-            primary.research_status = research_status
 
         if duplicate is not None:
             assert duplicate_paper_ref is not None
@@ -467,6 +465,22 @@ class ResearchCommands:
                 primary_paper_ref,
             )
             del proposed.papers[duplicate_paper_ref]
+
+        # After a merge, rewritten Landscape refs may now point at the primary
+        # paper. If the primary is not ACTIVE+analyzed, those refs would violate
+        # landscape evidence eligibility — reject rather than silently leave the
+        # Landscape citing an ineligible paper. This is identity reconciliation,
+        # not disposition: the caller must set the paper's status separately.
+        referencing = self._paper_referenced_by(proposed, primary_paper_ref)
+        if referencing and (
+            primary.research_status is not PaperResearchStatus.ACTIVE
+            or primary.analysis is None
+        ):
+            raise CommandRejectedError(
+                f"reconciled paper {primary_paper_ref!r} is referenced by "
+                f"semantic objects {list(referencing)} but is not ACTIVE with a "
+                f"PaperAnalysis; set its status separately before merging"
+            )
 
         if proposed == current:
             raise CommandRejectedError("paper reconciliation must change state")
@@ -829,23 +843,38 @@ class ResearchCommands:
         )
         if not isinstance(requester_rationale, str):
             raise CommandRejectedError("requester_rationale must be a string")
-        # Completion hard gate: an ACTIVE paper without a PaperAnalysis is
-        # unresolved research work. Research State still claims it belongs to
-        # the current corpus, yet no paper-level understanding has been formed.
-        # Requesting Completion in that state is a structural contradiction —
-        # a material candidate could silently disappear, exactly the bad_case.
-        # This is deterministic state consistency, not a paper count or score.
+        # Completion hard gate: every retained paper must be closed before an
+        # independent checker is asked to judge the corpus. Two closure rules:
+        #   ACTIVE  -> must have a PaperAnalysis (unresolved otherwise)
+        #   RETIRED -> must carry a non-empty retirement_reason
+        # The second rule is the legacy-state boundary: an old snapshot with
+        # RETIRED + reason=None still loads (validate_run stays weak so historical
+        # runs remain readable), but a NEW request-completion transition must
+        # satisfy the current closure invariant. This is deterministic state
+        # consistency, not a paper count or score.
         unanalyzed_active = [
             ref
             for ref, paper in current.papers.items()
             if paper.research_status is PaperResearchStatus.ACTIVE
             and paper.analysis is None
         ]
-        if unanalyzed_active:
+        retired_without_reason = [
+            ref
+            for ref, paper in current.papers.items()
+            if paper.research_status is PaperResearchStatus.RETIRED
+            and (
+                not isinstance(paper.retirement_reason, str)
+                or not paper.retirement_reason.strip()
+            )
+        ]
+        if unanalyzed_active or retired_without_reason:
             raise CommandRejectedError(
-                f"cannot request completion: {len(unanalyzed_active)} ACTIVE "
-                f"paper(s) have no PaperAnalysis: {sorted(unanalyzed_active)!r}; "
-                f"analyze or retire them first"
+                f"cannot request completion: retained papers are not closed; "
+                f"{len(unanalyzed_active)} ACTIVE paper(s) have no PaperAnalysis: "
+                f"{sorted(unanalyzed_active)!r}; "
+                f"{len(retired_without_reason)} RETIRED paper(s) lack a "
+                f"retirement_reason: {sorted(retired_without_reason)!r}; "
+                f"analyze or retire (with a reason) each first"
             )
 
         proposed = deepcopy(current)
@@ -1404,36 +1433,28 @@ class ResearchCommands:
 
     @staticmethod
     def _validate_finding_refs(run: ResearchRun, mutation: PutLandscapeFinding) -> None:
-        if not isinstance(mutation.statement, str):
-            raise CommandRejectedError("finding statement must be a string")
-        if not isinstance(mutation.approach_refs, frozenset) or not all(
-            isinstance(approach_ref, str) for approach_ref in mutation.approach_refs
-        ):
-            raise CommandRejectedError(
-                "finding approach_refs must be a frozenset of references"
-            )
+        """Validate a Finding mutation through the unified landscape eligibility gate.
+
+        This delegates to ``_validate_landscape_item_values`` so the mutation path
+        (``apply_research_mutation(PutLandscapeFinding)``) and the command path
+        (``put-finding``) enforce one identical rule set: every ``LiteratureSource``
+        paper_ref must exist, be ACTIVE, and have a PaperAnalysis. No duplicate,
+        weaker validator is kept.
+        """
+        cls = ResearchCommands
+        cls._validate_reference_frozenset(mutation.approach_refs, "approach_refs")
         if not isinstance(mutation.sources, frozenset) or not all(
             isinstance(source, LiteratureSource) for source in mutation.sources
         ):
             raise CommandRejectedError(
                 "finding sources must be a frozenset of LiteratureSource"
             )
-        missing_approaches = set(mutation.approach_refs) - set(
-            run.literature_landscape.approach_families
+        cls._validate_landscape_item_values(
+            run,
+            mutation.statement,
+            mutation.approach_refs,
+            mutation.sources,
         )
-        if missing_approaches:
-            raise CommandRejectedError(
-                f"finding has dangling approach refs: {sorted(missing_approaches)!r}"
-            )
-        missing_papers = {
-            source.paper_ref
-            for source in mutation.sources
-            if source.paper_ref not in run.papers
-        }
-        if missing_papers:
-            raise CommandRejectedError(
-                f"finding has dangling paper refs: {sorted(missing_papers)!r}"
-            )
 
     @staticmethod
     def _validate_completion_payload_types(

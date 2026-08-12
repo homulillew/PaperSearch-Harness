@@ -171,6 +171,21 @@ class DeterministicCitationRenderer:
             raise CitationValidationError(
                 f"citation targets unknown paper {citation.paper_ref!r}"
             )
+        # Formal report citations share the Landscape evidence boundary: a
+        # citation may only target a paper that is ACTIVE and has a
+        # PaperAnalysis. A RETIRED paper is a closed candidate (not current
+        # evidence); an unanalyzed ACTIVE paper would let search metadata ground
+        # a report claim. This keeps the Final Report from re-introducing papers
+        # that the Deep Reading invariants closed off — including under Partial
+        # Delivery, which routes through the same renderer.
+        target = papers[citation.paper_ref]
+        if target.research_status.value != "ACTIVE" or not target.has_analysis:
+            raise CitationValidationError(
+                f"citation targets paper {citation.paper_ref!r} which is not "
+                f"eligible formal evidence (must be ACTIVE with a "
+                f"PaperAnalysis; is {target.research_status.value}, "
+                f"has_analysis={target.has_analysis})"
+            )
         locator = citation.locator
         if locator is not None and (
             not isinstance(locator, SourceLocator)
