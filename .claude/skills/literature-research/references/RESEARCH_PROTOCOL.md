@@ -175,10 +175,9 @@ workflow; source-provider expansion requires a separate architecture decision.
 
 ## External Discovery Failure Closure
 
-A tool invocation is not a usable discovery outcome, and a usable discovery outcome is
-not the same as the research objective being satisfied. When DeepXiv or native
-`WebSearch` fails or returns a clearly inconclusive result, do not treat "a tool was
-called" as "the discovery objective is done." Close the failure loop explicitly:
+A tool invocation is not a usable discovery outcome, and a usable discovery outcome
+is not the same as the research objective being satisfied. When DeepXiv or native
+`WebSearch` fails or returns a clearly inconclusive result, close the loop explicitly:
 
 ```text
 failure / inconclusive outcome
@@ -186,10 +185,7 @@ failure / inconclusive outcome
 → bounded recovery (semantic, not a fixed retry count)
 → reassess the original research uncertainty
 ├── resolved → continue (no Gap)
-└── unresolved
-    → contract-material?
-      ├── no  → continue (no Gap)
-      └── yes → put-investigation-gap (describe the research consequence)
+└── unresolved + contract-material → put-gap (describe the research consequence)
 ```
 
 A failed tool call does **not** automatically create an InvestigationGap. Only an
@@ -197,9 +193,8 @@ A failed tool call does **not** automatically create an InvestigationGap. Only a
 change a current Contract requirement, a major route, a representative method, a
 contradiction, or a frontier / recency judgment. If a semantic-equivalent query or
 another genuinely equivalent discovery path resolves the original uncertainty, continue
-without a Gap.
-
-When a Gap is warranted, describe the **research consequence**, never the tool log:
+without a Gap. When a Gap is warranted, describe the **research consequence**, never
+the tool log:
 
 > Correct: "Independent frontier recall for the 2026 KV-cache literature remains
 > unresolved; current recent coverage has not been independently counter-checked for
@@ -208,7 +203,12 @@ When a Gap is warranted, describe the **research consequence**, never the tool l
 > Wrong: "WebSearch failed." / "DeepXiv returned INVALID_RESPONSE."
 
 Tool-failure history stays in the host observation stream and the DeepXiv audit log
-(`audit-history`), never in `ResearchRun`. Persist decisions, not trajectories.
+(`audit-history`), never in `ResearchRun`. Persist decisions, not trajectories. If
+WebSearch later recovers or another genuinely equivalent discovery path closes the
+uncertainty, `resolve-gap` with a `--resolution` that describes the **research closure**
+(e.g. "Independent frontier counter-recall was completed using usable WebSearch results
+across the current 2026 route terminology; all material candidates were assessed and the
+evidence did not change the frontier judgment"), not "WebSearch works now."
 
 ### DeepXiv failure handling
 
@@ -251,12 +251,7 @@ normal frontier query
   treat the channel as unavailable/inconclusive
 ```
 
-No fixed query count. If WebSearch later recovers or another genuinely equivalent
-discovery path closes the uncertainty, `resolve-investigation-gap` with a resolution
-that describes the **research closure** (e.g. "Independent frontier counter-recall was
-completed using usable WebSearch results across the current 2026 route terminology; all
-material candidates were assessed and the evidence did not change the frontier
-judgment"), not "WebSearch works now."
+No fixed query count.
 
 ### WebSearch vs WebFetch semantic boundary
 

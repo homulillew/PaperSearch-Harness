@@ -1,26 +1,42 @@
 """External Discovery Failure Closure — DeepXiv reason propagation tests.
 
-These tests pin the diagnosability of a failed DeepXiv paper-search attempt:
-the provider's already-sanitized failure reason must survive the
-``PaperSearchProviderError → PaperSearchAttemptError → audit / CLI`` chain so
-Claude can diagnose recovery semantically, while the raw provider response is
-never persisted and resource accounting is unchanged.
+These tests pin the diagnosability of a failed DeepXiv paper-search attempt and the
+authority boundary that produces the safe reason:
 
-They drive the in-process runtime with a fake ``PaperSearchProvider`` (no
-subprocess, no network) so every failure kind can be exercised deterministically.
+```text
+DeepXiv adapter
+→ converts a provider failure into a sanitized PaperSearchProviderError
+   (fixed, schema-path message; raw response object/body is never interpolated)
 
-Coverage (8 cases):
+PaperSearchService
+→ propagates that already-sanitized reason into PaperSearchAttemptError / audit / CLI
+
+CLI
+→ additionally redacts DEEPXIV_TOKEN defensively
+```
+
+They drive the in-process runtime with a fake ``PaperSearchProvider`` (no subprocess,
+no network) so every failure kind can be exercised deterministically. A separate
+adapter-level test feeds a malformed response object straight into
+``DeepXivPaperSearchProvider._map_response`` (no token, no SDK) to pin that the
+adapter itself emits the fixed schema-path reason and never interpolates raw
+response values.
+
+Coverage (9 cases):
 
   1.  INVALID_RESPONSE reason survives into PaperSearchAttemptError.
   2.  failure audit event contains the sanitized reason.
   3.  AUTHENTICATION / RATE_LIMIT / UNAVAILABLE propagate their safe message.
-  4.  provider raw response is not persisted into audit/error state.
+  4.  the runtime does not introduce a raw provider payload into audit/error state
+      (the reason is the adapter's already-sanitized message; no raw body is stored).
   5.  a failed search attempt still consumes one paper_search_attempt and
       advances the revision exactly as before.
   6.  a structurally invalid provider page surfaces INVALID_RESPONSE + reason.
   7.  an unrecognized (non-PaperSearchProviderError) failure surfaces OTHER
       with no raw exception text as the reason.
   8.  CLI error JSON exposes failure_kind + safe reason (in-process main()).
+  9.  adapter: a malformed provider response yields a fixed schema-path safe reason
+      and the raw response value is not interpolated into the message.
 
 Run:
 
@@ -49,6 +65,7 @@ if str(RUNTIME_SRC) not in sys.path:
 from my_search_harness.domain.model import ArtifactKind  # noqa: E402
 from my_search_harness.runtime.audit import LocalAuditLog  # noqa: E402
 from my_search_harness.runtime.commands import CreateRunRequest  # noqa: E402
+from my_search_harness.runtime.deepxiv import DeepXivPaperSearchProvider  # noqa: E402
 from my_search_harness.runtime.local_runtime import LocalV1Runtime  # noqa: E402
 from my_search_harness.runtime.paper_search import (  # noqa: E402
     PaperSearchAttemptError,
@@ -100,18 +117,6 @@ class _MalformedPageProvider:
     def search(self, query, *, limit, offset=0, date_from=None, date_to=None):
         # total_count is a string, not an int -> structurally invalid.
         return PaperSearchPage(total_count="not-an-int", hits=())  # type: ignore[arg-type]
-
-
-class _RawResponseLeakProvider:
-    """Provider whose raw response text must never reach audit/error state."""
-
-    RAW_SECRET = "RAW_PROVIDER_BODY_SECRET_12345"
-
-    def search(self, query, *, limit, offset=0, date_from=None, date_to=None):
-        raise PaperSearchProviderError(
-            ProviderFailureKind.INVALID_RESPONSE,
-            "invalid paper search provider response: top-level status must be success",
-        )
 
 
 # --- in-process runtime helpers -------------------------------------------
@@ -226,12 +231,23 @@ def test_existing_failure_kinds_propagate_safe_message(tmp_path, kind, message):
     assert event.reason == message
 
 
-def test_provider_raw_response_not_persisted_into_audit_or_error(tmp_path):
-    """No raw provider response body or HTTP text reaches audit or error state."""
+def test_runtime_does_not_introduce_raw_payload_into_audit_or_error(tmp_path):
+    """The runtime propagates the adapter's already-sanitized reason and does not
+    introduce a raw provider payload into audit, error, or state.
+
+    The authority boundary is: the DeepXiv adapter converts a provider failure into
+    a sanitized ``PaperSearchProviderError`` (fixed, schema-path message), and
+    ``PaperSearchService`` propagates that already-sanitized reason verbatim. This
+    test pins that the service layer does not synthesize or store any payload beyond
+    the adapter's safe reason — it does not (and cannot) prove that an arbitrary
+    raw response would be sanitized, because the adapter never lets raw text reach
+    this layer. Adapter-level raw-response safety is pinned by
+    ``test_adapter_malformed_response_yields_safe_schema_path_reason`` below.
+    """
     workspace = tmp_path / "ws"
     workspace.mkdir()
-    provider = _RawResponseLeakProvider()
-    runtime = _make_runtime(workspace, provider)
+    # A provider that raises the adapter's exact sanitized INVALID_RESPONSE reason.
+    runtime = _make_runtime(workspace, _InvalidResponseProvider())
     run_id = _create_run(runtime)
     rev = runtime.researcher.view(run_id).state_revision
 
@@ -239,28 +255,26 @@ def test_provider_raw_response_not_persisted_into_audit_or_error(tmp_path):
         _search(runtime, run_id, rev)
 
     err = exc_info.value
-    # The sanitized reason carries no raw body.
-    assert provider.RAW_SECRET not in (err.reason or "")
-    assert provider.RAW_SECRET not in str(err)
+    # The reason is exactly the adapter's safe message — nothing more is synthesized.
+    assert err.reason == (
+        "invalid paper search provider response: top-level status must be success"
+    )
 
-    # The audit log carries no raw body either.
+    # The audit log carries only that safe reason; no extra payload field appears.
     events = _audit_events(workspace, run_id)
     for event in events:
-        blob = json.dumps(
-            {
-                "action": event.action,
-                "reason": event.reason,
-                "details": event.details,
-                "provider_outcome": event.provider_outcome,
-            },
-            sort_keys=True,
+        assert event.reason in (
+            None,
+            "invalid paper search provider response: top-level status must be success",
         )
-        assert provider.RAW_SECRET not in blob, blob
+        # Audit details carry only JSON scalars; no raw response object is embedded.
+        for value in event.details.values():
+            assert isinstance(value, (str, int, float, bool)), value
 
-    # The authoritative state.json carries no raw body.
+    # The authoritative state.json carries no attempt payload beyond the safe reason.
     state_path = workspace / "runs" / run_id / "state.json"
     state_text = state_path.read_text(encoding="utf-8")
-    assert provider.RAW_SECRET not in state_text
+    assert "top-level status must be success" not in state_text
 
 
 def test_failed_attempt_consumes_one_attempt_and_advances_revision(tmp_path):
@@ -326,6 +340,57 @@ def test_unrecognized_failure_surfaces_other_without_raw_text(tmp_path):
     event = _audit_events(workspace, run_id)[-1]
     assert event.provider_outcome == "OTHER"
     assert event.reason is None
+
+
+# --- adapter-level regression (no token, no SDK) --------------------------
+
+
+def test_adapter_malformed_response_yields_safe_schema_path_reason():
+    """The DeepXiv adapter converts a malformed provider response into a sanitized
+    ``PaperSearchProviderError`` whose message is a fixed, schema-path description,
+    and never interpolates raw response object/body values into the message.
+
+    ``_map_response`` is a classmethod taking a plain ``response: object``, so it
+    can be exercised directly with a hand-built mapping — no token, no SDK, no
+    network. This pins the real raw-response safety boundary at the layer that
+    actually owns it (the adapter), rather than asserting it at a layer that only
+    ever sees the already-sanitized reason.
+    """
+    # A response whose result[1].date is not ISO 8601. The raw date value below is
+    # deliberately a string that must NOT appear in the safe reason.
+    raw_secret_date = "RAW_NOT_A_DATE_VALUE_99999"
+    response = {
+        "status": "success",
+        "total_count": 2,
+        "result": [
+            {
+                "arxiv_id": "2401.00001",
+                "title": "Paper A",
+                "authors": "Alice",
+                "date": "2024-01-01",
+            },
+            {
+                "arxiv_id": "2401.00002",
+                "title": "Paper B",
+                "authors": "Bob",
+                "date": raw_secret_date,
+            },
+        ],
+    }
+
+    with pytest.raises(PaperSearchProviderError) as exc_info:
+        DeepXivPaperSearchProvider._map_response(response)
+
+    err = exc_info.value
+    assert err.failure_kind is ProviderFailureKind.INVALID_RESPONSE
+    # The reason is the fixed schema-path description (the adapter stores it as the
+    # exception message; PaperSearchService later copies str(exc) into the
+    # PaperSearchAttemptError.reason / audit reason).
+    assert str(err) == (
+        "invalid paper search provider response: result[1].date must be an ISO 8601 date"
+    )
+    # The raw response value is never interpolated into the message.
+    assert raw_secret_date not in str(err)
 
 
 # --- CLI error JSON contract (in-process) ---------------------------------

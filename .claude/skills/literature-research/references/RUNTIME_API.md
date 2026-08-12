@@ -304,5 +304,5 @@ A failed `search-papers` attempt also surfaces the provider's already-sanitized
 `OTHER`) and a safe `reason` string in the error JSON, and records both in the
 `paper_search_attempt` audit event. The reason is a description of what the provider
 returned or how it failed (e.g. "invalid paper search provider response: top-level
-status must be success"), never the raw provider response or HTTP body. Use
-`failure_kind` for semantic diagnosis; the raw response is not persisted anywhere.
+status must be success"), never the raw provider response or HTTP body. The raw
+response is not persisted into audit or error state.
