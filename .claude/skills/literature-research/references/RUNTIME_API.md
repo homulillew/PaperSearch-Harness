@@ -207,6 +207,7 @@ Submission input contains `completion_check_ref`, `verdict`, `reasons`, and opti
 ```text
 delivery-view --run-id RUN
 delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
+delivery-inspect-source --run-id RUN --expected-revision REV --paper-ref PAPER
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
 render-report --run-id RUN --input FILE
 publish-report --run-id RUN --expected-revision REV --input FILE
@@ -214,6 +215,12 @@ validate-delivery --run-id RUN
 reopen-research --run-id RUN --expected-revision REV
 close-run --run-id RUN --expected-revision REV
 ```
+
+`delivery-inspect-source` returns the source outline for a retained paper in
+DELIVERY (the same outline shape as `inspect-source` in Research). It advances
+`state_revision` on success and on a `SourceAccessAttemptError`. The Report
+Constructor uses it to recover material density without re-entering Research;
+it must not change accepted research semantics.
 
 `render-report` input contains `markdown` and `citations`. Markdown uses tokens such as
 `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and optional

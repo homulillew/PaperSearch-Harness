@@ -469,6 +469,19 @@ class DeliveryCapabilities:
         self._require_delivery(run_id)
         return self._context.inspect(run_id, expected_revision, refs)
 
+    def inspect_source(
+        self,
+        run_id: str,
+        expected_revision: int,
+        paper_ref: str,
+    ) -> InspectSourceResult:
+        self._require_delivery(run_id)
+        return self._source_access.inspect_source(
+            run_id,
+            expected_revision,
+            paper_ref,
+        )
+
     def read_source(
         self,
         run_id: str,

@@ -561,11 +561,13 @@ Research Gap 应由前文已有证据自然推出，而不是在结尾临时添�
 
 ---
 
-## 21. Fresh Editor 进行整篇文章编辑
+## 21. Report Reviewer 进行整篇文章审校
 
-最终编辑不是逐句润色，而是重新检查文章结构。
+最终审校不是逐句润色，而是重新检查文章结构。
 
-Fresh Editor 应重点判断：
+Report Reviewer 使用两阶段冷读：Phase 1 盲读（只看交付物描述、Writing Guide 和正文，不看 Report Brief）；Phase 2 对照 Report Brief 检查正文是否忠实完成论证。每次正文修订后重新请求新的 Reviewer instance。
+
+Report Reviewer 应重点判断：
 
 * 主线是否清楚；
 * 每一节是否回答真实研究问题；
@@ -581,15 +583,9 @@ Fresh Editor 应重点判断：
 * 是否存在公文腔、翻译腔、抽象名词链；
 * 是否保留所有重要限定条件。
 
-Editor 可以：
+Reviewer 只返回具体、可修复的 Blocking Issues。停止条件是 Blocking Issues 为空，不是分数阈值，也不是固定轮数。无 blocker 时不调用 Reviser。
 
-* 移动；
-* 合并；
-* 拆分；
-* 删除；
-* 重写段落。
-
-但不能创造 Research State 中不存在的新事实或实质研究判断。
+Reviewer 可以发现正文与 Brief 不一致，但不负责最终确认 claim 是否被 Primary Evidence 支持——后者属于 Research Integrity Review。
 
 发现事实边界问题时，应交给 Research Integrity Review，而不是通过写作技巧掩盖。
 

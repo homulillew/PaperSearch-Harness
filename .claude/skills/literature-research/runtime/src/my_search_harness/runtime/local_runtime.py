@@ -19,12 +19,11 @@ from .deepxiv import DeepXivPaperSearchProvider, DeepXivSourceAccessProvider
 from .paper_search import PaperSearchProvider
 from .persistence import JsonResearchRunRepository
 from .reporting import (
-    EditorialIntegrator,
-    FreshEditorialReviewerFactory,
-    NarrativePlanner,
-    ReportComposer,
+    ReportConstructor,
     ReportPipeline,
     ReportReviser,
+    ReportReviewerFactory,
+    ReportWriter,
     ResearchIntegrityReviewer,
     load_report_writing_guide,
 )
@@ -110,10 +109,9 @@ class LocalV1Runtime:
     def report_pipeline(
         self,
         *,
-        planner: NarrativePlanner,
-        composer: ReportComposer,
-        integrator: EditorialIntegrator,
-        editor_factory: FreshEditorialReviewerFactory,
+        constructor: ReportConstructor,
+        writer: ReportWriter,
+        reviewer_factory: ReportReviewerFactory,
         reviser: ReportReviser,
         integrity_reviewer: ResearchIntegrityReviewer,
         writing_guideline_path: str | Path,
@@ -122,10 +120,9 @@ class LocalV1Runtime:
 
         return ReportPipeline(
             self._delivery,
-            planner=planner,
-            composer=composer,
-            integrator=integrator,
-            editor_factory=editor_factory,
+            constructor=constructor,
+            writer=writer,
+            reviewer_factory=reviewer_factory,
             reviser=reviser,
             integrity_reviewer=integrity_reviewer,
             citation_renderer=DeterministicCitationRenderer(),

@@ -427,21 +427,22 @@ ${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md
 ${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md
 ```
 
-Apply the complete Writing Guide to the Narrative Planner, Report Composer, Editorial
-Integrator, fresh Editor, and Reviser. It governs organization, prose, synthesis, and
-readability. Create the independent Research Integrity Reviewer in a fresh context with
-the complete Integrity Guide, Delivery state, manuscript, and targeted inspection/source
-access. The Integrity Guide is its primary rubric; it does not receive the Writing Guide
-as a style rubric and does not perform prose polish.
+Apply the complete Writing Guide to the Report Constructor, Writer, Report
+Reviewer, and Reviser. It governs organization, prose, synthesis, and
+readability. Create the independent Research Integrity Reviewer in a fresh
+context with the complete Integrity Guide, Delivery state, the Report Brief,
+the manuscript, and targeted inspection/source access. The Integrity Guide is
+its primary rubric; it does not receive the Writing Guide as a style rubric and
+does not perform prose polish.
 
-The semantic stages are:
+The report generation flow (ADR-012) is:
 
 ```text
-Narrative Planner
-→ Report Composer
-→ Editorial Integrator
-→ Fresh Editor
-→ Reviser when needed
+Research State
+→ Report Constructor (builds the Report Brief)
+→ Writer (Brief + Writing Guide + safe paper metadata → Manuscript)
+→ Report Reviewer (Phase 1 blind read, no Brief; Phase 2 brief check)
+   ↔ Reviser while Blocking Issues remain
 → Research Integrity Reviewer
 → deterministic citation renderer
 → publish-report
@@ -449,24 +450,52 @@ Narrative Planner
 → close-run
 ```
 
-If integrity review finds a Delivery-only writing or citation repair, revise in Delivery.
-If it finds an unsupported claim or missing research, call `reopen-research` and return
-to the research loop.
+One authoritative State, one Report Brief, two independent gates. Problems
+return to the earliest layer authorized to repair them: Manuscript → Reviser,
+Brief → Report Constructor, State → Research. The Report Brief is the only
+report-semantic intermediate work product — it is a lightweight Delivery value
+object, not a Research Domain entity, and it is not persisted on the ResearchRun.
 
-The fresh Editor reviews the whole report semantically: sections must be driven by
-research questions or judgments rather than paper order; taxonomy must state its
-classification criterion; each paragraph should make one main judgment and start with
-a self-contained claim; giant paragraphs, abstract-noun chains, bureaucratic or
-translated prose should be repaired. Representative methods must serve synthesis,
-carry the required first-use hyperlink, and lead naturally from evidence to gaps. These
-are editorial judgments, not Python paragraph-length or style validators.
+The Report Constructor derives the Brief (argument flow, role-aware material,
+evidence boundaries) from the Delivery View. It may inspect Research refs,
+inspect-source, and do targeted read-source to recover material density, but
+must not silently mutate Research State; if semantics would change, call
+`reopen-research`. Brief freshness binds the DeliveryBasis, not ordinary
+state_revision.
+
+The Writer has article-reasoning authority but no Research authority. It
+receives the Brief, the Writing Guide, and safe `PaperIndexEntry` metadata —
+not the broad Delivery View or source access. If a section's Brief material is
+insufficient, the Writer returns a transient construction request rather than
+fabricating research interpretation; the pipeline routes it back to the
+Constructor.
+
+The Report Reviewer uses two-phase cold reading in one fresh instance: Phase 1
+is a blind read (no Brief — only the deliverable description, Writing Guide,
+and Manuscript); Phase 2 checks the Manuscript against the Brief. After every
+manuscript revision a NEW Reviewer instance is requested. The editorial loop
+stops only when Blocking Issues are empty — no scores, no fixed round count, no
+voting. Resource exhaustion terminates the loop but is never a PASS. No
+blockers means the Reviser is not called.
+
+Any manuscript change invalidates the prior Editorial PASS: a revised Manuscript
+always gets a fresh cold read. So an Integrity `REVISE_DELIVERY` repair (to
+Manuscript or Brief) re-runs the editorial loop and the integrity review on the
+new Manuscript, even for a small repair.
+
+If integrity review finds a Delivery-only repair, it returns `REVISE_DELIVERY`
+with a `repair_target` of `MANUSCRIPT` or `BRIEF`, routing to the Reviser or the
+Report Constructor respectively. If it finds an unsupported claim or missing
+research, it returns `REOPEN_RESEARCH` and the pipeline calls `reopen-research`
+to return to the research loop.
 
 The fresh Integrity Reviewer checks author claims versus independent evidence,
 single-paper evidence versus consensus, correlation versus causation, ablation versus
 causal mechanism, numerical gains versus statistical significance, SOTA and
 generalization scope, benchmark validity, robustness and efficiency dimensions,
 test-time compute/tool budgets, comparison fairness, recency and absolute claims,
-corpus-bounded absence, and citation-to-claim alignment. It returns the existing typed
+corpus-bounded absence, and citation-to-claim alignment. The Brief is its
+traceability map, not a re-planning entry. It returns the existing typed
 integrity result without a numeric score.
 
 Integrity may inspect Delivery state and retained objects, reread targeted sources, and

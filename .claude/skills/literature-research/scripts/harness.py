@@ -458,6 +458,7 @@ def _parser() -> argparse.ArgumentParser:
         "inspect-source",
         "read-source",
         "completion-read-source",
+        "delivery-inspect-source",
         "delivery-read-source",
     ):
         item = commands.add_parser(name)
@@ -781,6 +782,10 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
         return delivery.view(args.run_id)
     if args.command == "delivery-inspect":
         return delivery.inspect(args.run_id, args.expected_revision, tuple(args.refs))
+    if args.command == "delivery-inspect-source":
+        return delivery.inspect_source(
+            args.run_id, args.expected_revision, args.paper_ref
+        )
     if args.command == "delivery-read-source":
         return delivery.read_source(
             args.run_id,
@@ -920,6 +925,7 @@ _COMPLETION_COMMANDS = {
 _DELIVERY_COMMANDS = {
     "delivery-view",
     "delivery-inspect",
+    "delivery-inspect-source",
     "delivery-read-source",
     "render-report",
     "publish-report",
@@ -932,6 +938,7 @@ _EXTERNAL_COMMANDS = {
     "inspect-source",
     "read-source",
     "completion-read-source",
+    "delivery-inspect-source",
     "delivery-read-source",
 }
 _WIKI_COMMANDS = {

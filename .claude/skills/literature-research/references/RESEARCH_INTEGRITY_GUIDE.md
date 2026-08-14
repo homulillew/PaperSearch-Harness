@@ -511,7 +511,7 @@ Integrity Reviewer 应检查：
 
 不允许：
 
-> Writer 在阅读 Delivery View 后自行产生 State 中从未形成的新领域结论。
+> Writer 在阅读 Report Brief 后自行产生 State 中从未形成的新领域结论。
 
 如果新的 synthesis 实际构成重要研究判断：
 
