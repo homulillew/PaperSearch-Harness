@@ -419,61 +419,102 @@ authorizes complete Delivery.
 
 ## Deliver a report
 
-In DELIVERY, build the report from a fresh `delivery-view` and targeted inspections.
-Load the two authority documents separately:
+In DELIVERY, build the report from a fresh `delivery-view` and targeted
+inspections. Load the four authority documents separately — each drives a
+different role and must not be handed to a role it does not govern:
 
 ```text
-${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md
-${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md
+${CLAUDE_SKILL_DIR}/references/REPORT_QUALITY_STANDARD.md   → Report Constructor
+${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md       → Report Writer / Reviser
+${CLAUDE_SKILL_DIR}/references/REPORT_REVIEW_GUIDE.md        → Report Reviewer (Reader Gate)
+${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md   → Research Integrity Reviewer
 ```
 
-Apply the complete Writing Guide to the Narrative Planner, Report Composer, Editorial
-Integrator, fresh Editor, and Reviser. It governs organization, prose, synthesis, and
-readability. Create the independent Research Integrity Reviewer in a fresh context with
-the complete Integrity Guide, Delivery state, manuscript, and targeted inspection/source
-access. The Integrity Guide is its primary rubric; it does not receive the Writing Guide
-as a style rubric and does not perform prose polish.
+The Report Brief is the single report-semantic middle layer: it selects,
+expands, organizes, and omits from accepted Research State for a target
+audience. It is a Delivery work product, not a Research Domain entity — it is
+never stored in the run, has no stable identity, and no `ArtifactKind`. The
+Constructor reads the Quality Standard (not the Writing Guide); the Writer
+reads the Writing Guide (not the Quality Standard). Keep these inputs
+separated by role.
 
-The semantic stages are:
+The semantic stages are an Action loop, not a Report FSM — no new lifecycle
+mode is introduced, everything runs inside DELIVERY:
 
 ```text
-Narrative Planner
-→ Report Composer
-→ Editorial Integrator
-→ Fresh Editor
-→ Reviser when needed
-→ Research Integrity Reviewer
-→ deterministic citation renderer
-→ publish-report
-→ validate-delivery
-→ close-run
+Report Constructor → Report Brief
+→ Report Writer → Manuscript
+→ Report Reviewer (fresh instance, two-phase cold reading)
+   Phase 1 Blind Read: deliverable + audience + quality standard + review guide
+                       + manuscript — NO Brief, NO Writing Guide
+   → frozen BlindReadResult (bound to manuscript_digest)
+   Phase 2 Brief Check: frozen blind result + Brief + manuscript + review guide
+   → ReviewResult{blocking_issues}
+   ├─ blocking_issues → earliest repair layer (most-upstream fault wins):
+   │     MANUSCRIPT → Reviser → new manuscript → fresh Reader again
+   │     BRIEF → Constructor → new Brief → Writer → new manuscript → fresh Reader again
+   │     POSSIBLE_RESEARCH_ISSUE → escalate (Reader cannot mutate State)
+   └─ blocking_issues == () → Reader PASS (brief_digest + manuscript_digest)
+→ Research Integrity Reviewer (independent of the Reader Gate)
+   → IntegrityReview{PASS | REVISE_DELIVERY(target=MANUSCRIPT|BRIEF) | REOPEN_RESEARCH}
+   ├─ PASS → deterministic citation renderer → publish-report
+   ├─ REVISE_DELIVERY → route to earliest faulty layer → Reader again → Integrity again
+   └─ REOPEN_RESEARCH → reopen-research → return to the research loop
+→ validate-delivery → close-run
 ```
 
-If integrity review finds a Delivery-only writing or citation repair, revise in Delivery.
-If it finds an unsupported claim or missing research, call `reopen-research` and return
-to the research loop.
+A fresh Reviewer instance is created for every manuscript version (the
+factory creates a new reviewer each revision), so it re-reads cold and cannot
+confirm "you fixed what I asked." Phase 1 is frozen before Phase 2 sees the
+Brief; Phase 2 must not rewrite or reinterpret the blind read. Blocking
+issues are root-cause consolidated — one issue per cognitive root cause, no
+score, no severity rank. The pipeline routes by precedence
+(RESEARCH > BRIEF > MANUSCRIPT); Python routes, it does not rank "which
+problem is worse."
 
-The fresh Editor reviews the whole report semantically: sections must be driven by
-research questions or judgments rather than paper order; taxonomy must state its
-classification criterion; each paragraph should make one main judgment and start with
-a self-contained claim; giant paragraphs, abstract-noun chains, bureaucratic or
-translated prose should be repaired. Representative methods must serve synthesis,
-carry the required first-use hyperlink, and lead naturally from evidence to gaps. These
-are editorial judgments, not Python paragraph-length or style validators.
+Reader PASS certifies a specific `(brief_digest, manuscript_digest)` pair;
+Integrity PASS certifies `(delivery_basis, brief_digest, manuscript_digest)`.
+Any semantic edit to the Brief or manuscript invalidates the downstream
+certification and forces a re-run of the affected gate. Render and publish
+happen only when the current version carries BOTH a Reader PASS and an
+Integrity PASS.
 
-The fresh Integrity Reviewer checks author claims versus independent evidence,
-single-paper evidence versus consensus, correlation versus causation, ablation versus
-causal mechanism, numerical gains versus statistical significance, SOTA and
-generalization scope, benchmark validity, robustness and efficiency dimensions,
-test-time compute/tool budgets, comparison fairness, recency and absolute claims,
-corpus-bounded absence, and citation-to-claim alignment. It returns the existing typed
-integrity result without a numeric score.
+The Report Reviewer judges whether the report works as an article for the
+target reader: whether the reader can form a continuous, stable, retellable
+domain understanding from the prose alone. Sections must be driven by research
+questions or judgments rather than paper order; taxonomy must state its
+classification criterion; each paragraph should make one main judgment and
+start with a self-contained claim; giant paragraphs, abstract-noun chains,
+bureaucratic or translated prose should be repaired. Representative methods
+must serve synthesis, carry the required first-use hyperlink, and lead
+naturally from evidence to gaps. These are semantic judgments, not Python
+paragraph-length or style validators.
 
-Integrity may inspect Delivery state and retained objects, reread targeted sources, and
-review the manuscript. It must not search broadly, retain papers, mutate Research state,
-create Findings, or silently add evidence. Completion asks whether Research State
-satisfies the Contract; Integrity asks whether the report faithfully represents that
-accepted State. Keep these authority boundaries separate.
+The Research Integrity Reviewer is independent of the Reader Gate and checks
+research fidelity, not prose: author claims versus independent evidence,
+single-paper evidence versus consensus, correlation versus causation, ablation
+versus causal mechanism, numerical gains versus statistical significance, SOTA
+and generalization scope, benchmark validity, robustness and efficiency
+dimensions, test-time compute/tool budgets, comparison fairness, recency and
+absolute claims, corpus-bounded absence, and citation-to-claim alignment. It
+uses the Integrity Guide as its rubric (not the Writing Guide) and returns the
+typed integrity result without a numeric score. `REVISE_DELIVERY` must carry
+the earliest faulty Delivery target (`MANUSCRIPT` or `BRIEF`); the pipeline
+loops, re-running the Reader after any repair and then Integrity again.
+
+Integrity may inspect Delivery state and retained objects, reread targeted
+sources, and review the manuscript. It must not search broadly, retain papers,
+mutate Research state, create Findings, or silently add evidence. Completion
+asks whether Research State satisfies the Contract; Integrity asks whether the
+report faithfully represents that accepted State. Keep these authority
+boundaries separate.
+
+Delivery can restore detail density and cognitive continuity, but it cannot
+expand the accepted semantic scope: no new consensus, no stronger
+generalization, no new approach relationship, no new Open Problem, no
+contract-facing judgment. If a stage needs any of those, escalate via
+`reopen-research` and return to the research loop — do not manufacture it in
+Delivery.
 
 When a retained primary paper has a canonical URL, hyperlink the first formal occurrence
 of its method or system name to that URL. This navigation link never replaces a structured

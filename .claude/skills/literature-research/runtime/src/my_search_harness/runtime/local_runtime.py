@@ -19,12 +19,11 @@ from .deepxiv import DeepXivPaperSearchProvider, DeepXivSourceAccessProvider
 from .paper_search import PaperSearchProvider
 from .persistence import JsonResearchRunRepository
 from .reporting import (
-    EditorialIntegrator,
-    FreshEditorialReviewerFactory,
-    NarrativePlanner,
-    ReportComposer,
+    ReportConstructor,
     ReportPipeline,
+    ReportReviewerFactory,
     ReportReviser,
+    ReportWriter,
     ResearchIntegrityReviewer,
     load_report_writing_guide,
 )
@@ -34,6 +33,24 @@ from .wiki import (
     WikiProjectionService,
     WikiService,
 )
+
+
+def _read_guide(path: str | Path) -> str:
+    """Load a Delivery guide (quality standard / review / integrity) as text.
+
+    Mirrors ``load_report_writing_guide`` semantics: the pipeline validates
+    non-emptiness, so a missing or empty guide fails fast here with a clear
+    error rather than at pipeline construction.
+    """
+
+    guide_path = Path(path)
+    try:
+        text = guide_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(f"guide not found: {guide_path}") from exc
+    if not text.strip():
+        raise ValueError(f"guide is empty: {guide_path}")
+    return text
 
 
 class LocalV1Runtime:
@@ -110,24 +127,35 @@ class LocalV1Runtime:
     def report_pipeline(
         self,
         *,
-        planner: NarrativePlanner,
-        composer: ReportComposer,
-        integrator: EditorialIntegrator,
-        editor_factory: FreshEditorialReviewerFactory,
+        constructor: ReportConstructor,
+        writer: ReportWriter,
+        reviewer_factory: ReportReviewerFactory,
         reviser: ReportReviser,
         integrity_reviewer: ResearchIntegrityReviewer,
-        writing_guideline_path: str | Path,
+        quality_standard_path: str | Path,
+        writing_guide_path: str | Path,
+        review_guide_path: str | Path,
+        integrity_guide_path: str | Path,
     ) -> ReportPipeline:
-        """Bind report actors and the explicitly configured writing guide."""
+        """Bind report actors and the explicitly configured Delivery guides.
+
+        The four guides are loaded here (not interpreted): the Report Quality
+        Standard drives the Constructor, the Writing Guide drives the Writer,
+        the Review Guide drives the two-phase Reader, and the Integrity Guide
+        drives the Research Integrity Reviewer. Each is a non-empty string the
+        pipeline validates at construction time.
+        """
 
         return ReportPipeline(
             self._delivery,
-            planner=planner,
-            composer=composer,
-            integrator=integrator,
-            editor_factory=editor_factory,
+            constructor=constructor,
+            writer=writer,
+            reviewer_factory=reviewer_factory,
             reviser=reviser,
             integrity_reviewer=integrity_reviewer,
             citation_renderer=DeterministicCitationRenderer(),
-            writing_guideline=load_report_writing_guide(writing_guideline_path),
+            quality_standard=_read_guide(quality_standard_path),
+            writing_guide=load_report_writing_guide(writing_guide_path),
+            review_guide=_read_guide(review_guide_path),
+            integrity_guide=_read_guide(integrity_guide_path),
         )
