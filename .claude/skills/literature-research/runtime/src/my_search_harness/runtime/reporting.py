@@ -301,27 +301,30 @@ def brief_digest(brief: ReportBrief) -> str:
     return _digest(_canonical(brief))
 
 
-_ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
+_ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*)|[ \t]*)$")
 _FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(?:[^\r\n]*)$")
+_ATX_CLOSING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
 
 
-def brief_outline_signature(brief: ReportBrief) -> tuple[int, ...]:
-    """Return the Constructor-owned reader-visible section depths."""
+def _normalize_heading_identity(value: str) -> str:
+    """Remove only outer whitespace and valid optional ATX closing hashes."""
 
-    if not isinstance(brief, ReportBrief):
-        raise ReportPipelineError("outline signature requires a ReportBrief")
-    return tuple(section.outline_depth for section in brief.sections)
+    normalized = value.strip()
+    closing = _ATX_CLOSING_HASHES.search(normalized)
+    if closing is not None:
+        normalized = normalized[: closing.start()].rstrip()
+    return normalized
 
 
-def manuscript_outline_signature(manuscript: ReportManuscript) -> tuple[int, ...]:
-    """Extract H2+ ATX heading depths while ignoring fenced code and H1."""
+def _visible_atx_headings(manuscript: ReportManuscript) -> tuple[tuple[int, str], ...]:
+    """Extract reader-visible ATX heading levels and normalized text."""
 
     if not isinstance(manuscript, ReportManuscript):
         raise ReportPipelineError("outline signature requires a ReportManuscript")
     if not isinstance(manuscript.markdown, str):
         raise ReportPipelineError("ReportManuscript markdown must be text")
 
-    depths: list[int] = []
+    headings: list[tuple[int, str]] = []
     fence_character: str | None = None
     fence_length = 0
     for line in manuscript.markdown.splitlines():
@@ -345,10 +348,42 @@ def manuscript_outline_signature(manuscript: ReportManuscript) -> tuple[int, ...
         heading = _ATX_HEADING.match(line)
         if heading is None:
             continue
-        level = len(heading.group(1))
-        if level >= 2:
-            depths.append(level - 2)
-    return tuple(depths)
+        headings.append(
+            (
+                len(heading.group(1)),
+                _normalize_heading_identity(heading.group(2) or ""),
+            )
+        )
+    return tuple(headings)
+
+
+def brief_outline_signature(brief: ReportBrief) -> tuple[int, ...]:
+    """Return the depth-only Brief projection retained for API compatibility."""
+
+    if not isinstance(brief, ReportBrief):
+        raise ReportPipelineError("outline signature requires a ReportBrief")
+    return tuple(section.outline_depth for section in brief.sections)
+
+
+def manuscript_outline_signature(manuscript: ReportManuscript) -> tuple[int, ...]:
+    """Return the depth-only H2+ projection retained for API compatibility."""
+
+    return tuple(
+        level - 2
+        for level, _ in _visible_atx_headings(manuscript)
+        if level >= 2
+    )
+
+
+def _brief_visible_outline_signature(
+    brief: ReportBrief,
+) -> tuple[tuple[int, str], ...]:
+    if not isinstance(brief, ReportBrief):
+        raise ReportPipelineError("outline signature requires a ReportBrief")
+    return tuple(
+        (section.outline_depth, _normalize_heading_identity(section.title))
+        for section in brief.sections
+    )
 
 
 def validate_outline_fidelity(
@@ -357,8 +392,26 @@ def validate_outline_fidelity(
 ) -> None:
     """Reject a manuscript that does not realize the Brief heading hierarchy."""
 
-    expected = brief_outline_signature(brief)
-    actual = manuscript_outline_signature(manuscript)
+    visible_headings = _visible_atx_headings(manuscript)
+    h1_positions = tuple(
+        index for index, (level, _) in enumerate(visible_headings) if level == 1
+    )
+    if len(h1_positions) != 1:
+        raise ReportPipelineError(
+            "ReportManuscript must contain exactly one reader-visible H1; "
+            f"found {len(h1_positions)}"
+        )
+    if h1_positions[0] != 0:
+        raise ReportPipelineError(
+            "ReportManuscript H1 must be the first reader-visible heading"
+        )
+
+    expected = _brief_visible_outline_signature(brief)
+    actual = tuple(
+        (level - 2, text)
+        for level, text in visible_headings
+        if level >= 2
+    )
     if actual != expected:
         raise ReportPipelineError(
             "ReportManuscript visible outline does not match ReportBrief: "

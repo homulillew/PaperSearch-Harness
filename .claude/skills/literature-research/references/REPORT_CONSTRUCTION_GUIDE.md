@@ -32,6 +32,8 @@ outline_depth 2 → Markdown H4
 
 首个 section 必须为 depth 0，向下最多逐级进入，向上可以回到任意已有层级。深度表达语义归属，不表达重要性评分。
 
+`ReportBriefSection.title` 是最终 reader-visible heading 的正式文本，不是内部 label。Constructor 提交 Brief 前必须同时判断标题是否专业、自然、有导航价值，并适合作为最终成品标题；Writer 不负责重新命名。所有报告标题和 section heading 使用 ATX syntax，`outline_depth` 对应 ATX H2+。
+
 ## 3. 专业技术调研的宏观体裁
 
 强默认是：
@@ -85,7 +87,7 @@ Constructor 可以从已接受材料中恢复建立连续理解所必需的：
 
 1. sections 已覆盖交付要求，但没有把 Contract 的内容要求机械改写成章节布局；
 2. 顺序形成连续的认知路径；
-3. 每个 heading 都有真实导航价值；
+3. 每个 `section.title` 都专业、自然，并作为最终 heading 具有真实导航价值；
 4. `outline_depth` 准确表达各 section 的父子归属且没有跳级；
 5. 重要比较、开放问题和结论在适用时可被快速定位；
 6. Brief 没有越过已接受 Research semantics 的上限。

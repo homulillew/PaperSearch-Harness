@@ -49,7 +49,6 @@ Writer 首先执行报告蓝图，而不是重新决定：
 
 Writer 可以决定：
 
-- 标题和小标题的自然表达；
 - 段落如何划分；
 - 句子怎样组织；
 - 某个局部论证用自然段、列表还是表格；
@@ -59,6 +58,9 @@ Writer 可以决定：
 
 Writer 不应自行：
 
+- 重命名 Report Brief 已确定的 heading；
+- 交换同层 sibling section 或同构 subtree；
+- 新增或删除 reader-visible section heading；
 - 改变 section 的 `outline_depth`；
 - 改变 section 顺序或父子归属；
 - 把 Brief 中的 heading 压成粗体段首或普通段落；
@@ -74,9 +76,11 @@ Writer 不应自行：
 
 > **Writer 的任务是实现认知设计，不是重新做一次报告构造。**
 
-> **Writer 可以改标题措辞，但不能重新决定标题层级。**
+> **Constructor 决定 heading；Writer 忠实实现 heading。**
 
-如果报告蓝图的层级或材料不足以支持一条连续、可信的正文论证，应返回 `BriefInsufficient` 到报告构造阶段，而不是在写作过程中偷偷补出新的全局结构。
+Writer 必须逐项保留 Report Brief 已确定的 heading text、heading order、heading depth 和 parent-child ownership。正文表达仍属于 Writer：段落、句子、过渡以及局部 prose/list/table 呈现不因此转交给 Constructor。
+
+报告标题与 section heading 必须使用 ATX 语法：`# Report Title`、`## Section`、`### Subsection`。不要使用 Setext underline heading。如果 heading wording、层级或材料不足以支持一条连续、可信的正文论证，应返回 `BriefInsufficient` 到报告构造阶段，而不是自行改名或补出新的全局结构。
 
 ---
 

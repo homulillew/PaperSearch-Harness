@@ -438,6 +438,109 @@ def test_staged_manuscript_boundary_rejects_outline_mismatch(tmp_path):
     assert "visible outline" in envelope["error"]["message"]
 
 
+def test_staged_boundary_rejects_same_depth_sibling_reorder(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    brief_path = _input(
+        tmp_path,
+        "ordered-brief.json",
+        _brief_with_depths(requirement_ref, (0, 1, 1)),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(brief_path),
+    )
+    assert code == 0, envelope
+
+    reordered_path = _input(
+        tmp_path,
+        "reordered-manuscript.json",
+        _manuscript(
+            "# Report\n\n"
+            "## Section 1\n\n"
+            "### Section 3\n\n"
+            "### Section 2\n"
+        ),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(reordered_path),
+    )
+    assert code == 2
+    assert "visible outline" in envelope["error"]["message"]
+    assert "Section 2" in envelope["error"]["message"]
+
+
+def test_staged_boundary_enforces_h1_and_atx_closing_hashes(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    brief_path = _input(tmp_path, "h1-brief.json", _brief(requirement_ref))
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(brief_path),
+    )
+    assert code == 0, envelope
+
+    invalid_markdowns = (
+        ("## Result\n", "exactly one reader-visible H1"),
+        (
+            "# Report\n\n## Result\n\n# Another Root\n",
+            "exactly one reader-visible H1",
+        ),
+        ("## Result\n\n# Report\n", "H1 must be the first reader-visible heading"),
+    )
+    for index, (markdown, message) in enumerate(invalid_markdowns):
+        path = _input(
+            tmp_path,
+            f"invalid-h1-{index}.json",
+            _manuscript(markdown),
+        )
+        code, envelope = _invoke(
+            harness,
+            workspace,
+            "put-report-manuscript",
+            "--run-id",
+            run_id,
+            "--input",
+            str(path),
+        )
+        assert code == 2
+        assert message in envelope["error"]["message"]
+
+    valid_path = _input(
+        tmp_path,
+        "closing-hashes.json",
+        _manuscript("# Report ###\n\n## Result ###\n\nContent."),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(valid_path),
+    )
+    assert code == 0, envelope
+
+
 def test_schema_v2_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"

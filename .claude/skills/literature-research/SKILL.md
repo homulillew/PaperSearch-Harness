@@ -455,10 +455,14 @@ unless the user explicitly requested that layout.
 Every `ReportBriefSection` must carry an explicit non-negative `outline_depth`.
 Depth 0 maps to Markdown H2, depth 1 to H3, and so on; H1 is the report title
 and is not a Brief section. The first section must be depth 0 and adjacent
-sections may descend by at most one level. Constructor decides this ordered
-hierarchy. Writer may improve heading wording but must preserve section count,
-order, depth, and parent-child ownership. If the hierarchy itself is not
-workable, return `BriefInsufficient` to Constructor.
+sections may descend by at most one level. `ReportBriefSection.title` is the
+reader-visible heading identity. Constructor decides its exact text, order,
+depth, and parent-child ownership; Writer must preserve all four under the
+mechanical ATX normalization rules. If a heading or hierarchy is not workable,
+return `BriefInsufficient` to Constructor rather than renaming or rearranging it.
+The Writer must use ATX headings. `put-report-manuscript` validates heading
+count, order, depth, identity, and exactly one reader-visible H1 appearing
+before every H2+ heading.
 
 The semantic stages are an Action loop, not a Report FSM — no new lifecycle
 mode is introduced, everything runs inside DELIVERY:

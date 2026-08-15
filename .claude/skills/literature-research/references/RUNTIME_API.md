@@ -236,9 +236,16 @@ H2, depth 1 to H3, and so on. Sections form an ordered implicit tree; the first 
 `put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
 tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
 optional `locator`. A new manuscript invalidates Blind, Reader, Integrity, and render
-results. Python rejects the manuscript before Reader unless its H2+ heading-depth
-signature exactly matches the Brief section signature. H1 is the report title and fenced
-code headings do not count.
+results. Python rejects the manuscript before Reader unless its H2+ heading count,
+order, depth, and normalized text exactly match the Brief section titles and depths.
+Normalization removes only outer whitespace and valid optional ATX closing hashes; it
+does not perform case folding, punctuation removal, fuzzy matching, or synonym matching.
+The Manuscript must contain exactly one reader-visible H1, and that H1 must be the first
+reader-visible heading. Its text is not compared with the Brief. Fenced-code,
+blockquote, and indented-code headings do not count.
+
+Writer must use ATX syntax for the report title and every section heading (`# Title`,
+`## Section`, `### Subsection`). Setext headings are outside this protocol.
 
 `render-reader-preview` is read-only, deterministic, and available after the current
 Brief and Manuscript are accepted. It renders internal citation tokens to the same

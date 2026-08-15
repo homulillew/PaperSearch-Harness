@@ -280,6 +280,19 @@ def _brief_with_depths(depths: tuple[int, ...]) -> ReportBrief:
     )
 
 
+def _brief_with_outline(
+    outline: tuple[tuple[int, str], ...],
+) -> ReportBrief:
+    section = _valid_brief().sections[0]
+    return replace(
+        _valid_brief(),
+        sections=tuple(
+            replace(section, outline_depth=depth, title=title)
+            for depth, title in outline
+        ),
+    )
+
+
 def _manuscript(
     markdown: str = "# Report\n\n## Section 1\n\nbody {{cite:c1}}",
 ) -> ReportManuscript:
@@ -687,7 +700,18 @@ class TestReportOutlineFidelity:
         assert manuscript_outline_signature(manuscript) == (0,)
 
     def test_exact_outline_signature_passes(self):
-        brief = _brief_with_depths((0, 0, 1, 1, 0, 1, 2, 2))
+        brief = _brief_with_outline(
+            (
+                (0, "A"),
+                (0, "B"),
+                (1, "C"),
+                (1, "D"),
+                (0, "E"),
+                (1, "F"),
+                (2, "G"),
+                (2, "H"),
+            )
+        )
         manuscript = ReportManuscript(
             markdown=(
                 "# Report\n"
@@ -708,12 +732,93 @@ class TestReportOutlineFidelity:
         ],
     )
     def test_outline_mismatch_rejected(self, markdown):
-        brief = _brief_with_depths((0, 1))
+        brief = _brief_with_outline(((0, "A"), (1, "B")))
         with pytest.raises(ReportPipelineError, match="visible outline"):
             validate_outline_fidelity(
                 brief,
                 ReportManuscript(markdown=markdown),
             )
+
+    def test_same_depth_sibling_reorder_rejected(self):
+        brief = _brief_with_outline(
+            ((0, "Overview"), (1, "Mechanism"), (1, "Comparison"))
+        )
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report\n\n"
+                "## Overview\n"
+                "### Comparison\n"
+                "### Mechanism\n"
+            )
+        )
+        with pytest.raises(ReportPipelineError, match="visible outline"):
+            validate_outline_fidelity(brief, manuscript)
+
+    def test_same_shaped_subtree_reorder_rejected(self):
+        brief = _brief_with_outline(
+            ((0, "Main"), (1, "A"), (2, "A1"), (1, "B"), (2, "B1"))
+        )
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report\n\n"
+                "## Main\n"
+                "### B\n"
+                "#### B1\n"
+                "### A\n"
+                "#### A1\n"
+            )
+        )
+        with pytest.raises(ReportPipelineError, match="visible outline"):
+            validate_outline_fidelity(brief, manuscript)
+
+    def test_heading_rename_is_not_fuzzy_matched(self):
+        brief = _brief_with_outline(((0, "Overview"), (1, "Mechanism")))
+        manuscript = ReportManuscript(
+            markdown="# Report\n\n## Overview\n\n### Core Mechanism\n"
+        )
+        with pytest.raises(ReportPipelineError, match="Core Mechanism"):
+            validate_outline_fidelity(brief, manuscript)
+
+    def test_atx_closing_hashes_are_normalized(self):
+        brief = _brief_with_outline(((0, " Overview "), (1, "Mechanism")))
+        manuscript = ReportManuscript(
+            markdown="# Report ###\n\n##   Overview   ##\n\n### Mechanism ###\n"
+        )
+        validate_outline_fidelity(brief, manuscript)
+
+    @pytest.mark.parametrize(
+        "markdown, message",
+        [
+            ("## Overview\n", "exactly one reader-visible H1"),
+            (
+                "Report\n======\n\n## Overview\n",
+                "exactly one reader-visible H1",
+            ),
+            (
+                "# Report\n\n## Overview\n\n# Another Root\n",
+                "exactly one reader-visible H1",
+            ),
+            (
+                "## Overview\n\n# Report\n",
+                "H1 must be the first reader-visible heading",
+            ),
+        ],
+    )
+    def test_h1_invariant_rejects_invalid_root_heading(self, markdown, message):
+        brief = _brief_with_outline(((0, "Overview"),))
+        with pytest.raises(ReportPipelineError, match=message):
+            validate_outline_fidelity(brief, ReportManuscript(markdown=markdown))
+
+    def test_fake_h1_in_fenced_code_does_not_count(self):
+        brief = _brief_with_outline(((0, "Overview"),))
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report\n\n"
+                "```markdown\n# Fake\n```\n\n"
+                "## Overview\n"
+            )
+        )
+        validate_outline_fidelity(brief, manuscript)
 
     def test_library_writer_boundary_rejects_outline_mismatch(self):
         pipeline = _build_pipeline(
@@ -1339,7 +1444,7 @@ class TestReaderPassVersionBinding:
             narrative_logic="l2",
             sections=(
                 ReportBriefSection(
-                    title="s",
+                    title="Section 1",
                     purpose="p",
                     reader_takeaway="t",
                     argument_flow="f",
