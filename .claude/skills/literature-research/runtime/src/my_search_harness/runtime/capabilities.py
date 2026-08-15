@@ -1,4 +1,4 @@
-"""Narrow external capability façades for the three V1 authority roles."""
+"""Narrow external capability façades for the three authority roles."""
 
 from __future__ import annotations
 

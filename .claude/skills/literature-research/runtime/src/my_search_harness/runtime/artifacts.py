@@ -34,7 +34,7 @@ class ReportArtifact:
 
 
 class LocalArtifactStore:
-    """Thin local store for the single V1 report artifact."""
+    """Thin local store for the report artifact."""
 
     def __init__(self, root: str | Path) -> None:
         self._root = Path(root)

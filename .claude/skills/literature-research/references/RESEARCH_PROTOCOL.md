@@ -1,8 +1,8 @@
 # Research Protocol
 
-This protocol explains how a semantic Claude researcher uses the deterministic V1
-Runtime. The Frozen Architecture and Domain Model remain the authority for runtime
-semantics; this document supplies operating guidance, not a second workflow model.
+This protocol explains how a semantic Claude researcher uses the deterministic
+Runtime. The implemented Domain Model remains the authority for runtime semantics;
+this document supplies operating guidance, not a second workflow model.
 
 ## Contract formation
 
@@ -196,9 +196,9 @@ another genuinely equivalent discovery path resolves the original uncertainty, c
 without a Gap. When a Gap is warranted, describe the **research consequence**, never
 the tool log:
 
-> Correct: "Independent frontier recall for the 2026 KV-cache literature remains
-> unresolved; current recent coverage has not been independently counter-checked for
-> potentially missed frontier work."
+> Correct: "Independent frontier recall for the requested recent window remains
+> unresolved; current coverage has not been independently counter-checked for
+> potentially missed work."
 >
 > Wrong: "WebSearch failed." / "DeepXiv returned INVALID_RESPONSE."
 
@@ -207,7 +207,7 @@ Tool-failure history stays in the host observation stream and the DeepXiv audit 
 WebSearch later recovers or another genuinely equivalent discovery path closes the
 uncertainty, `resolve-gap` with a `--resolution` that describes the **research closure**
 (e.g. "Independent frontier counter-recall was completed using usable WebSearch results
-across the current 2026 route terminology; all material candidates were assessed and the
+across the current route terminology; all material candidates were assessed and the
 evidence did not change the frontier judgment"), not "WebSearch works now."
 
 ### DeepXiv failure handling

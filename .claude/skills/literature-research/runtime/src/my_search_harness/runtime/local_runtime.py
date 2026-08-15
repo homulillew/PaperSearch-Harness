@@ -1,4 +1,4 @@
-"""Small local composition root for the complete V1 runtime."""
+"""Small local composition root for the complete runtime."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def _read_guide(path: str | Path) -> str:
 
 
 class LocalV1Runtime:
-    """Compose V1 capabilities over one local workspace without exposing storage."""
+    """Compose runtime capabilities over one local workspace without exposing storage."""
 
     def __init__(
         self,

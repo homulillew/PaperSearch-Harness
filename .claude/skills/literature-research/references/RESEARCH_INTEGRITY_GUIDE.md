@@ -94,11 +94,11 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 如果不同工作使用不同：
 
 * backbone；
-* prompt；
-* tool budget；
+* input configuration；
+* resource budget；
 * context length；
 * retrieval corpus；
-* sampling 次数；
+* 重复评测次数；
 
 则不能仅根据最高分判断方法机制更优。
 
@@ -132,11 +132,11 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 
 避免：
 
-> 实验证明 reflection 提升推理能力。
+> 实验证明组件 P 提升任务能力。
 
 优先：
 
-> 在作者测试的模型和任务上，引入 reflection 后准确率提高。
+> 在作者测试的系统和任务上，引入组件 P 后指标 M 提高。
 
 “证明”主要适用于：
 
@@ -160,7 +160,7 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 * cross-model；
 * OOD；
 * temporal；
-* tool/environment transfer。
+* environment transfer。
 
 报告必须明确实际验证的是哪一种。
 
@@ -176,14 +176,14 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 * retrieval noise；
 * adversarial perturbation；
 * model variation；
-* tool failure；
+* external dependency failure；
 * long-context noise；
 * incomplete observation；
 * distribution shift。
 
 优先：
 
-> 在加入一定比例无关检索结果后，该方法性能下降幅度小于 baseline。
+> 在加入一定比例干扰输入后，该方法性能下降幅度小于 baseline。
 
 而不是：
 
@@ -198,10 +198,8 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 * latency；
 * throughput；
 * FLOPs；
-* token usage；
-* model calls；
-* search rounds；
-* tool calls；
+* operation count；
+* external calls；
 * memory；
 * GPU hours；
 * dollar cost。
@@ -210,23 +208,21 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 
 例如：
 
-> 该方法减少平均搜索轮次，但论文未报告端到端 latency，因此不能判断实际运行时间是否更短。
+> 该方法减少平均操作次数，但论文未报告端到端 latency，因此不能判断实际运行时间是否更短。
 
 不要用一个“效率”概括多个未测量维度。
 
 ---
 
-## 9. Test-time compute 和工具预算必须显式考虑
+## 9. 计算与外部资源预算必须显式考虑
 
-Agent、DeepResearch、reasoning、multi-agent 方法尤其需要检查：
+资源敏感型方法尤其需要检查：
 
-* input tokens；
-* output tokens；
-* reasoning tokens；
-* sampling 次数；
-* retrieval calls；
-* browser/tool calls；
-* model calls；
+* input volume；
+* output volume；
+* 重复运行次数；
+* external data calls；
+* service calls；
 * wall-clock latency；
 * parallelism。
 
@@ -247,9 +243,9 @@ Agent、DeepResearch、reasoning、multi-agent 方法尤其需要检查：
 * model size；
 * dataset size；
 * context length；
-* number of agents；
-* tool count；
-* task horizon；
+* component count；
+* external service count；
+* workload horizon；
 * corpus size；
 * concurrency；
 * training cost。
@@ -264,15 +260,15 @@ Benchmark 是特定任务分布和评测协议。
 
 例如：
 
-> 在 BrowseComp 上提高 10%
+> 在 benchmark X 上提高 10%
 
 只能直接说明：
 
-> 方法在 BrowseComp 所定义的任务和评测协议下得到更高分数。
+> 方法在 benchmark X 所定义的任务和评测协议下得到更高分数。
 
 不能直接推出：
 
-> DeepResearch 能力提高 10%。
+> 一般能力 Q 提高 10%。
 
 检查 benchmark 是否真实覆盖报告声称的能力。
 
@@ -314,14 +310,14 @@ Benchmark 是特定任务分布和评测协议。
 * context window；
 * sample count；
 * inference budget；
-* tool access；
-* search API；
+* external resource access；
+* data access interface；
 * maximum steps；
 * prompt；
 * proprietary model；
 * baseline 来源；
 * extra supervision；
-* test-time training；
+* extra adaptation procedure；
 * hardware。
 
 如果关键条件不同，应明确：
@@ -334,15 +330,15 @@ Benchmark 是特定任务分布和评测协议。
 
 例如：
 
-> 去掉 verifier 后性能下降。
+> 去掉组件 P 后性能下降。
 
 可以支持：
 
-> verifier 对完整系统性能有贡献。
+> 组件 P 对完整系统性能有贡献。
 
 不能自动支持：
 
-> verifier 通过提高证据充分性判断准确率而提升性能。
+> 组件 P 通过过程 Z 提升性能。
 
 应区分：
 
@@ -564,7 +560,7 @@ Integrity Reviewer 不自行 broad search，不自行补 PaperAnalysis，不直�
 * benchmark 结果没有升级为一般能力；
 * SOTA、显著、泛化、鲁棒、效率、scalable 都有明确范围；
 * 方法比较考虑了 backbone、budget 和评测差异；
-* 额外 test-time compute 被如实说明；
+* 额外计算和外部调用预算被如实说明；
 * absolute / time-sensitive claim 有 scope；
 * 重要数字和 citation 可追溯；
 * corpus-bounded absence 没有被写成 universal absence；

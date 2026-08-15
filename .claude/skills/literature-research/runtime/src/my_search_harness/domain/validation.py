@@ -1,4 +1,4 @@
-"""Deterministic validation for V1 research state.
+"""Deterministic validation for research state.
 
 Snapshot validation checks facts that every persisted aggregate must satisfy.
 Transition validation checks the small set of invariants that need both the
@@ -45,7 +45,7 @@ from .model import (
 
 
 class DomainValidationError(ValueError):
-    """The proposed aggregate violates the frozen V1 domain model."""
+    """The proposed aggregate violates the domain model."""
 
 
 class _Entity(Protocol):
@@ -254,12 +254,12 @@ def _validate_papers(run: ResearchRun) -> set[str]:
         _validate_paper_source(paper.source, f"papers[{paper.id!r}].source")
         if not isinstance(paper.research_status, PaperResearchStatus):
             _fail(f"papers[{paper.id!r}].research_status must be PaperResearchStatus")
-        # Weak structural invariant (safe for old runs: they load reason as None):
+        # Weak structural invariant (snapshots may load reason as None):
         # a retirement_reason may exist only on a RETIRED paper. The stronger,
         # mutation-time rules (RETIRED requires a reason, ACTIVE clears it,
         # reference safety, evidence eligibility, the completion gate) live in
         # the command layer so they constrain future mutations without rejecting
-        # historical read-only runs on load.
+        # unchanged persisted state on load.
         if paper.retirement_reason is not None:
             if not isinstance(paper.retirement_reason, str):
                 _fail(
@@ -630,7 +630,7 @@ def _validate_transition_paper_dispositions(
 
     "Disposition-related state" is at least ``research_status`` and
     ``retirement_reason``. A paper whose disposition state did not change is
-    historical state and is not re-litigated here — so a legacy
+    persisted state and is not re-litigated here — so an unchanged
     RETIRED+reason=None paper survives an unrelated mutation, but mutating a
     RETIRED paper's reason to None (or retiring an ACTIVE paper) is caught.
     This is the global safety net behind the command-level
@@ -671,8 +671,8 @@ def _validate_transition_landscape_evidence(
     not a single-field diff — so renaming an ApproachFamily, weakening a
     Finding statement, or swapping any source all count and trigger a full
     re-check of the object's current paper evidence refs. Unchanged objects
-    are historical state and are not re-litigated (that would break unrelated
-    mutations on a legacy run). This is the global safety net behind the
+    are persisted state and are not re-litigated (that would break unrelated
+    mutations). This is the global safety net behind the
     command-level eligibility gates.
     """
     for ref, after_approach in after.literature_landscape.approach_families.items():

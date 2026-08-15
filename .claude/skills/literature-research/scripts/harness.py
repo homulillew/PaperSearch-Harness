@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Machine-readable Claude Code adapter over public V1 capabilities."""
+"""Machine-readable Claude Code adapter over public runtime capabilities."""
 
 from __future__ import annotations
 

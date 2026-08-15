@@ -1,6 +1,6 @@
-"""Semantic report orchestration over the frozen Delivery boundary.
+"""Semantic report orchestration over the certified Delivery boundary.
 
-This module implements the ADR-012 report pipeline:
+This module implements the certified report pipeline:
 
     Research State
         ↓ Completion PASS / DeliveryBasis
@@ -673,7 +673,7 @@ _DEFAULT_MAX_INTEGRITY_ROUNDS = 12
 
 
 class ReportPipeline:
-    """Run the ADR-012 semantic stages with deterministic invariants.
+    """Run the report semantic stages with deterministic invariants.
 
     It is an Action pipeline, not a Report FSM. No new lifecycle mode is
     introduced; everything here runs inside the existing DELIVERY mode.

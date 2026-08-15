@@ -1,4 +1,4 @@
-"""Explicit JSON codec for the frozen V1 ResearchRun model."""
+"""Explicit JSON codec for the ResearchRun model."""
 
 from __future__ import annotations
 

@@ -409,9 +409,8 @@ The fresh Completion Checker may only:
 
 `completion-view` exposes every retained paper — not only representative ones — as a
 per-paper closure summary (`research_status`, `has_analysis`, `retirement_reason`).
-Detailed `PaperAnalysis` stays behind `completion-inspect`. This is deliberate: the
-bad_case was a run where 49 retained-but-unanalyzed candidates were invisible to the
-checker, which then judged only the 10 it could see. The fresh checker now sees the whole
+Detailed `PaperAnalysis` stays behind `completion-inspect`. This ensures that unresolved
+candidates cannot disappear from Completion judgment. The fresh checker sees the whole
 corpus and must judge candidate closure — whether each retired paper's reason is
 defensible and whether the analyzed set actually supports the landscape — not merely
 whether the read papers were enough.
@@ -528,7 +527,7 @@ research fidelity, not prose: author claims versus independent evidence,
 single-paper evidence versus consensus, correlation versus causation, ablation
 versus causal mechanism, numerical gains versus statistical significance, SOTA
 and generalization scope, benchmark validity, robustness and efficiency
-dimensions, test-time compute/tool budgets, comparison fairness, recency and
+dimensions, resource and evaluation budgets, comparison fairness, recency and
 absolute claims, corpus-bounded absence, and citation-to-claim alignment. It
 uses the Integrity Guide as its rubric (not the Writing Guide) and returns the
 typed integrity result without a numeric score. `REVISE_DELIVERY` must carry

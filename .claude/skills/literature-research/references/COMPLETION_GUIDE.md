@@ -105,8 +105,8 @@ Examples include a missing major route, inadequate primary-source evidence, abse
 frontier coverage, unresolved contradiction, or a representative paper whose
 PaperAnalysis records detailed mechanism-level or empirical claims but rests only on
 its abstract or search metadata rather than inspected primary source. The last case is
-a P0 signal: name the paper and the missing primary-source grounding in the blocking
-gap. A representative paper that has not been analyzed beyond its abstract is also a
+a blocking evidence signal: name the paper and the missing primary-source grounding in
+the blocking gap. A representative paper that has not been analyzed beyond its abstract is also a
 blocking case when the contract requires mechanism-level understanding.
 
 A retired paper whose `retirement_reason` does not survive the evidence is also a

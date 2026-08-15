@@ -418,7 +418,7 @@ class ContextProjectionService:
         )
         # The fresh Checker sees every retained Paper, not only representative
         # ones — otherwise retained-but-unanalyzed candidates can silently
-        # disappear from Completion judgment (the bad_case). Detailed
+        # disappear from Completion judgment. Detailed
         # PaperAnalysis stays behind completion-inspect; here we expose only
         # the per-paper closure summary: status, has_analysis, retirement_reason.
         papers = tuple(

@@ -29,9 +29,9 @@ python "<SKILL_DIR>/scripts/harness.py" configure-token
 ```
 
 The Harness reads that file back when `DEEPXIV_TOKEN` is not already in the
-process environment, so the DeepXiv providers read it from `DEEPXIV_TOKEN` as
-before. An explicit `DEEPXIV_TOKEN` environment variable always takes
-precedence and is never overwritten.
+process environment, so the DeepXiv providers read it from `DEEPXIV_TOKEN`
+without additional adapter configuration. An explicit `DEEPXIV_TOKEN`
+environment variable always takes precedence and is never overwritten.
 
 Commands that accept semantic structures use `--input FILE`. The file must contain one
 JSON object with exactly the documented fields. This is typed command input, not JSON
@@ -95,11 +95,10 @@ OpenReview, DOI, or publisher page and construct the same provider-neutral hit s
 {
   "hits": [
     {
-      "title": "SearchMaster: Grounded and Regulated Self-Play for Search Agents",
-      "publication_year": 2026,
-      "publication_date": "2026-08-03",
-      "arxiv_id": "2608.01822",
-      "canonical_url": "https://arxiv.org/abs/2608.01822",
+      "title": "Method A for Task T",
+      "publication_year": 2025,
+      "publication_date": "2025-01-15",
+      "canonical_url": "https://example.org/papers/method-a",
       "other_identifiers": {},
       "categories": []
     }
@@ -221,11 +220,11 @@ close-run --run-id RUN --expected-revision REV
 ```
 
 These staged commands are the only supported production path for a formal `REPORT`
-artifact. The former direct `render-report` / `publish-report` commands are not exposed:
-arbitrary text cannot cross the artifact boundary without matching current Reader and
+artifact. No direct manuscript-to-publication command is exposed: arbitrary text cannot
+cross the artifact boundary without matching current Reader and
 Integrity certifications.
 
-`put-report-brief` accepts the ADR-012 Brief shape. Python validates Requirement and
+`put-report-brief` accepts the Report Brief schema. Python validates Requirement and
 Research ref namespaces independently; a material `source_ref` must name a retained
 paper, and a material `locator` requires `source_ref`. Accepting a new Brief binds it to
 the current `DeliveryBasis` and invalidates all downstream work.

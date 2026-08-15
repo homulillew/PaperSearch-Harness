@@ -1,4 +1,4 @@
-"""Explicit actions for the V1 delivery runtime."""
+"""Explicit actions for the delivery runtime."""
 
 from __future__ import annotations
 

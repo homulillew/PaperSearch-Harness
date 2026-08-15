@@ -263,7 +263,7 @@ my-project/
 在项目目录中启动 Claude Code，然后调用：
 
 ```text
-/literature-research 调研 LLM KV Cache 优化的主要技术路线和最新进展
+/literature-research 调研任务 T 的主要技术路线、证据边界和最新进展
 ```
 
 也可以提出更完整的研究要求，例如：
@@ -271,13 +271,13 @@ my-project/
 ```text
 /literature-research
 
-调研 Test-Time Compute Scaling 在大语言模型推理中的主要技术路线。
+调研任务 T 的主要技术路线。
 
-重点比较 sampling、search、verifier-guided inference、
-process/value models、self-refinement 和 adaptive compute。
+重点比较方法 A、方法 B 和方法 C 分别改变什么、
+依赖哪些条件，以及各自的主要收益与代价。
 
-希望说明不同方法如何利用额外推理计算提升性能，
-比较实验预算和 baseline 是否公平，并覆盖能够可靠验证的最新工作。
+希望说明不同方法的机制关系，比较实验条件和 baseline 是否公平，
+并覆盖能够可靠验证的最新工作。
 
 最终生成一份面向技术读者的中文领域调研报告。
 ```

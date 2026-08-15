@@ -1,4 +1,4 @@
-"""Frozen V1 research domain types and validation."""
+"""Research domain types and validation."""
 
 from .model import (
     ApproachFamily,

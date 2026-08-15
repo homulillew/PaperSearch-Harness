@@ -1,6 +1,6 @@
-"""Typed V1 research state.
+"""Typed research state.
 
-This module mirrors the frozen domain model without adding workflow behavior.
+This module defines the domain model without adding workflow behavior.
 Normal constructors generate opaque UUID-backed references; persisted references
 are restored by the explicit JSON codec.
 """

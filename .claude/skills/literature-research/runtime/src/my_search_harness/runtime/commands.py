@@ -1,4 +1,4 @@
-"""Typed command façade for the V1 core research loop."""
+"""Typed command façade for the core research loop."""
 
 from __future__ import annotations
 
@@ -287,9 +287,9 @@ class ResearchCommands:
                 # Deep reading produces a PaperAnalysis only for an ACTIVE
                 # paper — a RETIRED paper is a closed candidate and must be
                 # reactivated explicitly with set-paper-status before its
-                # analysis can be updated. A historical RETIRED paper that
-                # already carries an analysis (from before retirement) is left
-                # untouched; this gate only blocks *new* analysis writes.
+                # analysis can be updated. An existing RETIRED paper that
+                # already carries an analysis is left untouched; this gate only
+                # blocks *new* analysis writes.
                 if paper.research_status is not PaperResearchStatus.ACTIVE:
                     raise CommandRejectedError(
                         f"cannot put PaperAnalysis for paper {mutation.paper_ref!r} "
@@ -552,7 +552,7 @@ class ResearchCommands:
             )
         # Landscape evidence must rest on ACTIVE, analyzed papers: a representative
         # chosen only by search metadata would let discovery substitute for
-        # primary-source understanding (the failure mode exposed by bad_case).
+        # primary-source understanding.
         ineligible = {
             ref
             for ref in representative_paper_refs
@@ -872,9 +872,8 @@ class ResearchCommands:
         # independent checker is asked to judge the corpus. Two closure rules:
         #   ACTIVE  -> must have a PaperAnalysis (unresolved otherwise)
         #   RETIRED -> must carry a non-empty retirement_reason
-        # The second rule is the legacy-state boundary: an old snapshot with
-        # RETIRED + reason=None still loads (validate_run stays weak so historical
-        # runs remain readable), but a NEW request-completion transition must
+        # The second rule is a compatibility boundary: a persisted snapshot with
+        # RETIRED + reason=None may load, but a new request-completion transition must
         # satisfy the current closure invariant. This is deterministic state
         # consistency, not a paper count or score.
         unanalyzed_active = [

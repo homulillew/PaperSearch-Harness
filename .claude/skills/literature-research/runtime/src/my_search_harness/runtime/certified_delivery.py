@@ -1,4 +1,4 @@
-"""Persisted staged ADR-012 delivery with version-bound publication gates.
+"""Persisted certified delivery with version-bound publication gates.
 
 Claude Code supplies semantic work products across CLI calls.  This module
 owns their deterministic order, freshness and certification in workspace
