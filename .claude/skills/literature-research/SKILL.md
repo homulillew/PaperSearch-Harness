@@ -100,12 +100,14 @@ clean and a run can be recovered from authoritative state alone.
 ├── runs/<run_id>/                 # Runtime-owned persisted run data
 │   ├── state.json          # authoritative Research State — never hand-edited
 │   ├── events.jsonl        # Runtime-owned audit history
-│   └── artifacts/          # Runtime-owned delivery artifacts (report, etc.)
+│   ├── artifacts/          # Runtime-owned delivery artifacts (report, etc.)
+│   └── delivery/
+│       └── report_session.json  # Runtime-owned certification operations
 └── scratch/
     ├── research-contract.json      # pre-run: the create-run input
     └── <run_id>/
         ├── inputs/                 # JSON files passed via --input
-        └── captures/               # explicit stdout captures (not default)
+        └── captures/report/        # non-authoritative observability only
 ```
 
 Rules:
@@ -121,6 +123,9 @@ Rules:
   output is ephemeral: convert the evidence that matters into a `PaperAnalysis`
   and discard the raw text. Deleting `scratch/` must not change `state.json`,
   `events.jsonl`, or `artifacts/`.
+- `delivery/report_session.json` is Runtime-owned operational authority for report
+  sequencing and certification. It must never be hand-edited by the Agent. It is not
+  Research State, a ResearchRun field, an Artifact, or cross-run knowledge.
 - Do not write research files to `/tmp`, the project root, the repository
   root, or anywhere under `<SKILL_DIR>`. The Skill directory ships read-only
   instructions and the Runtime; it never holds run data.
@@ -473,6 +478,14 @@ score, no severity rank. The pipeline routes by precedence
 (POSSIBLE_RESEARCH_ISSUE > BRIEF > MANUSCRIPT); Python routes, it does not rank "which
 problem is worse."
 
+A frozen Blind Read with any blocking issue cannot become a Phase 2 PASS. Phase 2 may
+consolidate or reattribute those failures, but it must return at least one blocking
+issue. A Reader or Integrity blocker also establishes a pending repair obligation:
+`MANUSCRIPT` requires a new manuscript digest, `BRIEF` requires a new Brief digest,
+`POSSIBLE_RESEARCH_ISSUE` pauses certification for Research-authority confirmation,
+and `REOPEN_RESEARCH` requires the explicit lifecycle transition. Submitting different
+PASS JSON for the same work-product versions never clears an obligation.
+
 Use the production staged commands in this order:
 
 ```text
@@ -485,10 +498,12 @@ put-report-brief
 → publish-certified-report
 ```
 
-Claude supplies the semantic values; the Harness persists their ephemeral Delivery
-session under workspace scratch and enforces order, Blind freezing, digest binding,
-freshness, and publication authority. There is no direct manuscript-to-publication
-command. Never treat the scratch session or captures as Research truth.
+Claude supplies the semantic values; the Harness persists Runtime-owned operational
+certification data at `runs/<run_id>/delivery/report_session.json` and enforces order,
+Blind freezing, digest binding, repair obligations, freshness, and publication
+authority. Non-authoritative captures remain under
+`scratch/<run_id>/captures/report/`. There is no direct manuscript-to-publication
+command. Never treat the delivery session as Research truth or edit it by hand.
 
 Reader PASS certifies a specific `(brief_digest, manuscript_digest)` pair;
 Integrity PASS certifies `(delivery_basis, brief_digest, manuscript_digest)`.
@@ -534,7 +549,10 @@ contract-facing judgment. If a stage needs any of those, request confirmation fr
 actor with Research Authority. A Reader's `POSSIBLE_RESEARCH_ISSUE` result does not
 reopen Research. Only after confirmation may that actor explicitly call
 `reopen-research` and return to the research loop; do not manufacture the judgment in
-Delivery.
+Delivery. Use `delivery-inspect` / `delivery-read-source` for targeted confirmation. If
+Research is sufficient and the fault is in Delivery, submit a genuinely new Brief or
+manuscript version and run the affected gates again; the same-version Reader PASS is
+blocked.
 
 When a retained primary paper has a canonical URL, hyperlink the first formal occurrence
 of its method or system name to that URL. This navigation link never replaces a structured

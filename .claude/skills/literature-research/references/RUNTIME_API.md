@@ -244,22 +244,33 @@ returns `blind_read_digest`.
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
 current `manuscript_digest`, and Phase 2 `blocking_issues`. Each Phase 2 issue adds a
 `repair_target` (`MANUSCRIPT`, `BRIEF`, or `POSSIBLE_RESEARCH_ISSUE`). A mismatched Blind
-digest is rejected. `POSSIBLE_RESEARCH_ISSUE` returns a confirmation-required result and
-does not change lifecycle; an actor with Research Authority must explicitly call
-`reopen-research` after confirmation.
+digest is rejected. If the frozen Blind Read has blockers, Phase 2 must retain at least
+one blocker (consolidation is allowed). A `MANUSCRIPT` or `BRIEF` blocker creates a
+pending repair obligation that only a changed digest at that layer can clear.
+`POSSIBLE_RESEARCH_ISSUE` returns a confirmation-required result, pauses certification,
+and does not change lifecycle; use targeted Delivery inspection/source reads for
+Research-authority confirmation. Confirmed insufficiency requires explicit
+`reopen-research`; otherwise submit a genuinely new upstream Delivery work-product
+version and rerun the gates.
 
 `submit-integrity-review` accepts `disposition`, `issues`, and optional `revise_target`.
 It requires a matching current Reader PASS. `PASS` creates the version-bound Integrity
 certification; `REVISE_DELIVERY` requires a `MANUSCRIPT` or `BRIEF` target;
 `REOPEN_RESEARCH` confirms insufficiency but lifecycle transition remains the explicit
-`reopen-research` command.
+`reopen-research` command. A failed Integrity result cannot be overwritten with PASS on
+the same versions: MANUSCRIPT repair requires a changed manuscript followed by Blind and
+Reader again; BRIEF repair requires a changed Brief; REOPEN_RESEARCH blocks report
+certification until the explicit transition.
 
 `render-certified-report` revalidates the current DeliveryBasis, Brief, Manuscript,
 Reader PASS, and Integrity PASS before running the deterministic citation renderer.
 `publish-certified-report` revalidates those dependencies and the rendered content at
-the artifact boundary. Delivery session data and captures live under
-`workspace/scratch/<run_id>/`; they are observable, removable work products and never
-enter `state.json` or `ArtifactKind`. Validate the published artifact before closing.
+the artifact boundary. Runtime-owned sequencing and certification data live at
+`workspace/runs/<run_id>/delivery/report_session.json`; this file has execution authority
+but no Research semantic authority, never enters `state.json` / `ResearchRun` or
+`ArtifactKind`, and must not be hand-edited. Non-authoritative observability captures
+remain removable at `workspace/scratch/<run_id>/captures/report/`. Validate the
+published artifact before closing.
 
 ## Wiki projection and publication
 

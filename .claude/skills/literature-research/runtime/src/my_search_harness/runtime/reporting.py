@@ -744,10 +744,15 @@ class ReportPipeline:
         evidence: DeliveryEvidenceAccess,
     ) -> ReportPipelineResult:
         basis_key = _delivery_basis_key(view.delivery_basis)
+        rejected_brief_digest: str | None = None
 
         for _ in range(self._max_constructor_rebuilds):
             brief = self._construct_brief(view, evidence)
             b_digest = brief_digest(brief)
+            if rejected_brief_digest == b_digest:
+                raise ReportPipelineError(
+                    "Brief repair must produce a new Brief version"
+                )
             self._capture.capture(run_id, "report_brief.json", _brief_json(brief))
 
             try:
@@ -759,6 +764,7 @@ class ReportPipeline:
                 # rebuild the Brief via a fresh Constructor pass. The most
                 # upstream fault wins, so a BRIEF route always returns here
                 # rather than revising the manuscript or reopening research.
+                rejected_brief_digest = b_digest
                 continue
             # Reader PASS obtained for the current Brief/Manuscript pair.
             integrity_outcome = self._integrity_loop(
@@ -772,6 +778,7 @@ class ReportPipeline:
                 basis_key,
             )
             if isinstance(integrity_outcome, _BriefRebuild):
+                rejected_brief_digest = b_digest
                 continue  # Integrity routed to BRIEF → new Constructor pass.
             if isinstance(integrity_outcome, _ResearchReopen):
                 raise ResearchEscalationRequired(integrity_outcome.rationale)
@@ -862,6 +869,7 @@ class ReportPipeline:
                     )
                 )
             # MANUSCRIPT → Reviser. A fresh reviewer re-reads the revision.
+            rejected_manuscript_digest = manuscript_digest(current)
             current = self._reviser.revise(
                 brief=brief,
                 manuscript=current,
@@ -870,6 +878,10 @@ class ReportPipeline:
                 citation_metadata=self._current_citation_metadata(),
             )
             self._validate_manuscript(current)
+            if manuscript_digest(current) == rejected_manuscript_digest:
+                raise ReportPipelineError(
+                    "Manuscript repair must produce a new Manuscript version"
+                )
             self._capture.capture(
                 run_id, "manuscript_post_revision.md", current.markdown
             )
@@ -912,7 +924,6 @@ class ReportPipeline:
             manuscript=manuscript,
         )
         self._validate_blind_read(blind, m_digest)
-        frozen_blind_digest = blind_read_digest(blind)
         self._capture.capture(
             run_id,
             f"blind_review_{m_digest[:12]}.json",
@@ -926,7 +937,7 @@ class ReportPipeline:
             review_guide=self._review_guide,
         )
         b_digest = brief_digest(brief)
-        self._validate_review_result(result, frozen_blind_digest, b_digest, m_digest)
+        self._validate_review_result(result, blind, b_digest, m_digest)
         self._capture.capture(
             run_id,
             f"reader_review_{m_digest[:12]}.json",
@@ -1035,6 +1046,10 @@ class ReportPipeline:
             citation_metadata=self._current_citation_metadata(),
         )
         self._validate_manuscript(revised)
+        if manuscript_digest(revised) == manuscript_digest(manuscript):
+            raise ReportPipelineError(
+                "Integrity Manuscript repair must produce a new Manuscript version"
+            )
         self._capture.capture(run_id, "manuscript_post_revision.md", revised.markdown)
         return revised
 
@@ -1321,7 +1336,7 @@ class ReportPipeline:
     @staticmethod
     def _validate_review_result(
         result: object,
-        expected_blind_read_digest: str,
+        frozen_blind_read: BlindReadResult,
         expected_brief_digest: str,
         expected_manuscript_digest: str,
     ) -> None:
@@ -1329,6 +1344,7 @@ class ReportPipeline:
             raise ReportPipelineError(
                 "reviewer brief_check must return ReportReviewResult"
             )
+        expected_blind_read_digest = blind_read_digest(frozen_blind_read)
         if result.blind_read_digest != expected_blind_read_digest:
             raise ReportPipelineError(
                 "ReportReviewResult attempts to replace the frozen Blind Read"
@@ -1344,6 +1360,10 @@ class ReportPipeline:
         ):
             raise ReportPipelineError(
                 "blocking_issues must be a tuple of BlockingIssue"
+            )
+        if frozen_blind_read.blocking_issues and not result.blocking_issues:
+            raise ReportPipelineError(
+                "Phase 2 cannot PASS while the frozen Blind Read has blocking issues"
             )
         for issue in result.blocking_issues:
             for field_name in ("problem", "reader_effect", "why_blocking"):
@@ -1464,7 +1484,7 @@ def validate_blind_read(blind: object, expected_manuscript_digest: str) -> None:
 
 def validate_report_review(
     result: object,
-    expected_blind_read_digest: str,
+    frozen_blind_read: BlindReadResult,
     expected_brief_digest: str,
     expected_manuscript_digest: str,
 ) -> None:
@@ -1472,7 +1492,7 @@ def validate_report_review(
 
     ReportPipeline._validate_review_result(
         result,
-        expected_blind_read_digest,
+        frozen_blind_read,
         expected_brief_digest,
         expected_manuscript_digest,
     )

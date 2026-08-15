@@ -690,7 +690,7 @@ class TestBlindReaderBoundary:
             )
             _build_pipeline(caps, reviewer_factory=factory2).run("run_2")
 
-    def test_phase1_freezes_reader_failures_without_repair_target(self):
+    def test_phase1_blocker_cannot_disappear_into_phase2_pass(self):
         issue = BlindBlockingIssue(
             location="section 1",
             problem="missing bridge",
@@ -707,13 +707,56 @@ class TestBlindReaderBoundary:
             blocking_issues=(issue,),
         )
         caps = FakeDeliveryCapabilities(_make_view())
-        result = _build_pipeline(
-            caps,
-            reviewer_factory=CountingReviewerFactory(
-                lambda: FakeReviewer(blind_result=blind)
+        with pytest.raises(ReportPipelineError, match="frozen Blind Read"):
+            _build_pipeline(
+                caps,
+                reviewer_factory=CountingReviewerFactory(
+                    lambda: FakeReviewer(blind_result=blind)
+                ),
+            ).run("run_1")
+
+    def test_phase2_may_consolidate_multiple_blind_blockers(self):
+        blind = BlindReadResult(
+            core_understanding="partial",
+            domain_model="incomplete",
+            comparison_coordinates="none",
+            reverse_outline="disconnected",
+            manuscript_digest=manuscript_digest(_manuscript()),
+            blocking_issues=(
+                BlindBlockingIssue(
+                    problem="missing bridge",
+                    reader_effect="reader cannot connect the argument",
+                    why_blocking="main conclusion is not recoverable",
+                ),
+                BlindBlockingIssue(
+                    problem="unstable comparison",
+                    reader_effect="reader cannot compare methods",
+                    why_blocking="the promised synthesis is unavailable",
+                ),
             ),
+        )
+        consolidated = BlockingIssue(
+            problem="argument structure is incomplete",
+            reader_effect="reader cannot reconstruct the synthesis",
+            why_blocking="both observed failures share this root cause",
+            repair_target=RepairTarget.MANUSCRIPT,
+        )
+        calls = {"count": 0}
+
+        def builder():
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return FakeReviewer(
+                    blind_result=blind,
+                    blocking_issues=(consolidated,),
+                )
+            return FakeReviewer()
+
+        result = _build_pipeline(
+            FakeDeliveryCapabilities(_make_view()),
+            reviewer_factory=CountingReviewerFactory(builder),
         ).run("run_1")
-        assert result.reader_pass.manuscript_digest == blind.manuscript_digest
+        assert result.reader_pass.manuscript_digest != blind.manuscript_digest
 
     def test_phase2_cannot_replace_frozen_blind_read(self):
         class RewritingReviewer(FakeReviewer):
@@ -852,7 +895,12 @@ class TestFreshReview:
             return FakeReviewer()
 
         factory = CountingReviewerFactory(builder)
-        constructor = FakeConstructor(briefs=[_valid_brief(), _valid_brief()])
+        constructor = FakeConstructor(
+            briefs=[
+                _valid_brief(),
+                replace(_valid_brief(), report_goal="repaired survey X"),
+            ]
+        )
         writer = FakeWriter(manuscripts=[_manuscript("# v1"), _manuscript("# v2")])
         pipeline = _build_pipeline(
             caps,
@@ -920,7 +968,12 @@ class TestRootRepairRouting:
             return FakeReviewer()
 
         factory = CountingReviewerFactory(builder)
-        constructor = FakeConstructor(briefs=[_valid_brief(), _valid_brief()])
+        constructor = FakeConstructor(
+            briefs=[
+                _valid_brief(),
+                replace(_valid_brief(), report_goal="repaired survey X"),
+            ]
+        )
         reviser = FakeReviser()
         pipeline = _build_pipeline(
             caps, constructor=constructor, reviewer_factory=factory, reviser=reviser
@@ -957,7 +1010,12 @@ class TestRootRepairRouting:
             return FakeReviewer()
 
         factory = CountingReviewerFactory(builder)
-        constructor = FakeConstructor(briefs=[_valid_brief(), _valid_brief()])
+        constructor = FakeConstructor(
+            briefs=[
+                _valid_brief(),
+                replace(_valid_brief(), report_goal="repaired survey X"),
+            ]
+        )
         reviser = FakeReviser()
         pipeline = _build_pipeline(
             caps, constructor=constructor, reviewer_factory=factory, reviser=reviser
@@ -1190,7 +1248,12 @@ class TestIntegrityRouting:
                 ResearchIntegrityReview(disposition=IntegrityDisposition.PASS),
             ]
         )
-        constructor = FakeConstructor(briefs=[_valid_brief(), _valid_brief()])
+        constructor = FakeConstructor(
+            briefs=[
+                _valid_brief(),
+                replace(_valid_brief(), report_goal="repaired survey X"),
+            ]
+        )
         writer = FakeWriter(manuscripts=[_manuscript("# v1"), _manuscript("# v2")])
         pipeline = _build_pipeline(
             caps,
@@ -1431,7 +1494,12 @@ class TestAdditionalInvariants:
             )
 
         factory = CountingReviewerFactory(builder)
-        pipeline = _build_pipeline(caps, reviewer_factory=factory, max_reader_rounds=2)
+        pipeline = _build_pipeline(
+            caps,
+            reviewer_factory=factory,
+            reviser=FakeReviser(revised_markdowns=["# revision 1", "# revision 2"]),
+            max_reader_rounds=2,
+        )
         with pytest.raises(ReportResourceExhausted):
             pipeline.run("run_1")
         assert caps.publish_calls == []

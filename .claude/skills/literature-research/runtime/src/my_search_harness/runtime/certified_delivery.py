@@ -2,7 +2,7 @@
 
 Claude Code supplies semantic work products across CLI calls.  This module
 owns their deterministic order, freshness and certification in workspace
-scratch.  Nothing here is ResearchRun state or a published artifact.
+Runtime persistence.  Nothing here is ResearchRun state or a published artifact.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass, fields, is_dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import Mapping
 
@@ -22,6 +22,7 @@ from .capabilities import DeliveryCapabilities
 from .citations import DeterministicCitationRenderer
 from .delivery import PublishReportResult, _ReportPublicationAuthorization
 from .reporting import (
+    BlindBlockingIssue,
     BlindReadResult,
     BriefMaterial,
     CitationReference,
@@ -52,6 +53,16 @@ class CertifiedDeliveryError(RuntimeError):
     """A staged Delivery command violated ordering or certification."""
 
 
+class _PendingAction(StrEnum):
+    """Runtime-only repair obligation; never part of ResearchRun state."""
+
+    NONE = "NONE"
+    MANUSCRIPT_REPAIR_REQUIRED = "MANUSCRIPT_REPAIR_REQUIRED"
+    BRIEF_REBUILD_REQUIRED = "BRIEF_REBUILD_REQUIRED"
+    RESEARCH_CONFIRMATION_REQUIRED = "RESEARCH_CONFIRMATION_REQUIRED"
+    RESEARCH_REOPEN_REQUIRED = "RESEARCH_REOPEN_REQUIRED"
+
+
 @dataclass(slots=True, frozen=True, kw_only=True)
 class CertifiedDeliveryStatus:
     run_id: str
@@ -63,6 +74,7 @@ class CertifiedDeliveryStatus:
     reader_pass: ReaderPass | None
     integrity_pass: IntegrityPass | None
     rendered: bool
+    pending_action: str
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
@@ -76,7 +88,7 @@ class CertifiedReportRenderResult:
 class CertifiedReportDelivery:
     """Production orchestrator for Claude-driven staged report delivery."""
 
-    _SCHEMA_VERSION = 1
+    _SCHEMA_VERSION = 2
 
     def __init__(
         self,
@@ -92,7 +104,23 @@ class CertifiedReportDelivery:
         view = self._delivery.view(run_id)
         validate_report_brief(view, brief)
         b_digest = brief_digest(brief)
-        session = self._empty_session(delivery_basis_key(view.delivery_basis))
+        basis_key = delivery_basis_key(view.delivery_basis)
+        existing = self._load_if_exists(run_id, basis_key)
+        if existing is not None:
+            self._require_action_allowed(existing, "put-report-brief")
+            pending = self._pending_action(existing)
+            if (
+                pending
+                in {
+                    _PendingAction.BRIEF_REBUILD_REQUIRED,
+                    _PendingAction.RESEARCH_CONFIRMATION_REQUIRED,
+                }
+                and existing.get("brief_digest") == b_digest
+            ):
+                raise CertifiedDeliveryError(
+                    "pending repair requires a new Report Brief version"
+                )
+        session = self._empty_session(basis_key)
         session["brief"] = _jsonable(brief)
         session["brief_digest"] = b_digest
         self._save(run_id, session)
@@ -103,16 +131,31 @@ class CertifiedReportDelivery:
         self, run_id: str, manuscript: ReportManuscript
     ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "put-report-manuscript")
         self._require_brief(session)
         validate_report_manuscript(manuscript)
+        new_digest = manuscript_digest(manuscript)
+        pending = self._pending_action(session)
+        if (
+            pending
+            in {
+                _PendingAction.MANUSCRIPT_REPAIR_REQUIRED,
+                _PendingAction.RESEARCH_CONFIRMATION_REQUIRED,
+            }
+            and session.get("manuscript_digest") == new_digest
+        ):
+            raise CertifiedDeliveryError(
+                "pending repair requires a new Report Manuscript version"
+            )
         name = (
             "manuscript_post_revision.md"
             if session.get("manuscript") is not None
             else "manuscript_pre_reader.md"
         )
         session["manuscript"] = _jsonable(manuscript)
-        session["manuscript_digest"] = manuscript_digest(manuscript)
+        session["manuscript_digest"] = new_digest
         self._clear_from(session, "blind_read")
+        session["pending_action"] = _PendingAction.NONE.value
         self._save(run_id, session)
         self._captures.capture(run_id, name, manuscript.markdown)
         return self._status(run_id, "MANUSCRIPT_ACCEPTED", session)
@@ -121,6 +164,7 @@ class CertifiedReportDelivery:
         self, run_id: str, blind: BlindReadResult
     ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "submit-blind-review")
         manuscript = self._require_manuscript(session)
         m_digest = manuscript_digest(manuscript)
         validate_blind_read(blind, m_digest)
@@ -138,24 +182,35 @@ class CertifiedReportDelivery:
         self, run_id: str, review: ReportReviewResult
     ) -> CertifiedDeliveryStatus | ResearchConfirmationRequiredResult:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "submit-reader-review")
         brief = self._require_brief(session)
         manuscript = self._require_manuscript(session)
+        frozen_blind = self._require_blind_read(session)
         frozen_digest = self._required_string(session, "blind_read_digest")
         b_digest = brief_digest(brief)
         m_digest = manuscript_digest(manuscript)
-        validate_report_review(review, frozen_digest, b_digest, m_digest)
+        validate_blind_read(frozen_blind, m_digest)
+        if blind_read_digest(frozen_blind) != frozen_digest:
+            raise CertifiedDeliveryError("stored Blind Read digest is stale")
+        if frozen_blind.blocking_issues and not review.blocking_issues:
+            raise CertifiedDeliveryError(
+                "Phase 2 cannot PASS while the frozen Blind Read has blocking issues"
+            )
+        validate_report_review(review, frozen_blind, b_digest, m_digest)
         session["reader_review"] = _jsonable(review)
-        session["reader_pass"] = (
-            _jsonable(
+        if review.blocking_issues:
+            session["reader_pass"] = None
+            pending = self._pending_for_reader(review)
+        else:
+            session["reader_pass"] = _jsonable(
                 ReaderPass(
                     brief_digest=b_digest,
                     manuscript_digest=m_digest,
                 )
             )
-            if not review.blocking_issues
-            else None
-        )
+            pending = _PendingAction.NONE
         self._clear_from(session, "integrity_review")
+        session["pending_action"] = pending.value
         self._save(run_id, session)
         self._captures.capture(
             run_id, f"reader_review_{m_digest[:12]}.json", _pretty(review)
@@ -180,6 +235,7 @@ class CertifiedReportDelivery:
         self, run_id: str, review: ResearchIntegrityReview
     ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "submit-integrity-review")
         brief = self._require_brief(session)
         manuscript = self._require_manuscript(session)
         reader_pass = self._reader_pass(session)
@@ -204,9 +260,12 @@ class CertifiedReportDelivery:
                     manuscript_digest=m_digest,
                 )
             )
+            session["pending_action"] = _PendingAction.NONE.value
             stage = "INTEGRITY_PASS"
         else:
             session["integrity_pass"] = None
+            session["reader_pass"] = None
+            session["pending_action"] = self._pending_for_integrity(review).value
             stage = (
                 "RESEARCH_REOPEN_CONFIRMED"
                 if review.disposition is IntegrityDisposition.REOPEN_RESEARCH
@@ -221,6 +280,7 @@ class CertifiedReportDelivery:
 
     def render_certified(self, run_id: str) -> CertifiedReportRenderResult:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "render-certified-report")
         brief, manuscript, _, _ = self._require_certified(run_id, session)
         content = self._renderer.render(self._delivery.view(run_id), manuscript)
         if not content.strip():
@@ -245,6 +305,7 @@ class CertifiedReportDelivery:
         self, run_id: str, expected_revision: int
     ) -> PublishReportResult:
         session = self._load_current(run_id)
+        self._require_action_allowed(session, "publish-certified-report")
         brief, manuscript, reader_pass, integrity_pass = self._require_certified(
             run_id, session
         )
@@ -323,6 +384,16 @@ class CertifiedReportDelivery:
             )
         return session
 
+    def _load_if_exists(
+        self, run_id: str, current_basis_key: str
+    ) -> dict[str, object] | None:
+        if not self._session_path(run_id).exists():
+            return None
+        session = self._load(run_id)
+        if session.get("delivery_basis_key") != current_basis_key:
+            return None
+        return session
+
     def _load(self, run_id: str) -> dict[str, object]:
         path = self._session_path(run_id)
         try:
@@ -350,10 +421,10 @@ class CertifiedReportDelivery:
 
     def _session_directory(self, run_id: str) -> Path:
         validate_ref(run_id, "run", "run_id")
-        return self._workspace_root / "scratch" / run_id / "report_delivery"
+        return self._workspace_root / "runs" / run_id / "delivery"
 
     def _session_path(self, run_id: str) -> Path:
-        return self._session_directory(run_id) / "session.json"
+        return self._session_directory(run_id) / "report_session.json"
 
     @staticmethod
     def _write_atomic(path: Path, payload: str) -> None:
@@ -376,6 +447,7 @@ class CertifiedReportDelivery:
         return {
             "schema_version": CertifiedReportDelivery._SCHEMA_VERSION,
             "delivery_basis_key": basis_key,
+            "pending_action": _PendingAction.NONE.value,
             "brief": None,
             "brief_digest": None,
             "manuscript": None,
@@ -408,6 +480,58 @@ class CertifiedReportDelivery:
         session["rendered"] = None
 
     @staticmethod
+    def _pending_action(session: Mapping[str, object]) -> _PendingAction:
+        raw = session.get("pending_action")
+        try:
+            return _PendingAction(raw)
+        except (TypeError, ValueError) as exc:
+            raise CertifiedDeliveryError(
+                "report delivery session has invalid pending_action"
+            ) from exc
+
+    @classmethod
+    def _require_action_allowed(
+        cls, session: Mapping[str, object], command: str
+    ) -> None:
+        pending = cls._pending_action(session)
+        allowed = {
+            _PendingAction.NONE: None,
+            _PendingAction.MANUSCRIPT_REPAIR_REQUIRED: {"put-report-manuscript"},
+            _PendingAction.BRIEF_REBUILD_REQUIRED: {"put-report-brief"},
+            _PendingAction.RESEARCH_CONFIRMATION_REQUIRED: {
+                "put-report-brief",
+                "put-report-manuscript",
+            },
+            _PendingAction.RESEARCH_REOPEN_REQUIRED: set(),
+        }[pending]
+        if allowed is None or command in allowed:
+            return
+        raise CertifiedDeliveryError(
+            f"{command} is blocked by pending action {pending.value}"
+        )
+
+    @staticmethod
+    def _pending_for_reader(review: ReportReviewResult) -> _PendingAction:
+        targets = {issue.repair_target for issue in review.blocking_issues}
+        if RepairTarget.POSSIBLE_RESEARCH_ISSUE in targets:
+            return _PendingAction.RESEARCH_CONFIRMATION_REQUIRED
+        if RepairTarget.BRIEF in targets:
+            return _PendingAction.BRIEF_REBUILD_REQUIRED
+        if RepairTarget.MANUSCRIPT in targets:
+            return _PendingAction.MANUSCRIPT_REPAIR_REQUIRED
+        raise CertifiedDeliveryError("Reader blockers carry no repair target")
+
+    @staticmethod
+    def _pending_for_integrity(review: ResearchIntegrityReview) -> _PendingAction:
+        if review.disposition is IntegrityDisposition.REOPEN_RESEARCH:
+            return _PendingAction.RESEARCH_REOPEN_REQUIRED
+        if review.revise_target is RepairTarget.BRIEF:
+            return _PendingAction.BRIEF_REBUILD_REQUIRED
+        if review.revise_target is RepairTarget.MANUSCRIPT:
+            return _PendingAction.MANUSCRIPT_REPAIR_REQUIRED
+        raise CertifiedDeliveryError("Integrity repair carries no repair target")
+
+    @staticmethod
     def _required_string(session: Mapping[str, object], name: str) -> str:
         value = session.get(name)
         if not isinstance(value, str) or not value:
@@ -427,6 +551,13 @@ class CertifiedReportDelivery:
         if not isinstance(value, Mapping):
             raise CertifiedDeliveryError("put-report-manuscript is required first")
         return _manuscript_from(value)
+
+    @staticmethod
+    def _require_blind_read(session: Mapping[str, object]) -> BlindReadResult:
+        value = session.get("blind_read")
+        if not isinstance(value, Mapping):
+            raise CertifiedDeliveryError("submit-blind-review is required first")
+        return _blind_read_from(value)
 
     @staticmethod
     def _reader_pass(session: Mapping[str, object]) -> ReaderPass:
@@ -482,6 +613,7 @@ class CertifiedReportDelivery:
                 else None
             ),
             rendered=isinstance(session.get("rendered"), Mapping),
+            pending_action=CertifiedReportDelivery._pending_action(session).value,
         )
 
 
@@ -633,4 +765,33 @@ def _manuscript_from(value: Mapping[str, object]) -> ReportManuscript:
     return ReportManuscript(
         markdown=_mapping_string(value, "markdown"),
         citations=tuple(citations),
+    )
+
+
+def _blind_read_from(value: Mapping[str, object]) -> BlindReadResult:
+    raw_issues = value.get("blocking_issues", [])
+    if not isinstance(raw_issues, list):
+        raise CertifiedDeliveryError("stored Blind Read blocking_issues are invalid")
+    issues: list[BlindBlockingIssue] = []
+    for raw in raw_issues:
+        if not isinstance(raw, Mapping):
+            raise CertifiedDeliveryError("stored BlindBlockingIssue is invalid")
+        location = raw.get("location")
+        if location is not None and not isinstance(location, str):
+            raise CertifiedDeliveryError("stored BlindBlockingIssue location is invalid")
+        issues.append(
+            BlindBlockingIssue(
+                problem=_mapping_string(raw, "problem"),
+                reader_effect=_mapping_string(raw, "reader_effect"),
+                why_blocking=_mapping_string(raw, "why_blocking"),
+                location=location,
+            )
+        )
+    return BlindReadResult(
+        core_understanding=_mapping_string(value, "core_understanding"),
+        domain_model=_mapping_string(value, "domain_model"),
+        comparison_coordinates=_mapping_string(value, "comparison_coordinates"),
+        reverse_outline=_mapping_string(value, "reverse_outline"),
+        manuscript_digest=_mapping_string(value, "manuscript_digest"),
+        blocking_issues=tuple(issues),
     )
