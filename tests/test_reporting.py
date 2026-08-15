@@ -20,8 +20,7 @@ Run:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 import pytest
@@ -46,9 +45,9 @@ from my_search_harness.runtime.context import (
     RequirementContext,
 )
 from my_search_harness.runtime.reporting import (
+    BlindBlockingIssue,
     BlindReadResult,
     BlockingIssue,
-    BriefInsufficient,
     BriefMaterial,
     CitationMetadata,
     IntegrityDisposition,
@@ -64,9 +63,10 @@ from my_search_harness.runtime.reporting import (
     ReportPipelineError,
     ReportResourceExhausted,
     ReportReviewResult,
-    ResearchEscalationRequired,
+    ResearchConfirmationRequiredResult,
     ResearchIntegrityReview,
     brief_digest,
+    blind_read_digest,
     manuscript_digest,
 )
 
@@ -158,7 +158,9 @@ def _make_view(
 class FakePublishResult:
     artifact_kind: ArtifactKind = ArtifactKind.REPORT
     path: str = "workspace/runs/x/report.md"
-    delivery_basis: CompletionPassBasis = field(default_factory=lambda: CompletionPassBasis(completion_check_ref="check_1"))
+    delivery_basis: CompletionPassBasis = field(
+        default_factory=lambda: CompletionPassBasis(completion_check_ref="check_1")
+    )
     content_sha256: str = "abc123"
 
 
@@ -171,13 +173,13 @@ class FakeDeliveryCapabilities:
     """Minimal stand-in for DeliveryCapabilities used by the pipeline.
 
     Records calls so tests can assert call order and arguments. ``view`` returns
-    a fixed DeliveryView; ``publish_report`` / ``reopen_research`` return canned
-    results and bump the recorded revision.
+    a fixed DeliveryView; private certified publication / ``reopen_research``
+    return canned results and bump the recorded revision.
     """
 
     def __init__(self, view: DeliveryView) -> None:
         self._view = view
-        self.publish_calls: list[tuple[str, int, str]] = []
+        self.publish_calls: list[tuple[str, int, str, object]] = []
         self.reopen_calls: list[tuple[str, int]] = []
         self.inspect_calls: list[tuple[str, int, tuple[str, ...]]] = []
         self.read_calls: list[tuple[str, int, str]] = []
@@ -190,22 +192,29 @@ class FakeDeliveryCapabilities:
         self.inspect_calls.append((run_id, expected_revision, refs))
         return InspectResult(
             state_revision=expected_revision,
-            objects=tuple(InspectedObject(ref=r, kind="paper", value=object()) for r in refs),
+            objects=tuple(
+                InspectedObject(ref=r, kind="paper", value=object()) for r in refs
+            ),
         )
 
     def read_source(self, run_id, expected_revision, paper_ref, locator=None):
         self.read_calls.append((run_id, expected_revision, paper_ref))
         # Return a lightweight stand-in; tests that need real content inject a
         # custom reader via the evidence access surface.
-        from my_search_harness.runtime.source_access import ReadSourceResult, SourceContent
+        from my_search_harness.runtime.source_access import (
+            ReadSourceResult,
+            SourceContent,
+        )
 
         return ReadSourceResult(
             state_revision=expected_revision,
             source_content=SourceContent(paper_ref=paper_ref, content="source body"),
         )
 
-    def publish_report(self, run_id: str, expected_revision: int, content: str):
-        self.publish_calls.append((run_id, expected_revision, content))
+    def _publish_certified_report(
+        self, run_id: str, expected_revision: int, content: str, authorization: object
+    ):
+        self.publish_calls.append((run_id, expected_revision, content, authorization))
         return self._published
 
     def reopen_research(self, run_id: str, expected_revision: int):
@@ -305,7 +314,14 @@ class FakeReviewer:
         self._blocking = blocking_issues
         self._blind_result = blind_result
 
-    def blind_read(self, deliverable_description, audience, quality_standard, review_guide, manuscript):
+    def blind_read(
+        self,
+        deliverable_description,
+        audience,
+        quality_standard,
+        review_guide,
+        manuscript,
+    ):
         record = {
             "deliverable_description": deliverable_description,
             "audience": audience,
@@ -337,7 +353,7 @@ class FakeReviewer:
         if self._check_hook is not None:
             self._check_hook(record)
         return ReportReviewResult(
-            blind_read=blind_read,
+            blind_read_digest=blind_read_digest(blind_read),
             brief_digest=brief_digest(brief),
             manuscript_digest=manuscript_digest(manuscript),
             blocking_issues=self._blocking,
@@ -454,8 +470,46 @@ class TestReportBriefValidation:
                 ),
             ),
         )
-        pipeline = _build_pipeline(caps, constructor=FakeConstructor(briefs=[bad_brief]))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor(briefs=[bad_brief])
+        )
         with pytest.raises(ReportPipelineError, match="unknown requirement refs"):
+            pipeline.run("run_1")
+
+    def test_requirement_ref_cannot_pass_as_research_ref(self):
+        caps = FakeDeliveryCapabilities(_make_view())
+        brief = _valid_brief()
+        section = replace(brief.sections[0], research_refs=("requirement_alpha",))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor([replace(brief, sections=(section,))])
+        )
+        with pytest.raises(ReportPipelineError, match="unknown research refs"):
+            pipeline.run("run_1")
+
+    def test_material_source_ref_must_be_retained_paper(self):
+        caps = FakeDeliveryCapabilities(_make_view())
+        brief = _valid_brief()
+        material = replace(
+            brief.sections[0].material[0],
+            source_ref="paper_missing",
+            locator=None,
+        )
+        section = replace(brief.sections[0], material=(material,))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor([replace(brief, sections=(section,))])
+        )
+        with pytest.raises(ReportPipelineError, match="retained paper ref"):
+            pipeline.run("run_1")
+
+    def test_material_locator_requires_source_ref(self):
+        caps = FakeDeliveryCapabilities(_make_view())
+        brief = _valid_brief()
+        material = replace(brief.sections[0].material[0], source_ref=None)
+        section = replace(brief.sections[0], material=(material,))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor([replace(brief, sections=(section,))])
+        )
+        with pytest.raises(ReportPipelineError, match="locator requires source_ref"):
             pipeline.run("run_1")
 
     def test_unknown_research_ref_rejected(self):
@@ -477,7 +531,9 @@ class TestReportBriefValidation:
                 ),
             ),
         )
-        pipeline = _build_pipeline(caps, constructor=FakeConstructor(briefs=[bad_brief]))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor(briefs=[bad_brief])
+        )
         with pytest.raises(ReportPipelineError, match="unknown research refs"):
             pipeline.run("run_1")
 
@@ -506,7 +562,9 @@ class TestReportBriefValidation:
                 ),
             ),
         )
-        pipeline = _build_pipeline(caps, constructor=FakeConstructor(briefs=[bad_brief]))
+        pipeline = _build_pipeline(
+            caps, constructor=FakeConstructor(briefs=[bad_brief])
+        )
         with pytest.raises(ReportPipelineError, match="BriefMaterial content"):
             pipeline.run("run_1")
 
@@ -631,6 +689,48 @@ class TestBlindReaderBoundary:
                 lambda: FakeReviewer(blind_result=bad_blind)
             )
             _build_pipeline(caps, reviewer_factory=factory2).run("run_2")
+
+    def test_phase1_freezes_reader_failures_without_repair_target(self):
+        issue = BlindBlockingIssue(
+            location="section 1",
+            problem="missing bridge",
+            reader_effect="reader cannot connect the argument",
+            why_blocking="main conclusion is not recoverable",
+        )
+        assert not hasattr(issue, "repair_target")
+        blind = BlindReadResult(
+            core_understanding="partial",
+            domain_model="incomplete",
+            comparison_coordinates="none",
+            reverse_outline="disconnected",
+            manuscript_digest=manuscript_digest(_manuscript()),
+            blocking_issues=(issue,),
+        )
+        caps = FakeDeliveryCapabilities(_make_view())
+        result = _build_pipeline(
+            caps,
+            reviewer_factory=CountingReviewerFactory(
+                lambda: FakeReviewer(blind_result=blind)
+            ),
+        ).run("run_1")
+        assert result.reader_pass.manuscript_digest == blind.manuscript_digest
+
+    def test_phase2_cannot_replace_frozen_blind_read(self):
+        class RewritingReviewer(FakeReviewer):
+            def brief_check(self, blind_read, brief, manuscript, review_guide):
+                return ReportReviewResult(
+                    blind_read_digest="0" * 64,
+                    brief_digest=brief_digest(brief),
+                    manuscript_digest=manuscript_digest(manuscript),
+                )
+
+        caps = FakeDeliveryCapabilities(_make_view())
+        pipeline = _build_pipeline(
+            caps,
+            reviewer_factory=CountingReviewerFactory(RewritingReviewer),
+        )
+        with pytest.raises(ReportPipelineError, match="frozen Blind Read"):
+            pipeline.run("run_1")
 
 
 # ===========================================================================
@@ -869,9 +969,7 @@ class TestRootRepairRouting:
 
     def test_possible_research_issue_reader_cannot_mutate_state(self):
         # Invariant 17: POSSIBLE_RESEARCH_ISSUE does not let the Reader mutate
-        # Research State — it must escalate, not edit. The pipeline converts the
-        # escalation into the existing reopen transition (no direct state edit
-        # by the Reader/Reviser).
+        # Research State. It returns a typed confirmation request and stops.
         caps = FakeDeliveryCapabilities(_make_view())
 
         def builder():
@@ -889,13 +987,10 @@ class TestRootRepairRouting:
         factory = CountingReviewerFactory(builder)
         pipeline = _build_pipeline(caps, reviewer_factory=factory)
         result = pipeline.run("run_1")
-        from my_search_harness.runtime.reporting import ReportResearchReopenedResult
 
-        # The Reader escalated; the pipeline reopened research via the existing
-        # delivery transition. No publish, no direct state mutation by the Reader.
-        assert isinstance(result, ReportResearchReopenedResult)
+        assert isinstance(result, ResearchConfirmationRequiredResult)
         assert caps.publish_calls == []
-        assert len(caps.reopen_calls) == 1
+        assert caps.reopen_calls == []
 
     def test_confirmed_research_insufficiency_reopens_research(self):
         # Invariant 18: confirmed research insufficiency → reopen RESEARCH.
@@ -1012,7 +1107,9 @@ class TestReaderPassVersionBinding:
             ),
         )
         constructor = FakeConstructor(briefs=[_valid_brief(), brief_v2])
-        pipeline = _build_pipeline(caps, constructor=constructor, reviewer_factory=factory)
+        pipeline = _build_pipeline(
+            caps, constructor=constructor, reviewer_factory=factory
+        )
         result = pipeline.run("run_1")
         from my_search_harness.runtime.reporting import PublishedReportPipelineResult
 
@@ -1071,6 +1168,13 @@ class TestIntegrityRouting:
         assert len(integrity.calls) == 2
         # Reviser called once for the integrity repair.
         assert len(reviser.calls) == 1
+        assert result.reader_pass.manuscript_digest == manuscript_digest(
+            _manuscript("# Report\n\nfixed {{cite:c1}}")
+        )
+        assert (
+            result.reader_pass.manuscript_digest
+            == result.integrity_pass.manuscript_digest
+        )
 
     def test_revise_delivery_brief_constructor_writer_reader_integrity(self):
         # Invariant 24: REVISE_DELIVERY target BRIEF → Constructor → Writer →
@@ -1139,7 +1243,10 @@ class TestIntegrityRouting:
         reviser = FakeReviser(revised_markdowns=["# Report\n\nfixed {{cite:c1}}"])
         factory = CountingReviewerFactory(FakeReviewer)
         pipeline = _build_pipeline(
-            caps, integrity_reviewer=integrity, reviser=reviser, reviewer_factory=factory
+            caps,
+            integrity_reviewer=integrity,
+            reviser=reviser,
+            reviewer_factory=factory,
         )
         pipeline.run("run_1")
         # Two reader instances: one before integrity, one after the repair.
@@ -1239,12 +1346,19 @@ class TestNoScoreNoFSM:
             BlockingIssue,
             BlindReadResult,
         ):
-            for attr in ("score", "quality_score", "readability_score", "cognitive_score", "ai_style_score", "severity", "rank"):
+            for attr in (
+                "score",
+                "quality_score",
+                "readability_score",
+                "cognitive_score",
+                "ai_style_score",
+                "severity",
+                "rank",
+            ):
                 assert not hasattr(cls, attr), f"{cls.__name__} has {attr}"
         # No score function in the module namespace.
         score_names = [
-            n for n in dir(reporting)
-            if "score" in n.lower() and not n.startswith("_")
+            n for n in dir(reporting) if "score" in n.lower() and not n.startswith("_")
         ]
         assert score_names == []
 
@@ -1265,11 +1379,9 @@ class TestNoScoreNoFSM:
 
     def test_no_reportbrief_stored_in_research_run(self):
         # Invariant 32: no ReportBrief stored in ResearchRun.
-        import my_search_harness.runtime.reporting as reporting
-
         # The reporting module exposes no ResearchRun write path and no
-        # ArtifactKind.REPORT_BRIEF. The pipeline only calls publish_report /
-        # reopen_research on the delivery capabilities — neither stores a Brief.
+        # ArtifactKind.REPORT_BRIEF. The pipeline only calls certified publish /
+        # reopen_research on Delivery capabilities — neither stores a Brief.
         assert not hasattr(ArtifactKind, "REPORT_BRIEF")
         # The pipeline result carries the Brief as a return value, not as a
         # persisted run artifact.
@@ -1294,7 +1406,7 @@ class TestAdditionalInvariants:
         caps = FakeDeliveryCapabilities(_make_view())
         sink = NoopReportCaptureSink()
         # Noop capture must not raise and must not persist anything.
-        sink.capture("report_brief.json", "{}")
+        sink.capture("run_1", "report_brief.json", "{}")
         pipeline = _build_pipeline(caps, capture_sink=sink)
         pipeline.run("run_1")
         # No run mutation recorded beyond the single publish.
@@ -1303,6 +1415,7 @@ class TestAdditionalInvariants:
     def test_resource_exhaustion_is_not_pass(self):
         # Hitting a resource limit raises ReportResourceExhausted, never a PASS.
         caps = FakeDeliveryCapabilities(_make_view())
+
         # Reader always blocks MANUSCRIPT; reviser always returns a manuscript
         # that still blocks → reader loop never converges.
         def builder():
@@ -1318,9 +1431,7 @@ class TestAdditionalInvariants:
             )
 
         factory = CountingReviewerFactory(builder)
-        pipeline = _build_pipeline(
-            caps, reviewer_factory=factory, max_reader_rounds=2
-        )
+        pipeline = _build_pipeline(caps, reviewer_factory=factory, max_reader_rounds=2)
         with pytest.raises(ReportResourceExhausted):
             pipeline.run("run_1")
         assert caps.publish_calls == []
@@ -1335,7 +1446,11 @@ class TestAdditionalInvariants:
         assert isinstance(citation_meta, CitationMetadata)
         # CitationMetadata carries only (ref, title, url) tuples — no DeliveryView.
         assert all(isinstance(t, tuple) and len(t) == 3 for t in citation_meta.papers)
-        assert citation_meta.papers[0] == ("paper_p1", "Paper One", "https://example.org/p1")
+        assert citation_meta.papers[0] == (
+            "paper_p1",
+            "Paper One",
+            "https://example.org/p1",
+        )
 
     def test_constructor_does_not_receive_writing_guide(self):
         # The Constructor receives the Quality Standard, not the Writing Guide.
@@ -1390,13 +1505,17 @@ class TestAdditionalInvariants:
             ]
         )
         pipeline = _build_pipeline(caps, integrity_reviewer=integrity)
-        with pytest.raises(ReportPipelineError, match="non-PASS disposition requires issues"):
+        with pytest.raises(
+            ReportPipelineError, match="non-PASS disposition requires issues"
+        ):
             pipeline.run("run_1")
 
     def test_empty_guides_rejected_at_construction(self):
         # The pipeline validates all four guides at construction time.
         caps = FakeDeliveryCapabilities(_make_view())
-        with pytest.raises(ValueError, match="quality_standard must be a non-empty string"):
+        with pytest.raises(
+            ValueError, match="quality_standard must be a non-empty string"
+        ):
             ReportPipeline(
                 caps,
                 constructor=FakeConstructor(),

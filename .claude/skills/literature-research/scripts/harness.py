@@ -9,11 +9,11 @@ import json
 import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, fields, is_dataclass
+from dataclasses import fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, NoReturn, TextIO
+from typing import NoReturn, TextIO
 
 
 def _skill_dir() -> Path:
@@ -93,19 +93,28 @@ from my_search_harness.domain import (  # noqa: E402
     SourceRelation,
 )
 from my_search_harness.runtime import (  # noqa: E402
+    BlindBlockingIssue,
+    BlindReadResult,
+    BlockingIssue,
+    BriefMaterial,
     CitationReference,
     BlockingGapSpec,
     ContextContinuation,
     ContextSection,
     CreateRunRequest,
-    DeterministicCitationRenderer,
+    IntegrityDisposition,
     LocalAuditLog,
     LocalV1Runtime,
     NewBlockingGap,
     PaperSearchHit,
     PutPaperAnalysis,
     ReopenBlockingGap,
+    RepairTarget,
+    ReportBrief,
+    ReportBriefSection,
     ReportManuscript,
+    ReportReviewResult,
+    ResearchIntegrityReview,
     ResearchMutationBatch,
     WikiPageDraft,
     WikiProvenanceRef,
@@ -408,6 +417,210 @@ def _manuscript(value: Mapping[str, object]) -> ReportManuscript:
     )
 
 
+def _brief_material(value: object) -> BriefMaterial:
+    if not isinstance(value, dict):
+        raise AdapterInputError("material entries must be objects")
+    _shape(
+        value,
+        required=frozenset({"content"}),
+        optional=frozenset({"role", "research_refs", "source_ref", "locator"}),
+    )
+    return BriefMaterial(
+        content=_string(value["content"], "material.content"),
+        role=_optional_string(value.get("role"), "material.role"),
+        research_refs=_optional_strings(value, "research_refs"),
+        source_ref=_optional_string(value.get("source_ref"), "material.source_ref"),
+        locator=_locator(value.get("locator")),
+    )
+
+
+def _report_brief(value: Mapping[str, object]) -> ReportBrief:
+    _shape(
+        value,
+        required=frozenset(
+            {
+                "audience",
+                "report_goal",
+                "reader_takeaway",
+                "narrative_logic",
+                "sections",
+            }
+        ),
+        optional=frozenset({"terminology", "intentional_omissions"}),
+    )
+    raw_sections = value["sections"]
+    if not isinstance(raw_sections, list):
+        raise AdapterInputError("sections must be an array")
+    sections: list[ReportBriefSection] = []
+    for raw in raw_sections:
+        if not isinstance(raw, dict):
+            raise AdapterInputError("sections entries must be objects")
+        _shape(
+            raw,
+            required=frozenset(
+                {"title", "purpose", "reader_takeaway", "argument_flow"}
+            ),
+            optional=frozenset(
+                {"requirement_refs", "research_refs", "material", "evidence_boundary"}
+            ),
+        )
+        raw_material = raw.get("material", [])
+        if not isinstance(raw_material, list):
+            raise AdapterInputError("material must be an array")
+        sections.append(
+            ReportBriefSection(
+                title=_string(raw["title"], "section.title"),
+                purpose=_string(raw["purpose"], "section.purpose"),
+                reader_takeaway=_string(
+                    raw["reader_takeaway"], "section.reader_takeaway"
+                ),
+                argument_flow=_string(raw["argument_flow"], "section.argument_flow"),
+                requirement_refs=_optional_strings(raw, "requirement_refs"),
+                research_refs=_optional_strings(raw, "research_refs"),
+                material=tuple(_brief_material(item) for item in raw_material),
+                evidence_boundary=_optional_string(
+                    raw.get("evidence_boundary"), "section.evidence_boundary"
+                ),
+            )
+        )
+    raw_terms = value.get("terminology", [])
+    if not isinstance(raw_terms, list):
+        raise AdapterInputError("terminology must be an array")
+    terminology: list[tuple[str, str]] = []
+    for item in raw_terms:
+        if not isinstance(item, list) or len(item) != 2:
+            raise AdapterInputError("terminology entries must be [term, definition]")
+        terminology.append(
+            (
+                _string(item[0], "terminology.term"),
+                _string(item[1], "terminology.definition"),
+            )
+        )
+    return ReportBrief(
+        audience=_string(value["audience"], "audience"),
+        report_goal=_string(value["report_goal"], "report_goal"),
+        reader_takeaway=_string(value["reader_takeaway"], "reader_takeaway"),
+        narrative_logic=_string(value["narrative_logic"], "narrative_logic"),
+        sections=tuple(sections),
+        terminology=tuple(terminology),
+        intentional_omissions=_optional_strings(value, "intentional_omissions"),
+    )
+
+
+def _blind_issue(value: object) -> BlindBlockingIssue:
+    if not isinstance(value, dict):
+        raise AdapterInputError("blocking_issues entries must be objects")
+    _shape(
+        value,
+        required=frozenset({"problem", "reader_effect", "why_blocking"}),
+        optional=frozenset({"location"}),
+    )
+    return BlindBlockingIssue(
+        problem=_string(value["problem"], "problem"),
+        reader_effect=_string(value["reader_effect"], "reader_effect"),
+        why_blocking=_string(value["why_blocking"], "why_blocking"),
+        location=_optional_string(value.get("location"), "location"),
+    )
+
+
+def _blind_read(value: Mapping[str, object]) -> BlindReadResult:
+    _shape(
+        value,
+        required=frozenset(
+            {
+                "core_understanding",
+                "domain_model",
+                "comparison_coordinates",
+                "reverse_outline",
+                "manuscript_digest",
+            }
+        ),
+        optional=frozenset({"blocking_issues"}),
+    )
+    raw_issues = value.get("blocking_issues", [])
+    if not isinstance(raw_issues, list):
+        raise AdapterInputError("blocking_issues must be an array")
+    return BlindReadResult(
+        core_understanding=_string(value["core_understanding"], "core_understanding"),
+        domain_model=_string(value["domain_model"], "domain_model"),
+        comparison_coordinates=_string(
+            value["comparison_coordinates"], "comparison_coordinates"
+        ),
+        reverse_outline=_string(value["reverse_outline"], "reverse_outline"),
+        manuscript_digest=_string(value["manuscript_digest"], "manuscript_digest"),
+        blocking_issues=tuple(_blind_issue(item) for item in raw_issues),
+    )
+
+
+def _blocking_issue(value: object) -> BlockingIssue:
+    if not isinstance(value, dict):
+        raise AdapterInputError("blocking_issues entries must be objects")
+    _shape(
+        value,
+        required=frozenset(
+            {"problem", "reader_effect", "why_blocking", "repair_target"}
+        ),
+        optional=frozenset({"location", "brief_ref", "suggested_repair_direction"}),
+    )
+    try:
+        target = RepairTarget(_string(value["repair_target"], "repair_target"))
+    except ValueError as exc:
+        raise AdapterInputError("repair_target is invalid") from exc
+    return BlockingIssue(
+        problem=_string(value["problem"], "problem"),
+        reader_effect=_string(value["reader_effect"], "reader_effect"),
+        why_blocking=_string(value["why_blocking"], "why_blocking"),
+        repair_target=target,
+        location=_optional_string(value.get("location"), "location"),
+        brief_ref=_optional_string(value.get("brief_ref"), "brief_ref"),
+        suggested_repair_direction=_optional_string(
+            value.get("suggested_repair_direction"), "suggested_repair_direction"
+        ),
+    )
+
+
+def _report_review(value: Mapping[str, object]) -> ReportReviewResult:
+    _shape(
+        value,
+        required=frozenset({"blind_read_digest", "brief_digest", "manuscript_digest"}),
+        optional=frozenset({"blocking_issues"}),
+    )
+    raw_issues = value.get("blocking_issues", [])
+    if not isinstance(raw_issues, list):
+        raise AdapterInputError("blocking_issues must be an array")
+    return ReportReviewResult(
+        blind_read_digest=_string(value["blind_read_digest"], "blind_read_digest"),
+        brief_digest=_string(value["brief_digest"], "brief_digest"),
+        manuscript_digest=_string(value["manuscript_digest"], "manuscript_digest"),
+        blocking_issues=tuple(_blocking_issue(item) for item in raw_issues),
+    )
+
+
+def _integrity_review(value: Mapping[str, object]) -> ResearchIntegrityReview:
+    _shape(
+        value,
+        required=frozenset({"disposition", "issues"}),
+        optional=frozenset({"revise_target"}),
+    )
+    try:
+        disposition = IntegrityDisposition(_string(value["disposition"], "disposition"))
+        raw_target = value.get("revise_target")
+        target = (
+            RepairTarget(_string(raw_target, "revise_target"))
+            if raw_target is not None
+            else None
+        )
+    except ValueError as exc:
+        raise AdapterInputError(
+            "integrity disposition or revise_target is invalid"
+        ) from exc
+    return ResearchIntegrityReview(
+        disposition=disposition,
+        issues=_strings(value["issues"], "issues"),
+        revise_target=target,
+    )
+
+
 def _add_run_revision(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--expected-revision", required=True, type=int)
@@ -513,13 +726,22 @@ def _parser() -> argparse.ArgumentParser:
     _add_run_revision(submit)
     submit.add_argument("--input", required=True)
 
-    render = commands.add_parser("render-report")
-    render.add_argument("--run-id", required=True)
-    render.add_argument("--input", required=True)
+    for name in (
+        "put-report-brief",
+        "put-report-manuscript",
+        "submit-blind-review",
+        "submit-reader-review",
+        "submit-integrity-review",
+    ):
+        item = commands.add_parser(name)
+        item.add_argument("--run-id", required=True)
+        item.add_argument("--input", required=True)
 
-    publish = commands.add_parser("publish-report")
+    render = commands.add_parser("render-certified-report")
+    render.add_argument("--run-id", required=True)
+
+    publish = commands.add_parser("publish-certified-report")
     _add_run_revision(publish)
-    publish.add_argument("--input", required=True)
 
     validate = commands.add_parser("validate-delivery")
     validate.add_argument("--run-id", required=True)
@@ -777,6 +999,7 @@ def _completion_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> o
 
 def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> object:
     delivery = runtime.delivery
+    certified = runtime.certified_report_delivery
     if args.command == "delivery-view":
         return delivery.view(args.run_id)
     if args.command == "delivery-inspect":
@@ -788,21 +1011,28 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
             args.paper_ref,
             _locator_args(args),
         )
-    if args.command == "render-report":
-        manuscript = _manuscript(_load_input(args.input))
-        return {
-            "content": DeterministicCitationRenderer().render(
-                delivery.view(args.run_id), manuscript
-            )
-        }
-    if args.command == "publish-report":
-        value = _load_input(args.input)
-        _shape(value, required=frozenset({"content"}))
-        return delivery.publish_report(
-            args.run_id,
-            args.expected_revision,
-            _string(value["content"], "content"),
+    if args.command == "put-report-brief":
+        return certified.put_brief(args.run_id, _report_brief(_load_input(args.input)))
+    if args.command == "put-report-manuscript":
+        return certified.put_manuscript(
+            args.run_id, _manuscript(_load_input(args.input))
         )
+    if args.command == "submit-blind-review":
+        return certified.submit_blind_read(
+            args.run_id, _blind_read(_load_input(args.input))
+        )
+    if args.command == "submit-reader-review":
+        return certified.submit_reader_review(
+            args.run_id, _report_review(_load_input(args.input))
+        )
+    if args.command == "submit-integrity-review":
+        return certified.submit_integrity_review(
+            args.run_id, _integrity_review(_load_input(args.input))
+        )
+    if args.command == "render-certified-report":
+        return certified.render_certified(args.run_id)
+    if args.command == "publish-certified-report":
+        return certified.publish_certified(args.run_id, args.expected_revision)
     if args.command == "validate-delivery":
         return delivery.validate_delivery(args.run_id)
     if args.command == "reopen-research":
@@ -849,9 +1079,7 @@ def _wiki_page_draft(value: object) -> WikiPageDraft:
         slug=_string(value["slug"], "slug"),
         title=_string(value["title"], "title"),
         markdown=_string(value["markdown"], "markdown"),
-        contributing_refs=tuple(
-            _wiki_provenance_ref(item) for item in raw_refs
-        ),
+        contributing_refs=tuple(_wiki_provenance_ref(item) for item in raw_refs),
     )
 
 
@@ -921,8 +1149,13 @@ _DELIVERY_COMMANDS = {
     "delivery-view",
     "delivery-inspect",
     "delivery-read-source",
-    "render-report",
-    "publish-report",
+    "put-report-brief",
+    "put-report-manuscript",
+    "submit-blind-review",
+    "submit-reader-review",
+    "submit-integrity-review",
+    "render-certified-report",
+    "publish-certified-report",
     "validate-delivery",
     "reopen-research",
     "close-run",
@@ -952,10 +1185,7 @@ def _configure_token() -> dict[str, object]:
 
     import getpass
 
-    from my_search_harness.runtime.credentials import (
-        deepxiv_token_file,
-        store_deepxiv_token,
-    )
+    from my_search_harness.runtime.credentials import store_deepxiv_token
 
     prompt = "DeepXiv token: "
     token = getpass.getpass(prompt)

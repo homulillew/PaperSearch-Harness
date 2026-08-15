@@ -44,6 +44,7 @@ from .delivery import (
     DeliveryCommands,
     DeliveryValidationResult,
     PublishReportResult,
+    _ReportPublicationAuthorization,
     ReopenResearchResult,
 )
 from .paper_search import (
@@ -484,13 +485,16 @@ class DeliveryCapabilities:
             locator,
         )
 
-    def publish_report(
+    def _publish_certified_report(
         self,
         run_id: str,
         expected_revision: int,
         content: str,
+        authorization: _ReportPublicationAuthorization,
     ) -> PublishReportResult:
-        return self._commands.publish_report(run_id, expected_revision, content)
+        return self._commands._publish_certified_report(
+            run_id, expected_revision, content, authorization
+        )
 
     def validate_delivery(self, run_id: str) -> DeliveryValidationResult:
         self._require_delivery(run_id)

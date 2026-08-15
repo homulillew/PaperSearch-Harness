@@ -208,19 +208,58 @@ Submission input contains `completion_check_ref`, `verdict`, `reasons`, and opti
 delivery-view --run-id RUN
 delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
-render-report --run-id RUN --input FILE
-publish-report --run-id RUN --expected-revision REV --input FILE
+put-report-brief --run-id RUN --input FILE
+put-report-manuscript --run-id RUN --input FILE
+submit-blind-review --run-id RUN --input FILE
+submit-reader-review --run-id RUN --input FILE
+submit-integrity-review --run-id RUN --input FILE
+render-certified-report --run-id RUN
+publish-certified-report --run-id RUN --expected-revision REV
 validate-delivery --run-id RUN
 reopen-research --run-id RUN --expected-revision REV
 close-run --run-id RUN --expected-revision REV
 ```
 
-`render-report` input contains `markdown` and `citations`. Markdown uses tokens such as
-`{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and optional
-`locator`. The deterministic renderer validates references and adds the bibliography.
+These staged commands are the only supported production path for a formal `REPORT`
+artifact. The former direct `render-report` / `publish-report` commands are not exposed:
+arbitrary text cannot cross the artifact boundary without matching current Reader and
+Integrity certifications.
 
-`publish-report` input contains a non-empty `content` string. It calls the Delivery
-capability and never writes the artifact store directly. Validate before closing.
+`put-report-brief` accepts the ADR-012 Brief shape. Python validates Requirement and
+Research ref namespaces independently; a material `source_ref` must name a retained
+paper, and a material `locator` requires `source_ref`. Accepting a new Brief binds it to
+the current `DeliveryBasis` and invalidates all downstream work.
+
+`put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
+tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
+optional `locator`. A new manuscript invalidates Blind, Reader, Integrity, and render
+results.
+
+`submit-blind-review` accepts `core_understanding`, `domain_model`,
+`comparison_coordinates`, `reverse_outline`, `manuscript_digest`, and optional
+`blocking_issues`. Each Blind issue has `problem`, `reader_effect`, `why_blocking`, and
+optional `location`; it has no repair target. Python freezes the complete result and
+returns `blind_read_digest`.
+
+`submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
+current `manuscript_digest`, and Phase 2 `blocking_issues`. Each Phase 2 issue adds a
+`repair_target` (`MANUSCRIPT`, `BRIEF`, or `POSSIBLE_RESEARCH_ISSUE`). A mismatched Blind
+digest is rejected. `POSSIBLE_RESEARCH_ISSUE` returns a confirmation-required result and
+does not change lifecycle; an actor with Research Authority must explicitly call
+`reopen-research` after confirmation.
+
+`submit-integrity-review` accepts `disposition`, `issues`, and optional `revise_target`.
+It requires a matching current Reader PASS. `PASS` creates the version-bound Integrity
+certification; `REVISE_DELIVERY` requires a `MANUSCRIPT` or `BRIEF` target;
+`REOPEN_RESEARCH` confirms insufficiency but lifecycle transition remains the explicit
+`reopen-research` command.
+
+`render-certified-report` revalidates the current DeliveryBasis, Brief, Manuscript,
+Reader PASS, and Integrity PASS before running the deterministic citation renderer.
+`publish-certified-report` revalidates those dependencies and the rendered content at
+the artifact boundary. Delivery session data and captures live under
+`workspace/scratch/<run_id>/`; they are observable, removable work products and never
+enter `state.json` or `ArtifactKind`. Validate the published artifact before closing.
 
 ## Wiki projection and publication
 

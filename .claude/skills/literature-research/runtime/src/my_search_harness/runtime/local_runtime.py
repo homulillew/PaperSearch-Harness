@@ -13,12 +13,14 @@ from .capabilities import (
     build_runtime_capabilities,
 )
 from .citations import DeterministicCitationRenderer
+from .certified_delivery import CertifiedReportDelivery
 from .completion_runtime import CompletionCheckRuntime
 from .context import ContextLimits
 from .deepxiv import DeepXivPaperSearchProvider, DeepXivSourceAccessProvider
 from .paper_search import PaperSearchProvider
 from .persistence import JsonResearchRunRepository
 from .reporting import (
+    LocalReportCaptureSink,
     ReportConstructor,
     ReportPipeline,
     ReportReviewerFactory,
@@ -66,6 +68,7 @@ class LocalV1Runtime:
         audit_sink: AuditSink | None = None,
     ) -> None:
         root = Path(workspace_root)
+        self._workspace_root = root
         repository = JsonResearchRunRepository(root / "runs")
         artifacts = LocalArtifactStore(repository.root)
         capabilities = build_runtime_capabilities(
@@ -80,6 +83,7 @@ class LocalV1Runtime:
         self._researcher = capabilities.researcher
         self._completion_checker = capabilities.completion_checker
         self._delivery = capabilities.delivery
+        self._certified_report_delivery = CertifiedReportDelivery(root, self._delivery)
         self._completion = CompletionCheckRuntime.from_capabilities(capabilities)
         self._wiki = WikiService(
             WikiProjectionService(self._repository),
@@ -115,6 +119,12 @@ class LocalV1Runtime:
     @property
     def delivery(self) -> DeliveryCapabilities:
         return self._delivery
+
+    @property
+    def certified_report_delivery(self) -> CertifiedReportDelivery:
+        """The only supported production path for formal REPORT publication."""
+
+        return self._certified_report_delivery
 
     @property
     def completion(self) -> CompletionCheckRuntime:
@@ -158,4 +168,5 @@ class LocalV1Runtime:
             writing_guide=load_report_writing_guide(writing_guide_path),
             review_guide=_read_guide(review_guide_path),
             integrity_guide=_read_guide(integrity_guide_path),
+            capture_sink=LocalReportCaptureSink(self._workspace_root / "scratch"),
         )

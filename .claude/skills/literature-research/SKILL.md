@@ -447,8 +447,9 @@ Report Constructor → Report Brief
 → Report Reviewer (fresh instance, two-phase cold reading)
    Phase 1 Blind Read: deliverable + audience + quality standard + review guide
                        + manuscript — NO Brief, NO Writing Guide
-   → frozen BlindReadResult (bound to manuscript_digest)
-   Phase 2 Brief Check: frozen blind result + Brief + manuscript + review guide
+   → frozen BlindReadResult (understanding + cognitive structure + reader failures,
+                             bound to manuscript_digest; no repair targets)
+   Phase 2 Brief Check: frozen blind_read_digest + Brief + manuscript + review guide
    → ReviewResult{blocking_issues}
    ├─ blocking_issues → earliest repair layer (most-upstream fault wins):
    │     MANUSCRIPT → Reviser → new manuscript → fresh Reader again
@@ -457,7 +458,7 @@ Report Constructor → Report Brief
    └─ blocking_issues == () → Reader PASS (brief_digest + manuscript_digest)
 → Research Integrity Reviewer (independent of the Reader Gate)
    → IntegrityReview{PASS | REVISE_DELIVERY(target=MANUSCRIPT|BRIEF) | REOPEN_RESEARCH}
-   ├─ PASS → deterministic citation renderer → publish-report
+   ├─ PASS → deterministic citation renderer → certified publication
    ├─ REVISE_DELIVERY → route to earliest faulty layer → Reader again → Integrity again
    └─ REOPEN_RESEARCH → reopen-research → return to the research loop
 → validate-delivery → close-run
@@ -469,8 +470,25 @@ confirm "you fixed what I asked." Phase 1 is frozen before Phase 2 sees the
 Brief; Phase 2 must not rewrite or reinterpret the blind read. Blocking
 issues are root-cause consolidated — one issue per cognitive root cause, no
 score, no severity rank. The pipeline routes by precedence
-(RESEARCH > BRIEF > MANUSCRIPT); Python routes, it does not rank "which
+(POSSIBLE_RESEARCH_ISSUE > BRIEF > MANUSCRIPT); Python routes, it does not rank "which
 problem is worse."
+
+Use the production staged commands in this order:
+
+```text
+put-report-brief
+→ put-report-manuscript
+→ submit-blind-review
+→ submit-reader-review
+→ submit-integrity-review
+→ render-certified-report
+→ publish-certified-report
+```
+
+Claude supplies the semantic values; the Harness persists their ephemeral Delivery
+session under workspace scratch and enforces order, Blind freezing, digest binding,
+freshness, and publication authority. There is no direct manuscript-to-publication
+command. Never treat the scratch session or captures as Research truth.
 
 Reader PASS certifies a specific `(brief_digest, manuscript_digest)` pair;
 Integrity PASS certifies `(delivery_basis, brief_digest, manuscript_digest)`.
@@ -512,8 +530,10 @@ boundaries separate.
 Delivery can restore detail density and cognitive continuity, but it cannot
 expand the accepted semantic scope: no new consensus, no stronger
 generalization, no new approach relationship, no new Open Problem, no
-contract-facing judgment. If a stage needs any of those, escalate via
-`reopen-research` and return to the research loop — do not manufacture it in
+contract-facing judgment. If a stage needs any of those, request confirmation from an
+actor with Research Authority. A Reader's `POSSIBLE_RESEARCH_ISSUE` result does not
+reopen Research. Only after confirmation may that actor explicitly call
+`reopen-research` and return to the research loop; do not manufacture the judgment in
 Delivery.
 
 When a retained primary paper has a canonical URL, hyperlink the first formal occurrence
@@ -524,8 +544,9 @@ Paragraph rhythm, natural Chinese, terminology, title density, and appropriate t
 are semantic editorial criteria. Do not ask the Harness to encode them as structural
 validators. Preserve experimental conditions and qualifications while improving prose.
 
-Use `render-report` to resolve structured citation tokens deterministically, then pass
-the rendered content to `publish-report`. Only close after `validate-delivery` succeeds.
+Use `render-certified-report` only after matching Reader and Integrity PASS, then call
+`publish-certified-report`. Both commands revalidate the current version bindings;
+neither accepts arbitrary report content. Only close after `validate-delivery` succeeds.
 
 ## Wiki orchestration after closure
 

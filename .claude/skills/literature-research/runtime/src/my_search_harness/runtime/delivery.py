@@ -31,6 +31,25 @@ class PublishReportResult:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
+class _ReportPublicationAuthorization:
+    """Version-bound proof required to create the formal REPORT artifact.
+
+    This is a runtime capability input, not Research state.  It deliberately
+    repeats the certified dependency edges so the artifact boundary can reject
+    a fabricated mix of individually plausible but non-matching gate results.
+    """
+
+    delivery_basis: DeliveryBasis
+    brief_digest: str
+    manuscript_digest: str
+    reader_brief_digest: str
+    reader_manuscript_digest: str
+    integrity_delivery_basis: DeliveryBasis
+    integrity_brief_digest: str
+    integrity_manuscript_digest: str
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
 class DeliveryValidationResult:
     delivery_basis: DeliveryBasis | None
     validated_artifacts: frozenset[ArtifactKind]
@@ -60,19 +79,49 @@ class DeliveryCommands:
         self._artifact_store = artifact_store
         self._audit_sink = audit_sink
 
-    def publish_report(
+    def _publish_certified_report(
         self,
         run_id: str,
         expected_revision: int,
         content: str,
+        authorization: _ReportPublicationAuthorization,
     ) -> PublishReportResult:
         run = self._load_expected(run_id, expected_revision)
-        self._require_lifecycle(run, LifecycleMode.DELIVERY, "publish_report")
+        self._require_lifecycle(run, LifecycleMode.DELIVERY, "publish_certified_report")
         if run.delivery_basis is None:
-            raise CommandRejectedError("publish_report requires a delivery basis")
+            raise CommandRejectedError(
+                "publish_certified_report requires a delivery basis"
+            )
         if not isinstance(content, str) or not content.strip():
             raise CommandRejectedError(
-                "publish_report content must be a non-empty string"
+                "publish_certified_report content must be a non-empty string"
+            )
+        if not isinstance(authorization, _ReportPublicationAuthorization):
+            raise CommandRejectedError(
+                "formal REPORT publication requires version-bound certification"
+            )
+        if authorization.delivery_basis != run.delivery_basis:
+            raise CommandRejectedError(
+                "report certification binds a stale DeliveryBasis"
+            )
+        if authorization.integrity_delivery_basis != run.delivery_basis:
+            raise CommandRejectedError(
+                "integrity certification binds a stale DeliveryBasis"
+            )
+        if (
+            authorization.reader_brief_digest != authorization.brief_digest
+            or authorization.reader_manuscript_digest != authorization.manuscript_digest
+        ):
+            raise CommandRejectedError(
+                "Reader PASS does not match the current Brief and Manuscript"
+            )
+        if (
+            authorization.integrity_brief_digest != authorization.brief_digest
+            or authorization.integrity_manuscript_digest
+            != authorization.manuscript_digest
+        ):
+            raise CommandRejectedError(
+                "Integrity PASS does not match the current Brief and Manuscript"
             )
 
         artifact = self._artifact_store.write_report(
