@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -134,6 +135,7 @@ class ReportBriefSection:
     purpose: str
     reader_takeaway: str
     argument_flow: str
+    outline_depth: int
     requirement_refs: tuple[str, ...] = ()
     research_refs: tuple[str, ...] = ()
     material: tuple[BriefMaterial, ...] = ()
@@ -297,6 +299,71 @@ def brief_digest(brief: ReportBrief) -> str:
     """A canonical digest of the Report Brief's semantic content."""
 
     return _digest(_canonical(brief))
+
+
+_ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+|$)")
+_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(?:[^\r\n]*)$")
+
+
+def brief_outline_signature(brief: ReportBrief) -> tuple[int, ...]:
+    """Return the Constructor-owned reader-visible section depths."""
+
+    if not isinstance(brief, ReportBrief):
+        raise ReportPipelineError("outline signature requires a ReportBrief")
+    return tuple(section.outline_depth for section in brief.sections)
+
+
+def manuscript_outline_signature(manuscript: ReportManuscript) -> tuple[int, ...]:
+    """Extract H2+ ATX heading depths while ignoring fenced code and H1."""
+
+    if not isinstance(manuscript, ReportManuscript):
+        raise ReportPipelineError("outline signature requires a ReportManuscript")
+    if not isinstance(manuscript.markdown, str):
+        raise ReportPipelineError("ReportManuscript markdown must be text")
+
+    depths: list[int] = []
+    fence_character: str | None = None
+    fence_length = 0
+    for line in manuscript.markdown.splitlines():
+        if fence_character is not None:
+            close = re.match(
+                rf"^ {{0,3}}{re.escape(fence_character)}{{{fence_length},}}[ \t]*$",
+                line,
+            )
+            if close is not None:
+                fence_character = None
+                fence_length = 0
+            continue
+
+        fence = _FENCE_OPEN.match(line)
+        if fence is not None:
+            marker = fence.group(1)
+            fence_character = marker[0]
+            fence_length = len(marker)
+            continue
+
+        heading = _ATX_HEADING.match(line)
+        if heading is None:
+            continue
+        level = len(heading.group(1))
+        if level >= 2:
+            depths.append(level - 2)
+    return tuple(depths)
+
+
+def validate_outline_fidelity(
+    brief: ReportBrief,
+    manuscript: ReportManuscript,
+) -> None:
+    """Reject a manuscript that does not realize the Brief heading hierarchy."""
+
+    expected = brief_outline_signature(brief)
+    actual = manuscript_outline_signature(manuscript)
+    if actual != expected:
+        raise ReportPipelineError(
+            "ReportManuscript visible outline does not match ReportBrief: "
+            f"expected {expected!r}, got {actual!r}"
+        )
 
 
 def delivery_basis_key(basis: DeliveryBasis) -> str:
@@ -488,9 +555,10 @@ class LocalReportCaptureSink:
 class ReportConstructor(Protocol):
     """Construct the Report Brief: select, expand, organize, omit.
 
-    Reads Research Contract, Delivery View, Delivery Basis, and the Report
-    Quality Standard. Does NOT read the Report Writing Guide (language is not
-    its job). May targeted inspect/read source to recover explanatory detail,
+    Reads Research Contract, Delivery View, Delivery Basis, the shared Report
+    Quality Standard, and the Report Construction Guide. Does NOT read the
+    Report Writing Guide (language is not its job). May targeted inspect/read
+    source to recover explanatory detail,
     but must not produce new consensus, stronger generalization, new approach
     relationships, or contract-facing research judgments — those require
     reopening RESEARCH via ``ResearchEscalationRequired``.
@@ -500,6 +568,7 @@ class ReportConstructor(Protocol):
         self,
         view: DeliveryView,
         quality_standard: str,
+        construction_guide: str,
         evidence: DeliveryEvidenceAccess,
     ) -> ReportBrief: ...
 
@@ -690,6 +759,7 @@ class ReportPipeline:
         integrity_reviewer: ResearchIntegrityReviewer,
         citation_renderer: ReportCitationRenderer,
         quality_standard: str,
+        construction_guide: str,
         writing_guide: str,
         review_guide: str,
         integrity_guide: str,
@@ -699,7 +769,11 @@ class ReportPipeline:
         max_integrity_rounds: int = _DEFAULT_MAX_INTEGRITY_ROUNDS,
     ) -> None:
         self._validate_guides(
-            quality_standard, writing_guide, review_guide, integrity_guide
+            quality_standard,
+            construction_guide,
+            writing_guide,
+            review_guide,
+            integrity_guide,
         )
         for name, value in (
             ("max_constructor_rebuilds", max_constructor_rebuilds),
@@ -716,6 +790,7 @@ class ReportPipeline:
         self._integrity_reviewer = integrity_reviewer
         self._citation_renderer = citation_renderer
         self._quality_standard = quality_standard
+        self._construction_guide = construction_guide
         self._writing_guide = writing_guide
         self._review_guide = review_guide
         self._integrity_guide = integrity_guide
@@ -801,7 +876,12 @@ class ReportPipeline:
         view: DeliveryView,
         evidence: DeliveryEvidenceAccess,
     ) -> ReportBrief:
-        brief = self._constructor.construct(view, self._quality_standard, evidence)
+        brief = self._constructor.construct(
+            view,
+            self._quality_standard,
+            self._construction_guide,
+            evidence,
+        )
         self._validate_brief(view, brief)
         return brief
 
@@ -878,6 +958,7 @@ class ReportPipeline:
                 citation_metadata=self._current_citation_metadata(),
             )
             self._validate_manuscript(current)
+            validate_outline_fidelity(brief, current)
             if manuscript_digest(current) == rejected_manuscript_digest:
                 raise ReportPipelineError(
                     "Manuscript repair must produce a new Manuscript version"
@@ -896,6 +977,7 @@ class ReportPipeline:
         citation_meta = self._current_citation_metadata()
         manuscript = self._writer.write(brief, self._writing_guide, citation_meta)
         self._validate_manuscript(manuscript)
+        validate_outline_fidelity(brief, manuscript)
         return manuscript
 
     def _current_citation_metadata(self) -> CitationMetadata:
@@ -1046,6 +1128,7 @@ class ReportPipeline:
             citation_metadata=self._current_citation_metadata(),
         )
         self._validate_manuscript(revised)
+        validate_outline_fidelity(brief, revised)
         if manuscript_digest(revised) == manuscript_digest(manuscript):
             raise ReportPipelineError(
                 "Integrity Manuscript repair must produce a new Manuscript version"
@@ -1146,12 +1229,14 @@ class ReportPipeline:
     @staticmethod
     def _validate_guides(
         quality_standard: str,
+        construction_guide: str,
         writing_guide: str,
         review_guide: str,
         integrity_guide: str,
     ) -> None:
         for name, value in (
             ("quality_standard", quality_standard),
+            ("construction_guide", construction_guide),
             ("writing_guide", writing_guide),
             ("review_guide", review_guide),
             ("integrity_guide", integrity_guide),
@@ -1184,9 +1269,12 @@ class ReportPipeline:
                 "ReportBrief requires audience, report_goal, reader_takeaway, "
                 "narrative_logic, and sections"
             )
+        if not isinstance(brief.sections, tuple):
+            raise ReportPipelineError("ReportBrief sections must be a tuple")
         research_refs = ReportPipeline._research_refs(view)
         requirement_refs = {r.ref for r in view.contract.requirements}
         paper_refs = {paper.ref for paper in view.papers}
+        previous_depth: int | None = None
         for section in brief.sections:
             if not isinstance(section, ReportBriefSection):
                 raise ReportPipelineError("ReportBrief contains an invalid section")
@@ -1200,6 +1288,20 @@ class ReportPipeline:
                     "ReportBriefSection requires title, purpose, "
                     "reader_takeaway, and argument_flow"
                 )
+            depth = section.outline_depth
+            if not isinstance(depth, int) or isinstance(depth, bool) or depth < 0:
+                raise ReportPipelineError(
+                    "ReportBriefSection outline_depth must be a non-negative int"
+                )
+            if previous_depth is None and depth != 0:
+                raise ReportPipelineError(
+                    "the first ReportBriefSection outline_depth must be 0"
+                )
+            if previous_depth is not None and depth > previous_depth + 1:
+                raise ReportPipelineError(
+                    "ReportBriefSection outline_depth cannot skip a level"
+                )
+            previous_depth = depth
             for ref_list, label in (
                 (section.requirement_refs, "requirement_refs"),
                 (section.research_refs, "research_refs"),

@@ -329,6 +329,13 @@ def _integer(value: object, name: str) -> int:
     return result
 
 
+def _non_negative_integer(value: object, name: str) -> int:
+    result = _integer(value, name)
+    if result < 0:
+        raise AdapterInputError(f"{name} must be non-negative")
+    return result
+
+
 def _optional_float(value: object, name: str) -> float | None:
     if value is None:
         return None
@@ -458,7 +465,13 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
         _shape(
             raw,
             required=frozenset(
-                {"title", "purpose", "reader_takeaway", "argument_flow"}
+                {
+                    "title",
+                    "purpose",
+                    "reader_takeaway",
+                    "argument_flow",
+                    "outline_depth",
+                }
             ),
             optional=frozenset(
                 {"requirement_refs", "research_refs", "material", "evidence_boundary"}
@@ -475,6 +488,9 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
                     raw["reader_takeaway"], "section.reader_takeaway"
                 ),
                 argument_flow=_string(raw["argument_flow"], "section.argument_flow"),
+                outline_depth=_non_negative_integer(
+                    raw["outline_depth"], "section.outline_depth"
+                ),
                 requirement_refs=_optional_strings(raw, "requirement_refs"),
                 research_refs=_optional_strings(raw, "research_refs"),
                 material=tuple(_brief_material(item) for item in raw_material),
@@ -739,6 +755,9 @@ def _parser() -> argparse.ArgumentParser:
 
     render = commands.add_parser("render-certified-report")
     render.add_argument("--run-id", required=True)
+
+    reader_preview = commands.add_parser("render-reader-preview")
+    reader_preview.add_argument("--run-id", required=True)
 
     publish = commands.add_parser("publish-certified-report")
     _add_run_revision(publish)
@@ -1029,6 +1048,8 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
         return certified.submit_integrity_review(
             args.run_id, _integrity_review(_load_input(args.input))
         )
+    if args.command == "render-reader-preview":
+        return certified.render_reader_preview(args.run_id)
     if args.command == "render-certified-report":
         return certified.render_certified(args.run_id)
     if args.command == "publish-certified-report":
@@ -1154,6 +1175,7 @@ _DELIVERY_COMMANDS = {
     "submit-blind-review",
     "submit-reader-review",
     "submit-integrity-review",
+    "render-reader-preview",
     "render-certified-report",
     "publish-certified-report",
     "validate-delivery",

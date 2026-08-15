@@ -44,8 +44,14 @@ Read only the supporting material needed for the current stage:
   handling, and error behavior.
 - [Completion guide](references/COMPLETION_GUIDE.md): the independent completion
   boundary and PASS / CONTINUE / UNCERTAIN criteria.
+- [Report quality standard](references/REPORT_QUALITY_STANDARD.md): the shared final
+  quality target for the Constructor and Reader.
+- [Report construction guide](references/REPORT_CONSTRUCTION_GUIDE.md): the
+  Constructor's authority for cognitive grouping and reader-visible hierarchy.
 - [Report writing guide](references/REPORT_WRITING_GUIDE.md): the authoritative style
-  and editorial standard used by all semantic writing stages.
+  and realization rules used by the Writer and Reviser.
+- [Report review guide](references/REPORT_REVIEW_GUIDE.md): the two-phase Reader Gate,
+  including visible-outline scanning and fault attribution.
 - [Research integrity guide](references/RESEARCH_INTEGRITY_GUIDE.md): evidence-strength,
   benchmark, comparison, causality, recency, and high-risk claim checks used by the
   independent Research Integrity Reviewer.
@@ -424,23 +430,35 @@ authorizes complete Delivery.
 ## Deliver a report
 
 In DELIVERY, build the report from a fresh `delivery-view` and targeted
-inspections. Load the four authority documents separately — each drives a
+inspections. Load the five authority documents separately — each drives a
 different role and must not be handed to a role it does not govern:
 
 ```text
-${CLAUDE_SKILL_DIR}/references/REPORT_QUALITY_STANDARD.md   → Report Constructor
-${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md       → Report Writer / Reviser
-${CLAUDE_SKILL_DIR}/references/REPORT_REVIEW_GUIDE.md        → Report Reviewer (Reader Gate)
-${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md   → Research Integrity Reviewer
+${CLAUDE_SKILL_DIR}/references/REPORT_QUALITY_STANDARD.md      → Constructor + Reader shared quality target
+${CLAUDE_SKILL_DIR}/references/REPORT_CONSTRUCTION_GUIDE.md   → Report Constructor
+${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md        → Report Writer / Reviser
+${CLAUDE_SKILL_DIR}/references/REPORT_REVIEW_GUIDE.md         → Report Reviewer (Reader Gate)
+${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md    → Research Integrity Reviewer
 ```
 
 The Report Brief is the single report-semantic middle layer: it selects,
 expands, organizes, and omits from accepted Research State for a target
 audience. It is a Delivery work product, not a Research Domain entity — it is
 never stored in the run, has no stable identity, and no `ArtifactKind`. The
-Constructor reads the Quality Standard (not the Writing Guide); the Writer
-reads the Writing Guide (not the Quality Standard). Keep these inputs
-separated by role.
+Constructor reads the Quality Standard and Construction Guide (not the Writing
+Guide); the Writer reads the Writing Guide (not the Quality Standard). Keep
+these inputs separated by role. The Contract determines what the report must
+answer; the Brief determines how those answers are organized. Do not turn a
+content requirement such as coverage of major approaches into a chapter layout
+unless the user explicitly requested that layout.
+
+Every `ReportBriefSection` must carry an explicit non-negative `outline_depth`.
+Depth 0 maps to Markdown H2, depth 1 to H3, and so on; H1 is the report title
+and is not a Brief section. The first section must be depth 0 and adjacent
+sections may descend by at most one level. Constructor decides this ordered
+hierarchy. Writer may improve heading wording but must preserve section count,
+order, depth, and parent-child ownership. If the hierarchy itself is not
+workable, return `BriefInsufficient` to Constructor.
 
 The semantic stages are an Action loop, not a Report FSM — no new lifecycle
 mode is introduced, everything runs inside DELIVERY:
@@ -448,6 +466,8 @@ mode is introduced, everything runs inside DELIVERY:
 ```text
 Report Constructor → Report Brief
 → Report Writer → Manuscript
+→ deterministic outline-fidelity check
+→ deterministic reader citation preview
 → Report Reviewer (fresh instance, two-phase cold reading)
    Phase 1 Blind Read: deliverable + audience + quality standard + review guide
                        + manuscript — NO Brief, NO Writing Guide
@@ -490,6 +510,7 @@ Use the production staged commands in this order:
 ```text
 put-report-brief
 → put-report-manuscript
+→ render-reader-preview
 → submit-blind-review
 → submit-reader-review
 → submit-integrity-review
@@ -503,6 +524,11 @@ Blind freezing, digest binding, repair obligations, freshness, and publication
 authority. Non-authoritative captures remain under
 `scratch/<run_id>/captures/report/`. There is no direct manuscript-to-publication
 command. Never treat the delivery session as Research truth or edit it by hand.
+`render-reader-preview` is a read-only, deterministic projection of the current
+Manuscript: it replaces internal citation tokens with compact reader citations,
+does not persist a new artifact or create certification authority, and returns
+the source `manuscript_digest`. Give this projection—not the raw tokenized
+Manuscript—to the fresh Reader. Reader PASS remains bound to that source digest.
 
 Reader PASS certifies a specific `(brief_digest, manuscript_digest)` pair;
 Integrity PASS certifies `(delivery_basis, brief_digest, manuscript_digest)`.

@@ -46,6 +46,7 @@ from .reporting import (
     validate_report_brief,
     validate_report_manuscript,
     validate_report_review,
+    validate_outline_fidelity,
 )
 
 
@@ -85,10 +86,23 @@ class CertifiedReportRenderResult:
     manuscript_digest: str
 
 
+@dataclass(slots=True, frozen=True, kw_only=True)
+class ReaderPreviewResult:
+    """Read-only citation projection bound to the source work-product versions."""
+
+    content: str
+    brief_digest: str
+    manuscript_digest: str
+
+
 class CertifiedReportDelivery:
     """Production orchestrator for Claude-driven staged report delivery."""
 
-    _SCHEMA_VERSION = 2
+    _SCHEMA_VERSION = 3
+    _OLDER_SCHEMA_MESSAGE = (
+        "report delivery session uses an older schema and must rebuild "
+        "the Report Brief"
+    )
 
     def __init__(
         self,
@@ -132,8 +146,9 @@ class CertifiedReportDelivery:
     ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
         self._require_action_allowed(session, "put-report-manuscript")
-        self._require_brief(session)
+        brief = self._require_brief(session)
         validate_report_manuscript(manuscript)
+        validate_outline_fidelity(brief, manuscript)
         new_digest = manuscript_digest(manuscript)
         pending = self._pending_action(session)
         if (
@@ -159,6 +174,23 @@ class CertifiedReportDelivery:
         self._save(run_id, session)
         self._captures.capture(run_id, name, manuscript.markdown)
         return self._status(run_id, "MANUSCRIPT_ACCEPTED", session)
+
+    def render_reader_preview(self, run_id: str) -> ReaderPreviewResult:
+        """Render reader-facing citations without persistence or certification."""
+
+        session = self._load_current(run_id)
+        self._require_action_allowed(session, "render-reader-preview")
+        brief = self._require_brief(session)
+        manuscript = self._require_manuscript(session)
+        validate_outline_fidelity(brief, manuscript)
+        content = self._renderer.render(self._delivery.view(run_id), manuscript)
+        if not content.strip():
+            raise CertifiedDeliveryError("citation renderer returned empty preview")
+        return ReaderPreviewResult(
+            content=content,
+            brief_digest=brief_digest(brief),
+            manuscript_digest=manuscript_digest(manuscript),
+        )
 
     def submit_blind_read(
         self, run_id: str, blind: BlindReadResult
@@ -389,7 +421,12 @@ class CertifiedReportDelivery:
     ) -> dict[str, object] | None:
         if not self._session_path(run_id).exists():
             return None
-        session = self._load(run_id)
+        try:
+            session = self._load(run_id)
+        except CertifiedDeliveryError as exc:
+            if str(exc) == self._OLDER_SCHEMA_MESSAGE:
+                return None
+            raise
         if session.get("delivery_basis_key") != current_basis_key:
             return None
         return session
@@ -406,6 +443,8 @@ class CertifiedReportDelivery:
             raise CertifiedDeliveryError(
                 "report delivery session is unreadable"
             ) from exc
+        if isinstance(value, dict) and value.get("schema_version") == 2:
+            raise CertifiedDeliveryError(self._OLDER_SCHEMA_MESSAGE)
         if (
             not isinstance(value, dict)
             or value.get("schema_version") != self._SCHEMA_VERSION
@@ -646,6 +685,13 @@ def _mapping_string(value: Mapping[str, object], name: str) -> str:
     return item
 
 
+def _mapping_non_negative_int(value: Mapping[str, object], name: str) -> int:
+    item = value.get(name)
+    if not isinstance(item, int) or isinstance(item, bool) or item < 0:
+        raise CertifiedDeliveryError(f"stored {name} is invalid")
+    return item
+
+
 def _optional_mapping_string(value: Mapping[str, object], name: str) -> str | None:
     item = value.get(name)
     if item is None:
@@ -708,6 +754,9 @@ def _brief_from(value: Mapping[str, object]) -> ReportBrief:
                 purpose=_mapping_string(raw_section, "purpose"),
                 reader_takeaway=_mapping_string(raw_section, "reader_takeaway"),
                 argument_flow=_mapping_string(raw_section, "argument_flow"),
+                outline_depth=_mapping_non_negative_int(
+                    raw_section, "outline_depth"
+                ),
                 requirement_refs=_strings_from(
                     raw_section.get("requirement_refs", []), "requirement_refs"
                 ),

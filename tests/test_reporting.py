@@ -1,6 +1,6 @@
-"""ADR-012 Report Brief dual-review-loop — deterministic invariant tests.
+"""Certified Report Brief dual-review-loop deterministic invariant tests.
 
-These tests pin the ADR-012 report pipeline invariants using deterministic fake
+These tests pin the report pipeline invariants using deterministic fake
 protocols / factories. No real LLM, no subprocess, no real persistence. They
 cover the 32 required invariants grouped as:
 
@@ -21,6 +21,7 @@ Run:
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Callable
 
 import pytest
@@ -50,6 +51,7 @@ from my_search_harness.runtime.reporting import (
     BlockingIssue,
     BriefMaterial,
     CitationMetadata,
+    CitationReference,
     IntegrityDisposition,
     IntegrityPass,
     NoopReportCaptureSink,
@@ -65,10 +67,15 @@ from my_search_harness.runtime.reporting import (
     ReportReviewResult,
     ResearchConfirmationRequiredResult,
     ResearchIntegrityReview,
+    brief_outline_signature,
     brief_digest,
     blind_read_digest,
     manuscript_digest,
+    manuscript_outline_signature,
+    validate_outline_fidelity,
+    validate_report_brief,
 )
+from my_search_harness.runtime.citations import DeterministicCitationRenderer
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +249,7 @@ def _valid_brief() -> ReportBrief:
                 purpose="purpose",
                 reader_takeaway="takeaway",
                 argument_flow="flow",
+                outline_depth=0,
                 requirement_refs=("requirement_alpha",),
                 research_refs=("approach_one", "finding_f1", "paper_p1"),
                 material=(
@@ -261,7 +269,20 @@ def _valid_brief() -> ReportBrief:
     )
 
 
-def _manuscript(markdown: str = "# Report\n\nbody {{cite:c1}}") -> ReportManuscript:
+def _brief_with_depths(depths: tuple[int, ...]) -> ReportBrief:
+    section = _valid_brief().sections[0]
+    return replace(
+        _valid_brief(),
+        sections=tuple(
+            replace(section, title=f"Section {index}", outline_depth=depth)
+            for index, depth in enumerate(depths, start=1)
+        ),
+    )
+
+
+def _manuscript(
+    markdown: str = "# Report\n\n## Section 1\n\nbody {{cite:c1}}",
+) -> ReportManuscript:
     return ReportManuscript(
         markdown=markdown,
         citations=(
@@ -277,8 +298,8 @@ class FakeConstructor:
         self.calls: list[tuple] = []
         self._briefs = briefs
 
-    def construct(self, view, quality_standard, evidence):
-        self.calls.append((view, quality_standard))
+    def construct(self, view, quality_standard, construction_guide, evidence):
+        self.calls.append((view, quality_standard, construction_guide))
         if self._briefs is not None:
             return self._briefs.pop(0)
         return _valid_brief()
@@ -382,7 +403,9 @@ class FakeReviser:
         self.calls.append((brief, manuscript, issues, citation_metadata))
         if self._revised is not None:
             return _manuscript(self._revised.pop(0))
-        return _manuscript("# Report\n\nrevised body {{cite:c1}}")
+        return _manuscript(
+            "# Report\n\n## Section 1\n\nrevised body {{cite:c1}}"
+        )
 
 
 class FakeIntegrityReviewer:
@@ -435,6 +458,7 @@ def _build_pipeline(
         ),
         citation_renderer=citation_renderer or FakeCitationRenderer(),
         quality_standard="quality standard text",
+        construction_guide="construction guide text",
         writing_guide="writing guide text",
         review_guide="review guide text",
         integrity_guide="integrity guide text",
@@ -451,6 +475,52 @@ def _build_pipeline(
 
 
 class TestReportBriefValidation:
+    @pytest.mark.parametrize(
+        "depths",
+        [
+            (0,),
+            (0, 0),
+            (0, 1),
+            (0, 1, 2, 1, 0),
+            (0, 1, 2, 3, 2, 0),
+        ],
+    )
+    def test_outline_depth_sequences_accepted(self, depths):
+        brief = _brief_with_depths(depths)
+        validate_report_brief(_make_view(), brief)
+        assert brief_outline_signature(brief) == depths
+
+    @pytest.mark.parametrize(
+        "depths, message",
+        [
+            ((), "sections"),
+            ((1,), "must be 0"),
+            ((-1,), "non-negative int"),
+            ((False,), "non-negative int"),
+            (("0",), "non-negative int"),
+            ((0, 2), "cannot skip"),
+            ((0, 1, 3), "cannot skip"),
+        ],
+    )
+    def test_outline_depth_sequences_rejected(self, depths, message):
+        brief = _brief_with_depths(depths)
+        with pytest.raises(ReportPipelineError, match=message):
+            validate_report_brief(_make_view(), brief)
+
+    def test_outline_depth_is_required(self):
+        with pytest.raises(TypeError, match="outline_depth"):
+            ReportBriefSection(
+                title="section",
+                purpose="purpose",
+                reader_takeaway="takeaway",
+                argument_flow="flow",
+            )
+
+    def test_outline_depth_changes_brief_digest(self):
+        nested = _brief_with_depths((0, 1))
+        flat = _brief_with_depths((0, 0))
+        assert brief_digest(nested) != brief_digest(flat)
+
     def test_unknown_requirement_ref_rejected(self):
         # Invariant 1: unknown requirement ref rejected.
         caps = FakeDeliveryCapabilities(_make_view())
@@ -465,6 +535,7 @@ class TestReportBriefValidation:
                     purpose="p",
                     reader_takeaway="t",
                     argument_flow="f",
+                    outline_depth=0,
                     requirement_refs=("requirement_NONEXISTENT",),
                     research_refs=(),
                 ),
@@ -526,6 +597,7 @@ class TestReportBriefValidation:
                     purpose="p",
                     reader_takeaway="t",
                     argument_flow="f",
+                    outline_depth=0,
                     requirement_refs=("requirement_alpha",),
                     research_refs=("approach_NONEXISTENT",),
                 ),
@@ -551,6 +623,7 @@ class TestReportBriefValidation:
                     purpose="p",
                     reader_takeaway="t",
                     argument_flow="f",
+                    outline_depth=0,
                     requirement_refs=("requirement_alpha",),
                     research_refs=("paper_p1",),
                     material=(
@@ -582,6 +655,106 @@ class TestReportBriefValidation:
         # The fake capabilities recorded no run mutation beyond publish/reopen.
         assert caps.reopen_calls == []
         assert len(caps.publish_calls) == 1
+
+
+# ===========================================================================
+# Report information architecture fidelity
+# ===========================================================================
+
+
+class TestReportOutlineFidelity:
+    def test_markdown_outline_parser_ignores_title_and_fenced_code(self):
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report title\n\n"
+                "## Real\n\n"
+                "```python\n### fake\n```\n\n"
+                "### Child\n"
+            )
+        )
+        assert manuscript_outline_signature(manuscript) == (0, 1)
+
+    def test_markdown_outline_parser_handles_edge_cases(self):
+        manuscript = ReportManuscript(
+            markdown=(
+                "> ## quoted\n\n"
+                "~~~text\n## fenced\n~~~\n\n"
+                "   ## Three-space heading\n"
+                "#Malformed\n"
+                "    ## indented code\n"
+            )
+        )
+        assert manuscript_outline_signature(manuscript) == (0,)
+
+    def test_exact_outline_signature_passes(self):
+        brief = _brief_with_depths((0, 0, 1, 1, 0, 1, 2, 2))
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report\n"
+                "## A\n## B\n### C\n### D\n"
+                "## E\n### F\n#### G\n#### H\n"
+            )
+        )
+        validate_outline_fidelity(brief, manuscript)
+
+    @pytest.mark.parametrize(
+        "markdown",
+        [
+            "# Report\n\n## A\n",  # missing heading
+            "# Report\n\n## A\n### B\n#### Extra\n",  # extra heading
+            "# Report\n\n## A\n## B\n",  # wrong depth
+            "# Report\n\n### B\n## A\n",  # reordered structure
+            "# Report\n\n## A\n\n**B**\n",  # bold pseudo-heading
+        ],
+    )
+    def test_outline_mismatch_rejected(self, markdown):
+        brief = _brief_with_depths((0, 1))
+        with pytest.raises(ReportPipelineError, match="visible outline"):
+            validate_outline_fidelity(
+                brief,
+                ReportManuscript(markdown=markdown),
+            )
+
+    def test_library_writer_boundary_rejects_outline_mismatch(self):
+        pipeline = _build_pipeline(
+            FakeDeliveryCapabilities(_make_view()),
+            writer=FakeWriter(manuscripts=[_manuscript("# Report\n\nbody")]),
+        )
+        with pytest.raises(ReportPipelineError, match="visible outline"):
+            pipeline.run("run_1")
+
+    def test_locator_is_preserved_for_audit_but_hidden_from_reader(self):
+        locator = SourceLocator(kind="section", value="3.2")
+        manuscript = ReportManuscript(
+            markdown="# Report\n\n## Section 1\n\nclaim {{cite:c1}}",
+            citations=(
+                CitationReference(
+                    citation_id="c1",
+                    paper_ref="paper_p1",
+                    locator=locator,
+                ),
+            ),
+        )
+        renderer = DeterministicCitationRenderer()
+        audit = renderer.audit(_make_view(), manuscript)
+        rendered = renderer.render(_make_view(), manuscript)
+
+        assert audit.citations[0].locator == locator
+        assert "claim [1]" in rendered
+        assert "section: 3.2" not in rendered
+
+    def test_reader_guide_checks_under_and_over_structuring(self):
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_REVIEW_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        assert "Visible Outline Scan" in guide
+        assert "粗体段首" in guide
+        assert "每篇论文或每个实验都被写成 H4" in guide
 
 
 # ===========================================================================
@@ -901,7 +1074,12 @@ class TestFreshReview:
                 replace(_valid_brief(), report_goal="repaired survey X"),
             ]
         )
-        writer = FakeWriter(manuscripts=[_manuscript("# v1"), _manuscript("# v2")])
+        writer = FakeWriter(
+            manuscripts=[
+                _manuscript("# v1\n\n## Section 1"),
+                _manuscript("# v2\n\n## Section 1"),
+            ]
+        )
         pipeline = _build_pipeline(
             caps,
             constructor=constructor,
@@ -1115,14 +1293,20 @@ class TestReaderPassVersionBinding:
             return FakeReviewer()
 
         factory = CountingReviewerFactory(builder)
-        reviser = FakeReviser(revised_markdowns=["# Report\n\nrevised {{cite:c1}}"])
+        reviser = FakeReviser(
+            revised_markdowns=[
+                "# Report\n\n## Section 1\n\nrevised {{cite:c1}}"
+            ]
+        )
         pipeline = _build_pipeline(caps, reviewer_factory=factory, reviser=reviser)
         result = pipeline.run("run_1")
         from my_search_harness.runtime.reporting import PublishedReportPipelineResult
 
         assert isinstance(result, PublishedReportPipelineResult)
         # The certified digest matches the REVISED manuscript, not the original.
-        revised_ms = _manuscript("# Report\n\nrevised {{cite:c1}}")
+        revised_ms = _manuscript(
+            "# Report\n\n## Section 1\n\nrevised {{cite:c1}}"
+        )
         assert result.reader_pass.manuscript_digest == manuscript_digest(revised_ms)
 
     def test_brief_digest_changed_old_pass_rejected(self):
@@ -1159,6 +1343,7 @@ class TestReaderPassVersionBinding:
                     purpose="p",
                     reader_takeaway="t",
                     argument_flow="f",
+                    outline_depth=0,
                     requirement_refs=("requirement_beta",),
                     research_refs=("paper_p1",),
                 ),
@@ -1216,7 +1401,9 @@ class TestIntegrityRouting:
                 ResearchIntegrityReview(disposition=IntegrityDisposition.PASS),
             ]
         )
-        reviser = FakeReviser(revised_markdowns=["# Report\n\nfixed {{cite:c1}}"])
+        reviser = FakeReviser(
+            revised_markdowns=["# Report\n\n## Section 1\n\nfixed {{cite:c1}}"]
+        )
         pipeline = _build_pipeline(caps, integrity_reviewer=integrity, reviser=reviser)
         result = pipeline.run("run_1")
         from my_search_harness.runtime.reporting import PublishedReportPipelineResult
@@ -1227,7 +1414,7 @@ class TestIntegrityRouting:
         # Reviser called once for the integrity repair.
         assert len(reviser.calls) == 1
         assert result.reader_pass.manuscript_digest == manuscript_digest(
-            _manuscript("# Report\n\nfixed {{cite:c1}}")
+            _manuscript("# Report\n\n## Section 1\n\nfixed {{cite:c1}}")
         )
         assert (
             result.reader_pass.manuscript_digest
@@ -1254,7 +1441,12 @@ class TestIntegrityRouting:
                 replace(_valid_brief(), report_goal="repaired survey X"),
             ]
         )
-        writer = FakeWriter(manuscripts=[_manuscript("# v1"), _manuscript("# v2")])
+        writer = FakeWriter(
+            manuscripts=[
+                _manuscript("# v1\n\n## Section 1"),
+                _manuscript("# v2\n\n## Section 1"),
+            ]
+        )
         pipeline = _build_pipeline(
             caps,
             constructor=constructor,
@@ -1303,7 +1495,9 @@ class TestIntegrityRouting:
                 ResearchIntegrityReview(disposition=IntegrityDisposition.PASS),
             ]
         )
-        reviser = FakeReviser(revised_markdowns=["# Report\n\nfixed {{cite:c1}}"])
+        reviser = FakeReviser(
+            revised_markdowns=["# Report\n\n## Section 1\n\nfixed {{cite:c1}}"]
+        )
         factory = CountingReviewerFactory(FakeReviewer)
         pipeline = _build_pipeline(
             caps,
@@ -1366,7 +1560,10 @@ class TestIntegrityVersionBinding:
             ]
         )
         reviser = FakeReviser(
-            revised_markdowns=[f"# Report\n\nv{i} {{cite:c1}}" for i in range(20)]
+            revised_markdowns=[
+                f"# Report\n\n## Section 1\n\nv{i} {{cite:c1}}"
+                for i in range(20)
+            ]
         )
         pipeline = _build_pipeline(
             caps,
@@ -1497,7 +1694,12 @@ class TestAdditionalInvariants:
         pipeline = _build_pipeline(
             caps,
             reviewer_factory=factory,
-            reviser=FakeReviser(revised_markdowns=["# revision 1", "# revision 2"]),
+            reviser=FakeReviser(
+                revised_markdowns=[
+                    "# revision 1\n\n## Section 1",
+                    "# revision 2\n\n## Section 1",
+                ]
+            ),
             max_reader_rounds=2,
         )
         with pytest.raises(ReportResourceExhausted):
@@ -1526,8 +1728,9 @@ class TestAdditionalInvariants:
         constructor = FakeConstructor()
         pipeline = _build_pipeline(caps, constructor=constructor)
         pipeline.run("run_1")
-        view, quality_standard = constructor.calls[0]
+        view, quality_standard, construction_guide = constructor.calls[0]
         assert quality_standard == "quality standard text"
+        assert construction_guide == "construction guide text"
         assert quality_standard != "writing guide text"
 
     def test_integrity_revise_delivery_requires_valid_target(self):
@@ -1579,7 +1782,7 @@ class TestAdditionalInvariants:
             pipeline.run("run_1")
 
     def test_empty_guides_rejected_at_construction(self):
-        # The pipeline validates all four guides at construction time.
+        # The pipeline validates all five guides at construction time.
         caps = FakeDeliveryCapabilities(_make_view())
         with pytest.raises(
             ValueError, match="quality_standard must be a non-empty string"
@@ -1595,6 +1798,7 @@ class TestAdditionalInvariants:
                 ),
                 citation_renderer=FakeCitationRenderer(),
                 quality_standard="",
+                construction_guide="construction guide text",
                 writing_guide="writing guide text",
                 review_guide="review guide text",
                 integrity_guide="integrity guide text",

@@ -1,6 +1,6 @@
 # Report Review Guide
 
-> 版本：v0.3  
+> 版本：v0.4
 > 适用角色：Report Reviewer / Reader Gate  
 > 目标：验证最终稿是否真正作为面向目标读者的认知载体成立  
 > 不负责：研究完成性判断、Research State 修改、Primary Evidence 最终核验、事实修复
@@ -109,6 +109,36 @@ Phase 2 — Brief Check
 ---
 
 # Phase 1 — Blind Read
+
+## 3. Visible Outline Scan｜可见提纲扫描
+
+在完整冷读之前，Reviewer 必须先只看读者可见的：
+
+```text
+报告标题
+H2 / H3 / H4 标题树
+摘要
+表格与列表（如存在）
+```
+
+不借助全文细节，快速回答：
+
+- 这个报告是什么；
+- 背景在哪里；
+- 主体在哪里；
+- 主要对象或路线在哪里；
+- 横向比较在哪里；
+- 开放问题在哪里；
+- 结论在哪里。
+
+不适用的宏观部分无需机械出现，但其缺席应与报告承诺相符。此扫描检查的是人类导航成本；**可理解性不等于可扫描性**。Reviewer 不能因为自己能够从全文推断结构，就忽略标题树没有把结构交付给读者。
+
+完整冷读后，将 Visible Heading Tree 与第 7 节的 Reverse Outline 对比：
+
+- 若重要机制和认知分组只存在于粗体段首或长段落中，标题树无法恢复真实认知结构，属于欠结构化，必要时应成为 blocker；
+- 若每篇论文或每个实验都被写成 H4，标题树远比真实认知结构碎，属于过度结构化，必要时也应成为 blocker。
+
+Visible Outline Scan 不增加新的审查阶段或结果类型；发现的问题继续进入既有 `reverse_outline` 与 `blocking_issues`。
 
 ## 4. Blind Read Inputs｜盲读输入
 

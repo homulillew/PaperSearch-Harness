@@ -125,11 +125,7 @@ class DeterministicCitationRenderer:
 
         def replace(match: re.Match[str]) -> str:
             citation = resolved[match.group(1)]
-            if citation.locator is None:
-                return f"[{citation.citation_number}]"
-            locator_kind = self._markdown_text(citation.locator.kind)
-            locator_value = self._markdown_text(citation.locator.value)
-            return f"[{citation.citation_number}, {locator_kind}: {locator_value}]"
+            return f"[{citation.citation_number}]"
 
         rendered = _CITATION_PLACEHOLDER.sub(replace, manuscript.markdown).rstrip()
         if audit.bibliography_paper_refs:

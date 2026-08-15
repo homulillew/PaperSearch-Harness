@@ -209,6 +209,7 @@ delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
 put-report-brief --run-id RUN --input FILE
 put-report-manuscript --run-id RUN --input FILE
+render-reader-preview --run-id RUN
 submit-blind-review --run-id RUN --input FILE
 submit-reader-review --run-id RUN --input FILE
 submit-integrity-review --run-id RUN --input FILE
@@ -227,12 +228,25 @@ Integrity certifications.
 `put-report-brief` accepts the Report Brief schema. Python validates Requirement and
 Research ref namespaces independently; a material `source_ref` must name a retained
 paper, and a material `locator` requires `source_ref`. Accepting a new Brief binds it to
-the current `DeliveryBasis` and invalidates all downstream work.
+the current `DeliveryBasis` and invalidates all downstream work. Every section requires
+an integer `outline_depth >= 0` (`bool` is not an integer here): depth 0 maps to Markdown
+H2, depth 1 to H3, and so on. Sections form an ordered implicit tree; the first depth is
+0 and a descent cannot skip a level. The field has no compatibility default.
 
 `put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
 tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
 optional `locator`. A new manuscript invalidates Blind, Reader, Integrity, and render
-results.
+results. Python rejects the manuscript before Reader unless its H2+ heading-depth
+signature exactly matches the Brief section signature. H1 is the report title and fenced
+code headings do not count.
+
+`render-reader-preview` is read-only, deterministic, and available after the current
+Brief and Manuscript are accepted. It renders internal citation tokens to the same
+compact reader surface used for final delivery (`[n]`, never locator text), returns the
+source Brief and Manuscript digests, and does not persist an artifact, add a digest
+authority, or create certification. The fresh Reader must receive this preview rather
+than raw `{{cite:id}}` tokens; its results remain bound to the returned source
+`manuscript_digest`.
 
 `submit-blind-review` accepts `core_understanding`, `domain_model`,
 `comparison_coordinates`, `reverse_outline`, `manuscript_digest`, and optional
@@ -270,6 +284,11 @@ but no Research semantic authority, never enters `state.json` / `ResearchRun` or
 `ArtifactKind`, and must not be hand-edited. Non-authoritative observability captures
 remain removable at `workspace/scratch/<run_id>/captures/report/`. Validate the
 published artifact before closing.
+
+`report_session.json` uses schema version 3. A schema-v2 Delivery session cannot continue
+as a current certified session because its Brief lacks required hierarchy; rebuild the
+Report Brief with `put-report-brief`. `ResearchRun`, `state.json`, and `DeliveryBasis` are
+not migrated or changed.
 
 ## Wiki projection and publication
 

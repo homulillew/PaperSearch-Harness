@@ -1,4 +1,4 @@
-"""ADR-012 production adapter and certified publication integration tests."""
+"""Production adapter and certified publication integration tests."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ HARNESS = (
 
 
 def _load_harness():
-    spec = importlib.util.spec_from_file_location("adr12_harness", HARNESS)
+    spec = importlib.util.spec_from_file_location("reporting_harness", HARNESS)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -42,7 +42,7 @@ def _delivery_run(workspace: Path) -> tuple[str, int, str]:
     runtime = _runtime(workspace)
     created = runtime.researcher.create_run(
         CreateRunRequest(
-            mission="test ADR12 delivery",
+            mission="test certified delivery",
             requirements=("explain the result",),
             scope="test scope",
             deliverable_description="certified report",
@@ -93,6 +93,7 @@ def _brief(requirement_ref: str, *, goal: str = "explain") -> dict[str, object]:
                 "purpose": "explain",
                 "reader_takeaway": "result understood",
                 "argument_flow": "premise then consequence",
+                "outline_depth": 0,
                 "requirement_refs": [requirement_ref],
                 "research_refs": [],
                 "material": [],
@@ -103,7 +104,23 @@ def _brief(requirement_ref: str, *, goal: str = "explain") -> dict[str, object]:
     }
 
 
-def _manuscript(markdown: str = "# Report\n\nCertified content.") -> dict[str, object]:
+def _brief_with_depths(
+    requirement_ref: str,
+    depths: tuple[int, ...],
+) -> dict[str, object]:
+    brief = _brief(requirement_ref)
+    base = brief["sections"][0]
+    assert isinstance(base, dict)
+    brief["sections"] = [
+        {**base, "title": f"Section {index}", "outline_depth": depth}
+        for index, depth in enumerate(depths, start=1)
+    ]
+    return brief
+
+
+def _manuscript(
+    markdown: str = "# Report\n\n## Result\n\nCertified content.",
+) -> dict[str, object]:
     return {"markdown": markdown, "citations": []}
 
 
@@ -124,7 +141,7 @@ def _put_brief_and_manuscript(
     requirement_ref: str,
     *,
     goal: str = "explain",
-    markdown: str = "# Report\n\nCertified content.",
+    markdown: str = "# Report\n\n## Result\n\nCertified content.",
 ) -> tuple[str, str]:
     brief_path = _input(
         tmp_path, f"brief-{goal}.json", _brief(requirement_ref, goal=goal)
@@ -275,6 +292,20 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     b_digest, m_digest = _put_brief_and_manuscript(
         harness, workspace, tmp_path, run_id, requirement_ref
     )
+    session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
+    session_before_preview = session_path.read_text(encoding="utf-8")
+    code, preview = _invoke(
+        harness,
+        workspace,
+        "render-reader-preview",
+        "--run-id",
+        run_id,
+    )
+    assert code == 0, preview
+    assert preview["result"]["content"] == "# Report\n\n## Result\n\nCertified content.\n"
+    assert preview["result"]["brief_digest"] == b_digest
+    assert preview["result"]["manuscript_digest"] == m_digest
+    assert session_path.read_text(encoding="utf-8") == session_before_preview
     # No Reader or Integrity PASS.
     code, _ = _invoke(
         harness,
@@ -325,6 +356,9 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     assert (captures / f"integrity_review_{m_digest[:12]}.json").is_file()
     session = workspace / "runs" / run_id / "delivery" / "report_session.json"
     assert session.is_file()
+    session_value = json.loads(session.read_text(encoding="utf-8"))
+    assert session_value["schema_version"] == 3
+    assert session_value["brief"]["sections"][0]["outline_depth"] == 0
     assert not (
         workspace / "scratch" / run_id / "report_delivery" / "session.json"
     ).exists()
@@ -332,6 +366,202 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     assert "report_brief" not in state
     assert "reader_pass" not in state
     assert set(item.value for item in ArtifactKind) == {"REPORT"}
+
+
+def test_report_brief_adapter_requires_valid_outline_depth(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+
+    missing = _brief(requirement_ref)
+    del missing["sections"][0]["outline_depth"]
+    missing_path = _input(tmp_path, "brief-missing-depth.json", missing)
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(missing_path),
+    )
+    assert code == 2
+    assert "outline_depth" in envelope["error"]["message"]
+
+    boolean = _brief(requirement_ref)
+    boolean["sections"][0]["outline_depth"] = True
+    boolean_path = _input(tmp_path, "brief-bool-depth.json", boolean)
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(boolean_path),
+    )
+    assert code == 2
+    assert "integer" in envelope["error"]["message"]
+
+
+def test_staged_manuscript_boundary_rejects_outline_mismatch(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    brief_path = _input(tmp_path, "brief.json", _brief(requirement_ref))
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(brief_path),
+    )
+    assert code == 0, envelope
+
+    manuscript_path = _input(
+        tmp_path,
+        "flat-manuscript.json",
+        _manuscript("# Report\n\n**Result**\n\nContent."),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(manuscript_path),
+    )
+    assert code == 2
+    assert "visible outline" in envelope["error"]["message"]
+
+
+def test_schema_v2_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    _put_brief_and_manuscript(
+        harness,
+        workspace,
+        tmp_path,
+        run_id,
+        requirement_ref,
+    )
+    session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
+    session = json.loads(session_path.read_text(encoding="utf-8"))
+    session["schema_version"] = 2
+    session_path.write_text(json.dumps(session), encoding="utf-8")
+
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "render-reader-preview",
+        "--run-id",
+        run_id,
+    )
+    assert code == 2
+    assert "older schema" in envelope["error"]["message"]
+    assert "rebuild the Report Brief" in envelope["error"]["message"]
+
+    rebuilt_path = _input(tmp_path, "rebuilt-brief.json", _brief(requirement_ref))
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(rebuilt_path),
+    )
+    assert code == 0, envelope
+    rebuilt = json.loads(session_path.read_text(encoding="utf-8"))
+    assert rebuilt["schema_version"] == 3
+    assert rebuilt["manuscript"] is None
+
+
+def test_outline_change_invalidates_certification_without_changing_research(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    runtime = _runtime(workspace)
+    basis_before = runtime.delivery.view(run_id).delivery_basis
+    state_path = workspace / "runs" / run_id / "state.json"
+    state_before = state_path.read_bytes()
+
+    nested_path = _input(
+        tmp_path,
+        "nested-brief.json",
+        _brief_with_depths(requirement_ref, (0, 1)),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(nested_path),
+    )
+    assert code == 0, envelope
+    old_brief_digest = envelope["result"]["brief_digest"]
+    manuscript_path = _input(
+        tmp_path,
+        "nested-manuscript.json",
+        _manuscript("# Report\n\n## Section 1\n\n### Section 2\n\nContent."),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(manuscript_path),
+    )
+    assert code == 0, envelope
+    manuscript_digest = envelope["result"]["manuscript_digest"]
+    _reader_pass(
+        harness,
+        workspace,
+        tmp_path,
+        run_id,
+        old_brief_digest,
+        manuscript_digest,
+    )
+    _integrity_pass(harness, workspace, tmp_path, run_id)
+
+    flat_path = _input(
+        tmp_path,
+        "flat-brief.json",
+        _brief_with_depths(requirement_ref, (0, 0)),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(flat_path),
+    )
+    assert code == 0, envelope
+    assert envelope["result"]["brief_digest"] != old_brief_digest
+    assert envelope["result"]["reader_pass"] is None
+    assert envelope["result"]["integrity_pass"] is None
+    assert envelope["result"]["manuscript_digest"] is None
+
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "render-certified-report",
+        "--run-id",
+        run_id,
+    )
+    assert code == 2
+    assert state_path.read_bytes() == state_before
+    assert _runtime(workspace).delivery.view(run_id).delivery_basis == basis_before
 
 
 def test_integrity_input_without_reader_pass_is_rejected(tmp_path):
@@ -366,7 +596,9 @@ def test_stale_manuscript_and_brief_invalidate_certification(tmp_path):
     assert code == 0
 
     changed = _input(
-        tmp_path, "changed-manuscript.json", _manuscript("# Report\n\nChanged.")
+        tmp_path,
+        "changed-manuscript.json",
+        _manuscript("# Report\n\n## Result\n\nChanged."),
     )
     code, _ = _invoke(
         harness,
@@ -475,7 +707,9 @@ def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tm
     assert code == 2
 
     changed_path = _input(
-        tmp_path, "repaired-manuscript.json", _manuscript("# Report\n\nRepaired.")
+        tmp_path,
+        "repaired-manuscript.json",
+        _manuscript("# Report\n\n## Result\n\nRepaired."),
     )
     code, accepted = _invoke(
         harness,
@@ -614,7 +848,7 @@ def test_integrity_manuscript_repair_cannot_be_overwritten_by_pass(tmp_path):
     changed_path = _input(
         tmp_path,
         "integrity-repaired-manuscript.json",
-        _manuscript("# Report\n\nIntegrity repaired."),
+        _manuscript("# Report\n\n## Result\n\nIntegrity repaired."),
     )
     code, accepted = _invoke(
         harness,
@@ -942,7 +1176,9 @@ def test_possible_research_issue_does_not_reopen_research(tmp_path):
     changed_path = _input(
         tmp_path,
         "confirmed-delivery-repair.json",
-        _manuscript("# Report\n\nConfirmed Delivery-layer repair."),
+        _manuscript(
+            "# Report\n\n## Result\n\nConfirmed Delivery-layer repair."
+        ),
     )
     code, accepted = _invoke(
         harness,

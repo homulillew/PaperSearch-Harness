@@ -143,17 +143,19 @@ class LocalV1Runtime:
         reviser: ReportReviser,
         integrity_reviewer: ResearchIntegrityReviewer,
         quality_standard_path: str | Path,
+        construction_guide_path: str | Path,
         writing_guide_path: str | Path,
         review_guide_path: str | Path,
         integrity_guide_path: str | Path,
     ) -> ReportPipeline:
         """Bind report actors and the explicitly configured Delivery guides.
 
-        The four guides are loaded here (not interpreted): the Report Quality
-        Standard drives the Constructor, the Writing Guide drives the Writer,
-        the Review Guide drives the two-phase Reader, and the Integrity Guide
-        drives the Research Integrity Reviewer. Each is a non-empty string the
-        pipeline validates at construction time.
+        The five guides are loaded here (not interpreted): the Report Quality
+        Standard defines the shared target, the Construction Guide drives the
+        Constructor, the Writing Guide drives the Writer, the Review Guide
+        drives the two-phase Reader, and the Integrity Guide drives the
+        Research Integrity Reviewer. Each is a non-empty string the pipeline
+        validates at construction time.
         """
 
         return ReportPipeline(
@@ -165,6 +167,7 @@ class LocalV1Runtime:
             integrity_reviewer=integrity_reviewer,
             citation_renderer=DeterministicCitationRenderer(),
             quality_standard=_read_guide(quality_standard_path),
+            construction_guide=_read_guide(construction_guide_path),
             writing_guide=load_report_writing_guide(writing_guide_path),
             review_guide=_read_guide(review_guide_path),
             integrity_guide=_read_guide(integrity_guide_path),
