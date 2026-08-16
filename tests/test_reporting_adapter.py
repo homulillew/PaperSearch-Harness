@@ -137,6 +137,21 @@ def _reader_issue(target: str) -> dict[str, object]:
     }
 
 
+def _brief_repair_feedback() -> dict[str, object]:
+    return {
+        "feedback": [
+            {
+                "problem": "the current comparison cannot be realized faithfully",
+                "downstream_effect": "Authoring would have to redesign the Brief",
+                "resolution_condition": (
+                    "the Brief supplies a realizable comparison boundary"
+                ),
+                "location": "Result",
+            }
+        ]
+    }
+
+
 def _put_brief_and_manuscript(
     harness,
     workspace: Path,
@@ -997,6 +1012,188 @@ def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tm
     )
     assert code == 2
     assert "submit-blind-review" in envelope["error"]["message"]
+
+
+def test_authoring_brief_insufficient_round_trips_feedback_without_research_mutation(
+    tmp_path,
+):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    old_brief_digest, _ = _certify(
+        harness, workspace, tmp_path, run_id, requirement_ref
+    )
+    state_path = workspace / "runs" / run_id / "state.json"
+    state_before = state_path.read_bytes()
+    view_before = _runtime(workspace).delivery.view(run_id)
+    feedback = _brief_repair_feedback()
+    feedback_path = _input(tmp_path, "authoring-brief-insufficient.json", feedback)
+
+    code, blocked = _invoke(
+        harness,
+        workspace,
+        "submit-brief-insufficient",
+        "--run-id",
+        run_id,
+        "--input",
+        str(feedback_path),
+    )
+    assert code == 0, blocked
+    status = blocked["result"]
+    assert status["stage"] == "BRIEF_REBUILD_REQUIRED"
+    assert status["pending_action"] == "BRIEF_REBUILD_REQUIRED"
+    assert status["brief_digest"] == old_brief_digest
+    assert status["manuscript_digest"] is None
+    assert status["blind_read_digest"] is None
+    assert status["reader_pass"] is None
+    assert status["integrity_pass"] is None
+    assert status["rendered"] is False
+    assert state_path.read_bytes() == state_before
+
+    code, construction = _invoke(
+        harness,
+        workspace,
+        "report-construction-input",
+        "--run-id",
+        run_id,
+    )
+    assert code == 0, construction
+    repair = construction["result"]["repair"]
+    assert repair["previous_brief"]["report_goal"] == "explain"
+    assert repair["feedback"] == feedback["feedback"]
+
+    same_path = _input(tmp_path, "same-authoring-brief.json", _brief(requirement_ref))
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(same_path),
+    )
+    assert code == 2
+
+    changed_path = _input(
+        tmp_path,
+        "changed-authoring-brief.json",
+        _brief(requirement_ref, goal="realizable comparison"),
+    )
+    code, accepted = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(changed_path),
+    )
+    assert code == 0, accepted
+    assert accepted["result"]["pending_action"] == "NONE"
+    assert accepted["result"]["brief_digest"] != old_brief_digest
+    assert accepted["result"]["manuscript_digest"] is None
+    assert accepted["result"]["blind_read_digest"] is None
+    assert accepted["result"]["reader_pass"] is None
+    assert accepted["result"]["integrity_pass"] is None
+
+    session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
+    session = json.loads(session_path.read_text(encoding="utf-8"))
+    assert session["schema_version"] == 4
+    assert session["brief_repair_feedback"] is None
+    assert state_path.read_bytes() == state_before
+    view_after = _runtime(workspace).delivery.view(run_id)
+    assert view_after == view_before
+    assert {item.value for item in ArtifactKind} == {"REPORT"}
+    assert {item.value for item in LifecycleMode} == {
+        "RESEARCH",
+        "COMPLETION_CHECK",
+        "DELIVERY",
+        "CLOSED",
+    }
+
+
+def test_authoring_brief_insufficient_is_legal_before_initial_manuscript(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    brief_path = _input(tmp_path, "initial-brief.json", _brief(requirement_ref))
+    code, accepted = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(brief_path),
+    )
+    assert code == 0, accepted
+
+    feedback_path = _input(
+        tmp_path, "initial-brief-insufficient.json", _brief_repair_feedback()
+    )
+    code, blocked = _invoke(
+        harness,
+        workspace,
+        "submit-brief-insufficient",
+        "--run-id",
+        run_id,
+        "--input",
+        str(feedback_path),
+    )
+    assert code == 0, blocked
+    assert blocked["result"]["pending_action"] == "BRIEF_REBUILD_REQUIRED"
+    assert blocked["result"]["brief_digest"] == accepted["result"]["brief_digest"]
+    assert blocked["result"]["manuscript_digest"] is None
+
+
+def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
+    tmp_path,
+):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, requirement_ref = _delivery_run(workspace)
+    feedback_path = _input(
+        tmp_path, "brief-insufficient-required.json", _brief_repair_feedback()
+    )
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "submit-brief-insufficient",
+        "--run-id",
+        run_id,
+        "--input",
+        str(feedback_path),
+    )
+    assert code == 2
+
+    b_digest, m_digest = _put_brief_and_manuscript(
+        harness, workspace, tmp_path, run_id, requirement_ref
+    )
+    blocked = _reader_pass(
+        harness,
+        workspace,
+        tmp_path,
+        run_id,
+        b_digest,
+        m_digest,
+        reader_issues=[_reader_issue("MANUSCRIPT")],
+    )
+    assert blocked["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
+
+    code, escalated = _invoke(
+        harness,
+        workspace,
+        "submit-brief-insufficient",
+        "--run-id",
+        run_id,
+        "--input",
+        str(feedback_path),
+    )
+    assert code == 0, escalated
+    assert escalated["result"]["pending_action"] == "BRIEF_REBUILD_REQUIRED"
+    assert escalated["result"]["manuscript_digest"] is None
+    assert escalated["result"]["reader_pass"] is None
+    assert escalated["result"]["integrity_pass"] is None
 
 
 def test_reader_brief_blocker_requires_changed_brief(tmp_path):

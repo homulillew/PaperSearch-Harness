@@ -985,6 +985,44 @@ class TestReportOutlineFidelity:
         assert "粗体段首" in guide
         assert "每篇论文或每个实验都被写成 H4" in guide
 
+    def test_reader_guide_has_dual_blocking_threshold_without_style_score(self):
+        root = Path(__file__).resolve().parents[1]
+        review_guide = (
+            root
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_REVIEW_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        quality_standard = (
+            root
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_QUALITY_STANDARD.md"
+        ).read_text(encoding="utf-8")
+        assert "实质增加目标读者的认知成本或破坏主要认知交付" in review_guide
+        assert "实质使交付物无法达到其要求的专业成品质量" in review_guide
+        assert "专业成品阈值不等于追求完美文风" in quality_standard
+        assert "本 Guide 不使用统一质量分数" in review_guide
+        assert "quality_score >= threshold" in review_guide
+
+    def test_writing_guide_requires_semantic_navigation_at_named_first_use(self):
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_WRITING_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        assert "首次正式引入一个具名方法或系统" in guide
+        assert "Authoring 应在该次引入发出" in guide
+        assert "普通 citation 不被" in guide
+        assert "canonical URL" in guide
+
 
 # ===========================================================================
 # Blind Reader boundary (invariants 5-9)
@@ -1372,6 +1410,11 @@ class TestRootRepairRouting:
         pipeline = _build_pipeline(caps, reviewer_factory=factory, reviser=reviser)
         pipeline.run("run_1")
         assert len(reviser.calls) == 1
+        citation_meta = reviser.calls[0][3]
+        assert isinstance(citation_meta, CitationMetadata)
+        assert citation_meta.papers == (("paper_p1", "Paper One"),)
+        assert "canonical_url" not in repr(citation_meta)
+        assert "https://example.org/p1" not in repr(citation_meta)
 
     def test_brief_blocker_routes_to_constructor(self):
         # Invariant 15: BRIEF blocker → Constructor (rebuild).
@@ -1981,13 +2024,11 @@ class TestAdditionalInvariants:
         pipeline.run("run_1")
         brief, guide, citation_meta = writer.calls[0]
         assert isinstance(citation_meta, CitationMetadata)
-        # CitationMetadata carries only (ref, title, url) tuples — no DeliveryView.
-        assert all(isinstance(t, tuple) and len(t) == 3 for t in citation_meta.papers)
-        assert citation_meta.papers[0] == (
-            "paper_p1",
-            "Paper One",
-            "https://example.org/p1",
-        )
+        # Presentation owns canonical URL resolution; Authoring gets identity only.
+        assert all(isinstance(t, tuple) and len(t) == 2 for t in citation_meta.papers)
+        assert citation_meta.papers == (("paper_p1", "Paper One"),)
+        assert "canonical_url" not in repr(citation_meta)
+        assert "https://example.org/p1" not in repr(citation_meta)
 
     def test_constructor_does_not_receive_writing_guide(self):
         # The Constructor receives the Quality Standard, not the Writing Guide.

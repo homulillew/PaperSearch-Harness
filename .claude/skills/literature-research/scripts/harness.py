@@ -97,6 +97,7 @@ from my_search_harness.runtime import (  # noqa: E402
     BlindReadResult,
     BlockingIssue,
     BriefMaterial,
+    BriefRepairFeedback,
     CitationReference,
     CognitiveFrictionObservation,
     BlockingGapSpec,
@@ -541,6 +542,36 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
     )
 
 
+def _brief_repair_feedback(value: object) -> BriefRepairFeedback:
+    if not isinstance(value, dict):
+        raise AdapterInputError("feedback entries must be objects")
+    _shape(
+        value,
+        required=frozenset({"problem", "downstream_effect", "resolution_condition"}),
+        optional=frozenset({"location"}),
+    )
+    return BriefRepairFeedback(
+        problem=_string(value["problem"], "feedback.problem"),
+        downstream_effect=_string(
+            value["downstream_effect"], "feedback.downstream_effect"
+        ),
+        resolution_condition=_string(
+            value["resolution_condition"], "feedback.resolution_condition"
+        ),
+        location=_optional_string(value.get("location"), "feedback.location"),
+    )
+
+
+def _brief_insufficient_feedback(
+    value: Mapping[str, object],
+) -> tuple[BriefRepairFeedback, ...]:
+    _shape(value, required=frozenset({"feedback"}))
+    raw_feedback = value["feedback"]
+    if not isinstance(raw_feedback, list) or not raw_feedback:
+        raise AdapterInputError("feedback must be a non-empty array")
+    return tuple(_brief_repair_feedback(item) for item in raw_feedback)
+
+
 def _blind_issue(value: object) -> BlindBlockingIssue:
     if not isinstance(value, dict):
         raise AdapterInputError("blocking_issues entries must be objects")
@@ -798,6 +829,7 @@ def _parser() -> argparse.ArgumentParser:
     for name in (
         "put-report-brief",
         "put-report-manuscript",
+        "submit-brief-insufficient",
         "submit-blind-review",
         "submit-reader-review",
         "submit-integrity-review",
@@ -1094,6 +1126,11 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
         return certified.put_manuscript(
             args.run_id, _manuscript(_load_input(args.input))
         )
+    if args.command == "submit-brief-insufficient":
+        return certified.submit_brief_insufficient(
+            args.run_id,
+            _brief_insufficient_feedback(_load_input(args.input)),
+        )
     if args.command == "submit-blind-review":
         return certified.submit_blind_read(
             args.run_id, _blind_read(_load_input(args.input))
@@ -1231,6 +1268,7 @@ _DELIVERY_COMMANDS = {
     "report-construction-input",
     "put-report-brief",
     "put-report-manuscript",
+    "submit-brief-insufficient",
     "submit-blind-review",
     "submit-reader-review",
     "submit-integrity-review",

@@ -46,6 +46,7 @@ from .reporting import (
     manuscript_digest,
     reader_repair_target,
     validate_blind_read,
+    validate_brief_repair_feedback,
     validate_integrity_review,
     validate_report_brief,
     validate_report_manuscript,
@@ -163,6 +164,30 @@ class CertifiedReportDelivery:
         self._save(run_id, session)
         self._captures.capture(run_id, "report_brief.json", _pretty(brief))
         return self._status(run_id, "BRIEF_ACCEPTED", session)
+
+    def submit_brief_insufficient(
+        self,
+        run_id: str,
+        feedback: tuple[BriefRepairFeedback, ...],
+    ) -> CertifiedDeliveryStatus:
+        """Route Authoring's neutral Brief insufficiency back to Constructor."""
+
+        validate_brief_repair_feedback(feedback)
+        session = self._load_current(run_id)
+        self._require_action_allowed(session, "submit-brief-insufficient")
+        brief = self._require_brief(session)
+        session["brief_repair_feedback"] = _jsonable(feedback)
+        session["manuscript"] = None
+        session["manuscript_digest"] = None
+        self._clear_from(session, "blind_read")
+        session["pending_action"] = _PendingAction.BRIEF_REBUILD_REQUIRED.value
+        self._save(run_id, session)
+        self._captures.capture(
+            run_id,
+            f"brief_repair_feedback_{brief_digest(brief)[:12]}.json",
+            _pretty(feedback),
+        )
+        return self._status(run_id, "BRIEF_REBUILD_REQUIRED", session)
 
     def put_manuscript(
         self, run_id: str, manuscript: ReportManuscript
@@ -500,6 +525,7 @@ class CertifiedReportDelivery:
             "pending_action": _PendingAction.NONE.value,
             "brief": None,
             "brief_digest": None,
+            "brief_repair_feedback": None,
             "manuscript": None,
             "manuscript_digest": None,
             "blind_read": None,
@@ -550,7 +576,10 @@ class CertifiedReportDelivery:
         pending = cls._pending_action(session)
         allowed = {
             _PendingAction.NONE: None,
-            _PendingAction.MANUSCRIPT_REPAIR_REQUIRED: {"put-report-manuscript"},
+            _PendingAction.MANUSCRIPT_REPAIR_REQUIRED: {
+                "put-report-manuscript",
+                "submit-brief-insufficient",
+            },
             _PendingAction.BRIEF_REBUILD_REQUIRED: {"put-report-brief"},
             _PendingAction.RESEARCH_REOPEN_REQUIRED: set(),
         }[pending]
@@ -575,6 +604,16 @@ class CertifiedReportDelivery:
     ) -> tuple[BriefRepairFeedback, ...]:
         """Adapt stored downstream review into neutral Constructor feedback."""
 
+        submitted = session.get("brief_repair_feedback")
+        if submitted is not None:
+            if not isinstance(submitted, list) or not submitted:
+                raise CertifiedDeliveryError("stored Brief repair feedback is invalid")
+            submitted_feedback = tuple(
+                _brief_repair_feedback_from(raw) for raw in submitted
+            )
+            validate_brief_repair_feedback(submitted_feedback)
+            return submitted_feedback
+
         reader = session.get("reader_review")
         if isinstance(reader, Mapping):
             raw_issues = reader.get("blocking_issues")
@@ -582,13 +621,13 @@ class CertifiedReportDelivery:
                 raise CertifiedDeliveryError(
                     "stored Reader review blocking_issues are invalid"
                 )
-            feedback: list[BriefRepairFeedback] = []
+            reader_feedback: list[BriefRepairFeedback] = []
             for raw in raw_issues:
                 if not isinstance(raw, Mapping):
                     raise CertifiedDeliveryError("stored Reader blocker is invalid")
                 if raw.get("repair_target") != RepairTarget.BRIEF.value:
                     continue
-                feedback.append(
+                reader_feedback.append(
                     BriefRepairFeedback(
                         problem=_mapping_string(raw, "problem"),
                         downstream_effect=_mapping_string(raw, "reader_effect"),
@@ -598,8 +637,8 @@ class CertifiedReportDelivery:
                         location=_optional_stored_string(raw, "location"),
                     )
                 )
-            if feedback:
-                return tuple(feedback)
+            if reader_feedback:
+                return tuple(reader_feedback)
 
         integrity = session.get("integrity_review")
         if isinstance(integrity, Mapping):
@@ -778,6 +817,17 @@ def _optional_stored_string(value: Mapping[str, object], name: str) -> str | Non
     if not isinstance(item, str) or not item.strip():
         raise CertifiedDeliveryError(f"stored {name} is invalid")
     return item
+
+
+def _brief_repair_feedback_from(value: object) -> BriefRepairFeedback:
+    if not isinstance(value, Mapping):
+        raise CertifiedDeliveryError("stored BriefRepairFeedback is invalid")
+    return BriefRepairFeedback(
+        problem=_mapping_string(value, "problem"),
+        downstream_effect=_mapping_string(value, "downstream_effect"),
+        resolution_condition=_mapping_string(value, "resolution_condition"),
+        location=_optional_stored_string(value, "location"),
+    )
 
 
 def _locator_from(value: object) -> SourceLocator | None:

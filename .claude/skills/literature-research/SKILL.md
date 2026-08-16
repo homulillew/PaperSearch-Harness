@@ -516,7 +516,10 @@ Use the production staged commands in this order:
 ```text
 report-construction-input
 → put-report-brief
-→ put-report-manuscript
+→ Authoring WRITE
+   ├─ success → put-report-manuscript
+   └─ Brief insufficient → submit-brief-insufficient
+                            → report-construction-input → new Brief
 → render-reader-preview
 → submit-blind-review
 → submit-reader-review
@@ -531,6 +534,12 @@ the previous Brief plus neutral problem, downstream effect, resolution condition
 optional location. Preserve unaffected design and perform minimal sufficient
 reconstruction. If accepted research cannot support the required condition, Constructor
 may explicitly reopen Research; Fresh Reader never makes that sufficiency judgment.
+
+If Authoring cannot faithfully WRITE or REVISE without redesigning the current Brief,
+call `submit-brief-insufficient` with the existing neutral feedback fields. This clears
+any Manuscript and downstream certifications, preserves the current Brief for repair,
+and makes the next construction input carry the reason. Do not encode Authoring-private
+implementation details or prescribe exact headings in this feedback.
 
 Claude supplies the semantic values; the Harness persists Runtime-owned operational
 certification data at `runs/<run_id>/delivery/report_session.json` and enforces order,
@@ -592,10 +601,14 @@ Research is sufficient and the fault is in Delivery, submit a genuinely new Brie
 manuscript version and run the affected gates again; the same-version Reader PASS is
 blocked.
 
-For method-name navigation, Authoring writes
-`{{paper:citation_id|Method Name}}` beside the corresponding structured citation. The
-deterministic Presentation renderer resolves the first such paper use to its canonical
-URL; when no navigation token is present, it links the first rendered citation instead.
+When the report first formally introduces a named method/system whose retained primary
+paper has canonical navigation, Authoring should emit
+`{{paper:citation_id|Method Name}}`
+beside the corresponding structured citation. The deterministic Presentation renderer
+resolves the paper to its canonical URL; Authoring's narrow citation metadata contains
+paper identity and title, not URLs. When no navigation token is present, Presentation
+links the first rendered citation instead; Python does not guess whether prose names a
+method, and ordinary citations are not required to carry method-navigation tokens.
 Authoring must not copy URLs or hand-build the bibliography. Navigation never replaces a
 structured citation close to the technical judgment it supports.
 

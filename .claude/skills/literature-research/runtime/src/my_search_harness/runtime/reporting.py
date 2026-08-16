@@ -566,21 +566,20 @@ class CitationMetadata:
     """Narrow read-only navigation/citation metadata for Authoring.
 
     Authoring must NOT receive the full DeliveryView or broad evidence access.
-    This projection carries only the per-paper metadata needed to write
-    canonical citations and first-use navigation links.
+    This projection carries only the retained-paper identity needed to bind a
+    named method or citation to a paper. Canonical URL resolution belongs to
+    deterministic Presentation.
     """
 
-    papers: tuple[tuple[str, str, str | None], ...]
-    """Each entry: (paper_ref, title, canonical_url_or_None)."""
+    papers: tuple[tuple[str, str], ...]
+    """Each entry: (paper_ref, title)."""
 
 
 def citation_metadata_for(view: DeliveryView) -> CitationMetadata:
     """Project the narrowest citation/navigation metadata from a DeliveryView."""
 
     return CitationMetadata(
-        papers=tuple(
-            (paper.ref, paper.title, paper.canonical_url) for paper in view.papers
-        )
+        papers=tuple((paper.ref, paper.title) for paper in view.papers)
     )
 
 
@@ -799,7 +798,7 @@ class BriefInsufficient(ReportPipelineError):
             raise ValueError("brief-insufficient rationale must be non-empty")
         super().__init__(rationale)
         self.rationale = rationale
-        self.feedback = feedback or (
+        selected_feedback = feedback or (
             BriefRepairFeedback(
                 problem=rationale,
                 downstream_effect=(
@@ -812,6 +811,8 @@ class BriefInsufficient(ReportPipelineError):
                 ),
             ),
         )
+        validate_brief_repair_feedback(selected_feedback)
+        self.feedback = selected_feedback
 
 
 class ReportResourceExhausted(ReportPipelineError):
@@ -1830,6 +1831,36 @@ def validate_report_review(
         expected_brief_digest,
         expected_manuscript_digest,
     )
+
+
+def validate_brief_repair_feedback(feedback: object) -> None:
+    """Validate neutral operational feedback for one Brief reconstruction."""
+
+    if (
+        not isinstance(feedback, tuple)
+        or not feedback
+        or not all(isinstance(item, BriefRepairFeedback) for item in feedback)
+    ):
+        raise ReportPipelineError(
+            "Brief repair feedback must be a non-empty tuple of BriefRepairFeedback"
+        )
+    for item in feedback:
+        for field_name in (
+            "problem",
+            "downstream_effect",
+            "resolution_condition",
+        ):
+            value = getattr(item, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ReportPipelineError(
+                    f"BriefRepairFeedback.{field_name} must be non-empty text"
+                )
+        if item.location is not None and (
+            not isinstance(item.location, str) or not item.location.strip()
+        ):
+            raise ReportPipelineError(
+                "BriefRepairFeedback.location must be non-empty text or None"
+            )
 
 
 def reader_repair_target(

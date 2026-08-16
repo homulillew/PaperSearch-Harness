@@ -209,6 +209,7 @@ report-construction-input --run-id RUN
 delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
 put-report-brief --run-id RUN --input FILE
+submit-brief-insufficient --run-id RUN --input FILE
 put-report-manuscript --run-id RUN --input FILE
 render-reader-preview --run-id RUN
 submit-blind-review --run-id RUN --input FILE
@@ -249,6 +250,29 @@ contains the previous Brief plus neutral `problem`, `downstream_effect`,
 and again before rebuilding a Brief. Targeted evidence remains available through
 `delivery-inspect` and `delivery-read-source`.
 
+`submit-brief-insufficient` is Authoring's staged return path when the current Brief
+cannot be faithfully realized. It requires an existing current Brief and accepts:
+
+```json
+{
+  "feedback": [
+    {
+      "problem": "The comparison boundary is not realizable",
+      "downstream_effect": "Authoring would have to redesign the Brief",
+      "resolution_condition": "The Brief supplies a realizable comparison boundary",
+      "location": "Comparison"
+    }
+  ]
+}
+```
+
+`location` is optional. Feedback describes required outcomes, not exact headings or a
+prescribed structure. The command preserves the current Brief, clears any Manuscript and
+all downstream review/render certification, and sets `BRIEF_REBUILD_REQUIRED`.
+`report-construction-input` then returns the previous Brief plus this neutral feedback.
+The exact same Brief digest cannot clear the obligation. This is operational session
+state only and never mutates `ResearchRun`.
+
 `put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
 tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
 optional `locator`. A new manuscript invalidates Blind, Reader, Integrity, and render
@@ -264,10 +288,12 @@ blockquote, and indented-code headings do not count.
 Authoring must use ATX syntax for the report title and every section heading (`# Title`,
 `## Section`, `### Subsection`). Setext headings are outside this protocol.
 
-For first-use method-name navigation, Authoring may write
+When the report first formally introduces a named method/system whose retained primary
+paper has canonical navigation, Authoring should write
 `{{paper:method|Method Name}}` alongside `{{cite:method}}`. The identifier must have a
 citation declaration and a matching structured citation token; navigation never replaces
-claim support.
+claim support. Ordinary citations are not mechanically required to carry a navigation
+token because not every cited paper introduces a named method/system.
 
 `render-reader-preview` is read-only, deterministic, and available after the current
 Brief and Manuscript are accepted. It renders internal citation/navigation tokens to the
@@ -292,6 +318,9 @@ rewriting content.
 `blocking_issues`. Each friction observation has `location`, `observation`, and
 `reader_cost`; it is not automatically a blocker. Each Blind issue has `problem`,
 `reader_effect`, `why_blocking`, and optional `location`; it has no repair target.
+An issue blocks only when it materially damages primary cognitive delivery or materially
+prevents the required professional finished-product quality; isolated wording preferences
+do not block.
 Python freezes the complete result and returns `blind_read_digest`.
 
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
@@ -327,8 +356,9 @@ published artifact before closing.
 `report_session.json` uses schema version 4. Any older Delivery session cannot continue
 as a current certified session because its Brief and Blind Read lack required v0.5
 semantics; rebuild the Report Brief with `put-report-brief`. Missing semantic values are
-not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis` are not migrated or
-changed.
+not fabricated. `brief_repair_feedback` is an additive optional operational field in
+schema version 4; an existing v4 session without it remains readable. `ResearchRun`,
+`state.json`, and `DeliveryBasis` are not migrated or changed.
 
 ## Wiki projection and publication
 

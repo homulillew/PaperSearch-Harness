@@ -604,10 +604,13 @@ Research State 已经确认某个重要问题仍然开放。
 
 ## 18. Primary Paper 导航由确定性 Presentation 提供
 
-Authoring 只声明结构化 citation token、citation metadata，以及需要把方法名导航到
-Primary Paper 时的 `{{paper:citation_id|Method Name}}` token。canonical URL、citation
-number 与 bibliography 由确定性 Presentation 统一解析，不依赖 Authoring 记住或复制
-URL。paper navigation token 必须伴随正式 citation；链接不替代 claim 附近的证据引用。
+当正文首次正式引入一个具名方法或系统，且对应 retained Primary Paper 具有 canonical
+navigation 时，Authoring 应在该次引入发出
+`{{paper:citation_id|Method Name}}`。Authoring 只声明这种语义关联和结构化 citation，
+不接收、记忆或复制 canonical URL；URL、citation number 与 bibliography 由确定性
+Presentation 统一解析。paper navigation token 必须伴随正式 citation；链接不替代 claim
+附近的证据引用。并非每篇被引用论文都对应正文中的具名方法，因此普通 citation 不被
+机械要求必须带 navigation token。
 
 不要手写 References，也不要手工替换内部 citation token。
 
@@ -741,6 +744,10 @@ Authoring 在提交稿件前可以做一次局部自检，但这不是独立读�
 - 获取新论文或形成新研究判断；
 
 则 Authoring 应停止自行修复，并返回最早有资格处理该问题的层。
+
+在 staged production path 中，如果当前 Brief 无法被忠实实现，Authoring 使用
+`submit-brief-insufficient` 提交中性的 problem、downstream effect、resolution condition
+和可选 location；不要把内部写作方案或指定 heading 文本传给 Constructor。
 
 概念上：
 
