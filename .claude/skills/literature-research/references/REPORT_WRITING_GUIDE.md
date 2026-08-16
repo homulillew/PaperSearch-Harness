@@ -1,13 +1,13 @@
 # 专业中文研究报告写作指南
 
-> 版本：v0.4
-> 适用角色：Writer / Report Reviser  
-> 适用范围：AI / ML 技术调研、领域综述与 Deep Research 长报告  
+> 版本：v0.5
+> 适用角色：Authoring（WRITE / REVISE）
+> 适用范围：AI / ML 技术调研、领域综述与 Deep Research 长报告
 > 目标：把已经完成的报告蓝图实现为自然、专业、连续、可核查的中文文章
 
 本指南规定的是**如何把既定的报告认知设计实现成成品文章**。
 
-研究状态决定报告在研究上**可以陈述什么**；报告蓝图决定这一篇报告**准备让读者形成什么认识，以及通过什么认知顺序形成这些认识**；本指南规定 Writer **如何把这条认知路径实现成自然语言和信息结构**。
+研究状态决定报告在研究上**可以陈述什么**；报告蓝图决定这一篇报告**准备让读者形成什么认识，以及通过什么认知顺序形成这些认识**；本指南规定 Authoring **如何把这条认知路径实现成自然语言和信息结构**。
 
 因此：
 
@@ -18,11 +18,11 @@
 报告蓝图
 决定：这篇报告准备怎样让读者理解
         ↓
-Writer
+Authoring
 决定：这些认识具体怎样被写成文章
 ```
 
-Writer 拥有文章组织与表达权，但没有研究裁决权，也不重新承担全局报告构造权。
+Authoring 拥有唯一的正文实现权；WRITE 与 REVISE 是同一权力的两种动作，不是两个独立语义角色。Authoring 没有研究裁决权，也不重新承担全局报告构造权。
 
 本指南不保存研究事实，不判断研究是否完成，不替代报告蓝图，不替代读者审查，也不替代研究完整性审查。
 
@@ -36,7 +36,7 @@ Writer 拥有文章组织与表达权，但没有研究裁决权，也不重新�
 
 ## 1. 继承报告蓝图，不重新规划报告
 
-Writer 首先执行报告蓝图，而不是重新决定：
+Authoring 首先执行报告蓝图，而不是重新决定：
 
 - 全文最重要的认识是什么；
 - 哪些路线应该成为主要分类；
@@ -47,7 +47,7 @@ Writer 首先执行报告蓝图，而不是重新决定：
 
 这些属于报告构造阶段。
 
-Writer 可以决定：
+Authoring 可以决定：
 
 - 段落如何划分；
 - 句子怎样组织；
@@ -56,7 +56,7 @@ Writer 可以决定：
 - 在不改变语义的前提下调整局部表达顺序；
 - 为了可读性展开蓝图中已经要求的必要解释步骤。
 
-Writer 不应自行：
+Authoring 不应自行：
 
 - 重命名 Report Brief 已确定的 heading；
 - 交换同层 sibling section 或同构 subtree；
@@ -74,11 +74,11 @@ Writer 不应自行：
 
 核心原则：
 
-> **Writer 的任务是实现认知设计，不是重新做一次报告构造。**
+> **Authoring 的任务是实现认知设计，不是重新做一次报告构造。**
 
-> **Constructor 决定 heading；Writer 忠实实现 heading。**
+> **Constructor 决定 heading；Authoring 忠实实现 heading。**
 
-Writer 必须逐项保留 Report Brief 已确定的 heading text、heading order、heading depth 和 parent-child ownership。正文表达仍属于 Writer：段落、句子、过渡以及局部 prose/list/table 呈现不因此转交给 Constructor。
+Authoring 必须逐项保留 Report Brief 已确定的 heading text、heading order、heading depth 和 parent-child ownership。正文表达仍属于 Authoring：段落、句子、过渡以及局部 prose/list/table 呈现不因此转交给 Constructor。
 
 报告标题与 section heading 必须使用 ATX 语法：`# Report Title`、`## Section`、`### Subsection`。不要使用 Setext underline heading。如果 heading wording、层级或材料不足以支持一条连续、可信的正文论证，应返回 `BriefInsufficient` 到报告构造阶段，而不是自行改名或补出新的全局结构。
 
@@ -111,7 +111,7 @@ Writer 必须逐项保留 Report Brief 已确定的 heading text、heading order
 
 论文名称应该出现在真正需要识别代表方法、历史节点或证据来源的位置，而不是成为正文默认骨架。
 
-综合不能超出报告蓝图和研究状态已经允许的关系。Writer 可以把已有关系讲清楚，但不能为了形成“更好的故事”自行创造新的领域判断。
+综合不能超出报告蓝图和研究状态已经允许的关系。Authoring 可以把已有关系讲清楚，但不能为了形成“更好的故事”自行创造新的领域判断。
 
 ---
 
@@ -139,7 +139,7 @@ Writer 必须逐项保留 Report Brief 已确定的 heading text、heading order
 
 当边界模糊时，应明确说明方法可能跨越多个类别。
 
-如果报告蓝图已经规定了全文分类或共同比较坐标，Writer 应持续使用同一套坐标，不应在不同章节临时更换分类逻辑。
+如果报告蓝图已经规定了全文分类或共同比较坐标，Authoring 应持续使用同一套坐标，不应在不同章节临时更换分类逻辑。
 
 如果写作过程中发现蓝图分类本身无法解释重要材料之间的关系，应返回报告构造阶段，而不是自行重做 taxonomy。
 
@@ -149,7 +149,7 @@ Writer 必须逐项保留 Report Brief 已确定的 heading text、heading order
 
 长报告不是把若干局部正确章节拼接起来。
 
-Writer 应让读者的领域模型在阅读过程中总体持续积累：
+Authoring 应让读者的领域模型在阅读过程中总体持续积累：
 
 ```text
 M0
@@ -167,9 +167,9 @@ M0 → 章节 B 的局部模型
 M0 → 章节 C 的局部模型
 ```
 
-报告蓝图中的 `narrative_logic` 和各节 `argument_flow` 描述的是认知依赖。
+报告蓝图中的 `conceptual_model`、`narrative_logic` 和各节有序 `semantic_moves` 描述的是认知依赖。
 
-Writer 的任务是把这些依赖真正写出来。
+Authoring 的任务是把这些依赖真正写出来。
 
 对每个重要认知动作，都应检查：
 
@@ -499,7 +499,7 @@ Writer 的任务是把这些依赖真正写出来。
 
 方法比较不是把所有论文数字放入一张表。
 
-如果报告蓝图已经规定了稳定比较维度，Writer 应在不同章节持续复用这些坐标，不要每一节重新发明自己的评价标准。
+如果报告蓝图已经规定了稳定比较维度，Authoring 应在不同章节持续复用这些坐标，不要每一节重新发明自己的评价标准。
 
 常见的有效比较问题包括：
 
@@ -525,7 +525,7 @@ Writer 的任务是把这些依赖真正写出来。
 
 不同论文结果不同，不自动等于领域存在争议。
 
-在正式报告交付的权责边界下，Writer 不负责重新钻入论文裁决：
+在正式报告交付的权责边界下，Authoring 不负责重新钻入论文裁决：
 
 - 是否真的检验了同一个命题；
 - benchmark / model / budget 是否足够可比；
@@ -534,13 +534,13 @@ Writer 的任务是把这些依赖真正写出来。
 
 这些研究关系应当已经由 Research State、Report Brief 或其中的 material / evidence boundary 提供。
 
-如果已有材料明确表明条件不同，Writer 应准确写出：
+如果已有材料明确表明条件不同，Authoring 应准确写出：
 
 > 现有结果并不一致，但当前证据不足以判断差异来自方法本身还是实验条件。
 
-如果已有材料明确支持可比的正反证据，Writer 可以使用“冲突”或“争议”等更强表述。
+如果已有材料明确支持可比的正反证据，Authoring 可以使用“冲突”或“争议”等更强表述。
 
-如果现有 Brief / material 没有提供足够信息来判断证据关系，Writer 不应自行重新研究或扩大解释权限，而应反馈：
+如果现有 Brief / material 没有提供足够信息来判断证据关系，Authoring 不应自行重新研究或扩大解释权限，而应反馈：
 
 ```text
 Report Brief / material insufficient
@@ -551,7 +551,7 @@ Report Brief / material insufficient
 
 原则是：
 
-> **Writer 负责实现已接受的证据关系，不负责重新裁决证据关系。**
+> **Authoring 负责实现已接受的证据关系，不负责重新裁决证据关系。**
 
 
 ## 16. 保持已经确定的不确定性类型
@@ -573,11 +573,11 @@ Report Brief / material insufficient
 **领域尚未解决**  
 Research State 已经确认某个重要问题仍然开放。
 
-这些分类应来自 Research State / Report Brief 已经接受的语义，而不是由 Writer 在写作阶段重新判定。
+这些分类应来自 Research State / Report Brief 已经接受的语义，而不是由 Authoring 在写作阶段重新判定。
 
 开放问题应从正文已经建立的限制和关系自然出现，而不是在结尾临时添加“未来可以进一步研究”。
 
-如果 Writer 发现某项材料的证据状态无法从 Brief 中确定，应返回 Report Constructor；Writer 不负责把疑似缺口升级成新的 Research Gap 或 Open Problem。
+如果 Authoring 发现某项材料的证据状态无法从 Brief 中确定，应返回 Report Constructor；Authoring 不负责把疑似缺口升级成新的 Research Gap 或 Open Problem。
 
 
 ## 17. 正文不要泄漏内部 Research Runtime
@@ -602,23 +602,14 @@ Research State 已经确认某个重要问题仍然开放。
 
 ---
 
-## 18. 方法名称优先提供 Primary Paper 导航
+## 18. Primary Paper 导航由确定性 Presentation 提供
 
-当算法、系统或方法拥有当前 retained Paper 中明确的 canonical URL 时：
+Authoring 只声明结构化 citation token、citation metadata，以及需要把方法名导航到
+Primary Paper 时的 `{{paper:citation_id|Method Name}}` token。canonical URL、citation
+number 与 bibliography 由确定性 Presentation 统一解析，不依赖 Authoring 记住或复制
+URL。paper navigation token 必须伴随正式 citation；链接不替代 claim 附近的证据引用。
 
-第一次正式介绍该方法名称，应优先写成 Markdown 超链接：
-
-```markdown
-[MethodName](canonical-paper-url)
-```
-
-超链接的作用是方便读者进入 Primary Paper。
-
-它**不替代正式 citation**。
-
-相关机制、实验数字和判断仍应使用结构化引用，并尽量靠近实际 claim。
-
-同一方法后续出现时不必重复链接。
+不要手写 References，也不要手工替换内部 citation token。
 
 ---
 
@@ -643,7 +634,7 @@ Research State 已经确认某个重要问题仍然开放。
 
 > Abstract 的概括不能自动替代具体实验 setting。
 
-Writer 负责把已有证据放到正确的位置，但不负责重新裁决证据是否足以支持新的研究判断。
+Authoring 负责把已有证据放到正确的位置，但不负责重新裁决证据是否足以支持新的研究判断。
 
 ---
 
@@ -688,7 +679,7 @@ Writer 负责把已有证据放到正确的位置，但不负责重新裁决证�
 
 不要为了显得精确而加入与当前判断无关的数字。
 
-如果报告蓝图明确要求某项材料承担关键认知作用，Writer 不应无理由省略；如果蓝图提供的材料过多或无法形成连续论证，应返回报告构造阶段，而不是自行重新筛选研究结论。
+`reader_visible_obligation` 非空时，Authoring 必须实现其认知功能，但无需复现原句或 exact number。support-only material 可以综合、压缩或省略。如果这些自由仍不足以形成连续论证，应返回报告构造阶段，而不是自行重做认知设计。
 
 ---
 
@@ -717,19 +708,19 @@ Writer 负责把已有证据放到正确的位置，但不负责重新裁决证�
 
 具体日期来自当前研究过程，不写死在本 Guide 中。
 
-Writer 不应通过临时搜索或重新浏览最新论文来刷新这些判断；如果时间边界需要更新，应回到有研究权限的阶段。
+Authoring 不应通过临时搜索或重新浏览最新论文来刷新这些判断；如果时间边界需要更新，应回到有研究权限的阶段。
 
 ---
 
-## 22. Writer 交付前自检，但不替代 Reader Gate
+## 22. Authoring 交付前自检，但不替代 Reader Gate
 
-Writer 在提交稿件前可以做一次局部自检，但这不是独立读者审查。
+Authoring 在提交稿件前可以做一次局部自检，但这不是独立读者审查。
 
 至少检查：
 
 - 全文是否实现报告蓝图的核心认识；
 - 各节是否真正完成其认知任务；
-- `argument_flow` 中必要的认知台阶是否已经写出；
+- `semantic_moves` 中必要的认知台阶是否已经按依赖顺序写出；
 - 新章节是否继承前文已经建立的概念和比较坐标；
 - 是否存在大量局部正确但全局闲置的材料；
 - 是否用模板化过渡替代真实逻辑；
@@ -738,7 +729,7 @@ Writer 在提交稿件前可以做一次局部自检，但这不是独立读者�
 - 结论中的概念和分类是否都已经在正文中建立；
 - 正文是否泄漏内部 Research Runtime。
 
-如果发现的问题可以通过语言、段落、局部顺序或呈现形式解决，Writer 可以直接修复。
+如果发现的问题可以通过语言、段落、局部顺序或呈现形式解决，Authoring 可以直接修复。
 
 如果发现需要：
 
@@ -749,22 +740,22 @@ Writer 在提交稿件前可以做一次局部自检，但这不是独立读者�
 - 改变 intentional omissions；
 - 获取新论文或形成新研究判断；
 
-则 Writer 应停止自行修复，并返回最早有资格处理该问题的层。
+则 Authoring 应停止自行修复，并返回最早有资格处理该问题的层。
 
 概念上：
 
 ```text
 正文实现问题
-→ Writer / Reviser
+→ Authoring (WRITE / REVISE)
 
 报告蓝图不足
 → Report Constructor
 
-研究判断不足或错误
-→ Research
+Brief 无法由 accepted semantics 支持
+→ Report Constructor 判断是否升级 Research
 ```
 
-Writer 自检通过不意味着 Reader Gate PASS。
+Authoring 自检通过不意味着 Reader Gate PASS。
 
 任何最终稿仍需由不知道作者内部意图的新 Reviewer 从盲读阶段重新审查。
 
@@ -772,7 +763,7 @@ Writer 自检通过不意味着 Reader Gate PASS。
 
 ## 23. 最终目标
 
-交付前，Writer 的目标不是“把所有研究内容写进去”，而是让目标读者沿着报告蓝图设计的认知路径，准确形成主要领域认识。
+交付前，Authoring 的目标不是“把所有研究内容写进去”，而是让目标读者沿着报告蓝图设计的认知路径，准确形成主要领域认识。
 
 最终成品应做到：
 

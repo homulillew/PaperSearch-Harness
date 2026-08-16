@@ -37,6 +37,7 @@ from .context import (
     ContextProjectionService,
     DeliveryView,
     InspectResult,
+    ReportConstructionContext,
     ResearchView,
 )
 from .delivery import (
@@ -460,6 +461,12 @@ class DeliveryCapabilities:
                 "Delivery view requires DELIVERY lifecycle"
             )
         return view
+
+    def report_construction_context(self, run_id: str) -> ReportConstructionContext:
+        """Return the narrow, anti-anchoring projection for construction."""
+
+        self._require_delivery(run_id)
+        return self._context.report_construction_context(run_id)
 
     def inspect(
         self,

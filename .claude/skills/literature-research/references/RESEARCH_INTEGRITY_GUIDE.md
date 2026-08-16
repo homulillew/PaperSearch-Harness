@@ -1,5 +1,8 @@
 # Research Integrity Guide
 
+> 版本：v0.5
+> 适用角色：Research Integrity Reviewer / Research Claim Integrity Authority
+
 本指南定义 AI / ML 技术调研报告的 Research Integrity 检查标准。
 
 它不负责文风，不负责重新组织文章，也不决定 Research Run 是否完成。
@@ -31,7 +34,7 @@ Research Integrity Reviewer 可以要求修改 Delivery，也可以在发现实�
 
 如果报告需要的新判断本身有价值但当前 State 没有证据，应：
 
-> 返回 Research，而不是让 Writer 自行补充。
+> 返回 Research，而不是让 Authoring 自行补充。
 
 ---
 
@@ -507,7 +510,7 @@ Integrity Reviewer 应检查：
 
 不允许：
 
-> Writer 在阅读 Delivery View 后自行产生 State 中从未形成的新领域结论。
+> Authoring 在阅读 Delivery View 后自行产生 State 中从未形成的新领域结论。
 
 如果新的 synthesis 实际构成重要研究判断：
 
@@ -517,9 +520,10 @@ Integrity Reviewer 应检查：
 
 ## 23. Integrity Reviewer 的处理方式
 
-发现问题后分两类。
+Integrity 与 Fresh Reader 独立，只检查 research fidelity，不检查 prose quality。它只裁决，
+不直接编辑 Brief、Manuscript 或 Research State。发现问题后按最早有资格修复的层归因。
 
-### Delivery-only repair
+### MANUSCRIPT
 
 例如：
 
@@ -531,7 +535,12 @@ Integrity Reviewer 应检查：
 
 可以在 Delivery 中修正。
 
-### Research deficiency
+### BRIEF
+
+Research State 正确，但 Brief 的 evidence boundary、generalization、材料选择或 conceptual
+framing 已经不忠实于 accepted semantics。返回 `REVISE_DELIVERY(target=BRIEF)`。
+
+### RESEARCH
 
 例如：
 

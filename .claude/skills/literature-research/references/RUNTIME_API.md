@@ -205,6 +205,7 @@ Submission input contains `completion_check_ref`, `verdict`, `reasons`, and opti
 
 ```text
 delivery-view --run-id RUN
+report-construction-input --run-id RUN
 delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
 put-report-brief --run-id RUN --input FILE
@@ -228,10 +229,25 @@ Integrity certifications.
 `put-report-brief` accepts the Report Brief schema. Python validates Requirement and
 Research ref namespaces independently; a material `source_ref` must name a retained
 paper, and a material `locator` requires `source_ref`. Accepting a new Brief binds it to
-the current `DeliveryBasis` and invalidates all downstream work. Every section requires
-an integer `outline_depth >= 0` (`bool` is not an integer here): depth 0 maps to Markdown
-H2, depth 1 to H3, and so on. Sections form an ordered implicit tree; the first depth is
-0 and a descent cannot skip a level. The field has no compatibility default.
+the current `DeliveryBasis` and invalidates all downstream work. Required top-level
+semantic fields are `report_title`, `audience`, `report_goal`, `conceptual_model`,
+`reader_takeaway`, `narrative_logic`, and `sections`. Every section requires ordered
+non-empty `semantic_moves`, a non-empty `evidence_boundary`, and
+an integer `0 <= outline_depth <= 4` (`bool` is not an integer here): depth 0 maps to
+Markdown H2, depth 1 to H3, and depth 4 to H6. Sections form an ordered implicit tree; the first depth is
+0 and a descent cannot skip a level. Brief material may carry
+`reader_visible_obligation`: null means support-only material that Authoring may
+compress or omit; non-null names the cognitive function that must reach the reader.
+These fields have no compatibility migration.
+
+`report-construction-input` is the Constructor's default production input. Its
+`context` contains Contract and accepted approach/finding/open-problem/gap semantics
+with stable refs, but excludes paper inventory, representative-paper refs and source
+inventories. Its optional `repair` is non-null only for a pending BRIEF rebuild and
+contains the previous Brief plus neutral `problem`, `downstream_effect`,
+`resolution_condition`, and optional `location`. Call it before initial construction
+and again before rebuilding a Brief. Targeted evidence remains available through
+`delivery-inspect` and `delivery-read-source`.
 
 `put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
 tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
@@ -241,37 +257,53 @@ order, depth, and normalized text exactly match the Brief section titles and dep
 Normalization removes only outer whitespace and valid optional ATX closing hashes; it
 does not perform case folding, punctuation removal, fuzzy matching, or synonym matching.
 The Manuscript must contain exactly one reader-visible H1, and that H1 must be the first
-reader-visible heading. Its text is not compared with the Brief. Fenced-code,
+reader-visible heading. Its normalized text must exactly equal Brief `report_title`.
+Fenced-code,
 blockquote, and indented-code headings do not count.
 
-Writer must use ATX syntax for the report title and every section heading (`# Title`,
+Authoring must use ATX syntax for the report title and every section heading (`# Title`,
 `## Section`, `### Subsection`). Setext headings are outside this protocol.
 
+For first-use method-name navigation, Authoring may write
+`{{paper:method|Method Name}}` alongside `{{cite:method}}`. The identifier must have a
+citation declaration and a matching structured citation token; navigation never replaces
+claim support.
+
 `render-reader-preview` is read-only, deterministic, and available after the current
-Brief and Manuscript are accepted. It renders internal citation tokens to the same
-compact reader surface used for final delivery (`[n]`, never locator text), returns the
+Brief and Manuscript are accepted. It renders internal citation/navigation tokens to the
+same reader surface used for final delivery. A structured paper token becomes
+`[Method Name](canonical_url)` on the paper's first navigation use. Without one, the
+first rendered citation falls back to `[n](canonical_url)`; later citations are `[n]` and
+locator text remains hidden. It returns the
 source Brief and Manuscript digests, and does not persist an artifact, add a digest
 authority, or create certification. The fresh Reader must receive this preview rather
 than raw `{{cite:id}}` tokens; its results remain bound to the returned source
 `manuscript_digest`.
 
+Before Reader review, `put-report-manuscript` and preview run deterministic Presentation
+preflight: exact headings, citation declarations/tokens, internal-ref leakage,
+unsupported deterministic tokens, fenced-block closure, and the supported mechanical
+Markdown-LaTeX delimiter invariants. Presentation rejects rather than semantically
+rewriting content.
+
 `submit-blind-review` accepts `core_understanding`, `domain_model`,
-`comparison_coordinates`, `reverse_outline`, `manuscript_digest`, and optional
-`blocking_issues`. Each Blind issue has `problem`, `reader_effect`, `why_blocking`, and
-optional `location`; it has no repair target. Python freezes the complete result and
-returns `blind_read_digest`.
+`comparison_coordinates`, `reverse_outline`, `material_economy`,
+`professional_finish`, `manuscript_digest`, and optional `cognitive_friction` /
+`blocking_issues`. Each friction observation has `location`, `observation`, and
+`reader_cost`; it is not automatically a blocker. Each Blind issue has `problem`,
+`reader_effect`, `why_blocking`, and optional `location`; it has no repair target.
+Python freezes the complete result and returns `blind_read_digest`.
 
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
 current `manuscript_digest`, and Phase 2 `blocking_issues`. Each Phase 2 issue adds a
-`repair_target` (`MANUSCRIPT`, `BRIEF`, or `POSSIBLE_RESEARCH_ISSUE`). A mismatched Blind
+non-empty `resolution_condition` and `repair_target` (`MANUSCRIPT` or `BRIEF`). A mismatched Blind
 digest is rejected. If the frozen Blind Read has blockers, Phase 2 must retain at least
 one blocker (consolidation is allowed). A `MANUSCRIPT` or `BRIEF` blocker creates a
 pending repair obligation that only a changed digest at that layer can clear.
-`POSSIBLE_RESEARCH_ISSUE` returns a confirmation-required result, pauses certification,
-and does not change lifecycle; use targeted Delivery inspection/source reads for
-Research-authority confirmation. Confirmed insufficiency requires explicit
-`reopen-research`; otherwise submit a genuinely new upstream Delivery work-product
-version and rerun the gates.
+Reader cannot attribute RESEARCH. A condition missing from Brief routes to BRIEF;
+Constructor then decides whether accepted semantics support a rebuild or Research must
+be reopened. When both targets occur, BRIEF wins and stale Manuscript blockers do not
+become obligations for the new Brief/manuscript pair.
 
 `submit-integrity-review` accepts `disposition`, `issues`, and optional `revise_target`.
 It requires a matching current Reader PASS. `PASS` creates the version-bound Integrity
@@ -292,10 +324,11 @@ but no Research semantic authority, never enters `state.json` / `ResearchRun` or
 remain removable at `workspace/scratch/<run_id>/captures/report/`. Validate the
 published artifact before closing.
 
-`report_session.json` uses schema version 3. A schema-v2 Delivery session cannot continue
-as a current certified session because its Brief lacks required hierarchy; rebuild the
-Report Brief with `put-report-brief`. `ResearchRun`, `state.json`, and `DeliveryBasis` are
-not migrated or changed.
+`report_session.json` uses schema version 4. Any older Delivery session cannot continue
+as a current certified session because its Brief and Blind Read lack required v0.5
+semantics; rebuild the Report Brief with `put-report-brief`. Missing semantic values are
+not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis` are not migrated or
+changed.
 
 ## Wiki projection and publication
 

@@ -98,6 +98,7 @@ from my_search_harness.runtime import (  # noqa: E402
     BlockingIssue,
     BriefMaterial,
     CitationReference,
+    CognitiveFrictionObservation,
     BlockingGapSpec,
     ContextContinuation,
     ContextSection,
@@ -430,11 +431,23 @@ def _brief_material(value: object) -> BriefMaterial:
     _shape(
         value,
         required=frozenset({"content"}),
-        optional=frozenset({"role", "research_refs", "source_ref", "locator"}),
+        optional=frozenset(
+            {
+                "role",
+                "reader_visible_obligation",
+                "research_refs",
+                "source_ref",
+                "locator",
+            }
+        ),
     )
     return BriefMaterial(
         content=_string(value["content"], "material.content"),
         role=_optional_string(value.get("role"), "material.role"),
+        reader_visible_obligation=_optional_string(
+            value.get("reader_visible_obligation"),
+            "material.reader_visible_obligation",
+        ),
         research_refs=_optional_strings(value, "research_refs"),
         source_ref=_optional_string(value.get("source_ref"), "material.source_ref"),
         locator=_locator(value.get("locator")),
@@ -446,8 +459,10 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
         value,
         required=frozenset(
             {
+                "report_title",
                 "audience",
                 "report_goal",
+                "conceptual_model",
                 "reader_takeaway",
                 "narrative_logic",
                 "sections",
@@ -469,13 +484,12 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
                     "title",
                     "purpose",
                     "reader_takeaway",
-                    "argument_flow",
+                    "semantic_moves",
                     "outline_depth",
+                    "evidence_boundary",
                 }
             ),
-            optional=frozenset(
-                {"requirement_refs", "research_refs", "material", "evidence_boundary"}
-            ),
+            optional=frozenset({"requirement_refs", "research_refs", "material"}),
         )
         raw_material = raw.get("material", [])
         if not isinstance(raw_material, list):
@@ -487,15 +501,17 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
                 reader_takeaway=_string(
                     raw["reader_takeaway"], "section.reader_takeaway"
                 ),
-                argument_flow=_string(raw["argument_flow"], "section.argument_flow"),
+                semantic_moves=_strings(
+                    raw["semantic_moves"], "section.semantic_moves"
+                ),
                 outline_depth=_non_negative_integer(
                     raw["outline_depth"], "section.outline_depth"
                 ),
                 requirement_refs=_optional_strings(raw, "requirement_refs"),
                 research_refs=_optional_strings(raw, "research_refs"),
                 material=tuple(_brief_material(item) for item in raw_material),
-                evidence_boundary=_optional_string(
-                    raw.get("evidence_boundary"), "section.evidence_boundary"
+                evidence_boundary=_string(
+                    raw["evidence_boundary"], "section.evidence_boundary"
                 ),
             )
         )
@@ -513,8 +529,10 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
             )
         )
     return ReportBrief(
+        report_title=_string(value["report_title"], "report_title"),
         audience=_string(value["audience"], "audience"),
         report_goal=_string(value["report_goal"], "report_goal"),
+        conceptual_model=_string(value["conceptual_model"], "conceptual_model"),
         reader_takeaway=_string(value["reader_takeaway"], "reader_takeaway"),
         narrative_logic=_string(value["narrative_logic"], "narrative_logic"),
         sections=tuple(sections),
@@ -548,11 +566,35 @@ def _blind_read(value: Mapping[str, object]) -> BlindReadResult:
                 "domain_model",
                 "comparison_coordinates",
                 "reverse_outline",
+                "material_economy",
+                "professional_finish",
                 "manuscript_digest",
             }
         ),
-        optional=frozenset({"blocking_issues"}),
+        optional=frozenset({"cognitive_friction", "blocking_issues"}),
     )
+    raw_friction = value.get("cognitive_friction", [])
+    if not isinstance(raw_friction, list):
+        raise AdapterInputError("cognitive_friction must be an array")
+    friction: list[CognitiveFrictionObservation] = []
+    for raw in raw_friction:
+        if not isinstance(raw, dict):
+            raise AdapterInputError("cognitive_friction entries must be objects")
+        _shape(
+            raw,
+            required=frozenset({"location", "observation", "reader_cost"}),
+        )
+        friction.append(
+            CognitiveFrictionObservation(
+                location=_string(raw["location"], "cognitive_friction.location"),
+                observation=_string(
+                    raw["observation"], "cognitive_friction.observation"
+                ),
+                reader_cost=_string(
+                    raw["reader_cost"], "cognitive_friction.reader_cost"
+                ),
+            )
+        )
     raw_issues = value.get("blocking_issues", [])
     if not isinstance(raw_issues, list):
         raise AdapterInputError("blocking_issues must be an array")
@@ -563,7 +605,12 @@ def _blind_read(value: Mapping[str, object]) -> BlindReadResult:
             value["comparison_coordinates"], "comparison_coordinates"
         ),
         reverse_outline=_string(value["reverse_outline"], "reverse_outline"),
+        material_economy=_string(value["material_economy"], "material_economy"),
+        professional_finish=_string(
+            value["professional_finish"], "professional_finish"
+        ),
         manuscript_digest=_string(value["manuscript_digest"], "manuscript_digest"),
+        cognitive_friction=tuple(friction),
         blocking_issues=tuple(_blind_issue(item) for item in raw_issues),
     )
 
@@ -574,9 +621,15 @@ def _blocking_issue(value: object) -> BlockingIssue:
     _shape(
         value,
         required=frozenset(
-            {"problem", "reader_effect", "why_blocking", "repair_target"}
+            {
+                "problem",
+                "reader_effect",
+                "why_blocking",
+                "resolution_condition",
+                "repair_target",
+            }
         ),
-        optional=frozenset({"location", "brief_ref", "suggested_repair_direction"}),
+        optional=frozenset({"location", "brief_ref"}),
     )
     try:
         target = RepairTarget(_string(value["repair_target"], "repair_target"))
@@ -586,12 +639,12 @@ def _blocking_issue(value: object) -> BlockingIssue:
         problem=_string(value["problem"], "problem"),
         reader_effect=_string(value["reader_effect"], "reader_effect"),
         why_blocking=_string(value["why_blocking"], "why_blocking"),
+        resolution_condition=_string(
+            value["resolution_condition"], "resolution_condition"
+        ),
         repair_target=target,
         location=_optional_string(value.get("location"), "location"),
         brief_ref=_optional_string(value.get("brief_ref"), "brief_ref"),
-        suggested_repair_direction=_optional_string(
-            value.get("suggested_repair_direction"), "suggested_repair_direction"
-        ),
     )
 
 
@@ -758,6 +811,9 @@ def _parser() -> argparse.ArgumentParser:
 
     reader_preview = commands.add_parser("render-reader-preview")
     reader_preview.add_argument("--run-id", required=True)
+
+    construction_input = commands.add_parser("report-construction-input")
+    construction_input.add_argument("--run-id", required=True)
 
     publish = commands.add_parser("publish-certified-report")
     _add_run_revision(publish)
@@ -1030,6 +1086,8 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
             args.paper_ref,
             _locator_args(args),
         )
+    if args.command == "report-construction-input":
+        return certified.construction_input(args.run_id)
     if args.command == "put-report-brief":
         return certified.put_brief(args.run_id, _report_brief(_load_input(args.input)))
     if args.command == "put-report-manuscript":
@@ -1170,6 +1228,7 @@ _DELIVERY_COMMANDS = {
     "delivery-view",
     "delivery-inspect",
     "delivery-read-source",
+    "report-construction-input",
     "put-report-brief",
     "put-report-manuscript",
     "submit-blind-review",

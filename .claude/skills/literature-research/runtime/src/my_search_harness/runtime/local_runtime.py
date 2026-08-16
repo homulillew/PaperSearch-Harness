@@ -148,14 +148,16 @@ class LocalV1Runtime:
         review_guide_path: str | Path,
         integrity_guide_path: str | Path,
     ) -> ReportPipeline:
-        """Bind report actors and the explicitly configured Delivery guides.
+        """Bind the compatibility/reference in-process report runner.
 
         The five guides are loaded here (not interpreted): the Report Quality
         Standard defines the shared target, the Construction Guide drives the
-        Constructor, the Writing Guide drives the Writer, the Review Guide
-        drives the two-phase Reader, and the Integrity Guide drives the
-        Research Integrity Reviewer. Each is a non-empty string the pipeline
-        validates at construction time.
+        Constructor, the Writing Guide drives Authoring's WRITE and REVISE
+        actions, the Review Guide drives the two-phase Reader, and the
+        Integrity Guide drives the Research Integrity Reviewer. Each is a
+        non-empty string the pipeline validates at construction time. Formal
+        production delivery uses ``certified_report_delivery`` and staged
+        commands.
         """
 
         return ReportPipeline(

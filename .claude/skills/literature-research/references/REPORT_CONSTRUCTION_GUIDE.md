@@ -1,95 +1,125 @@
-# 专业研究报告构造指南
+# Report Construction Guide
 
-> 版本：v0.4
-> 适用角色：Report Constructor
-> 目标：把已接受的 Research State 构造成保真、可导航的 Report Brief
+> 版本：v0.5
+> 适用角色：Report Constructor / Cognitive Design Authority
+> 目标：把已接受的研究语义编译为可由 Authoring 实现、可由读者验证的 Report Brief
 
-## 1. 权责边界
+Constructor 不写正文，也不重新研究。它只拥有报告的认知设计权；`Report Brief`
+仍是唯一报告语义中间层。
 
-Constructor 负责选择材料、设计读者认知路径、建立认知分组，并判断哪些分组值得成为读者可见的导航节点。它决定 section 顺序、父子归属和 `outline_depth`；Writer 只负责忠实实现这些裁决。
+## 1. 输入边界
 
-核心原则：
-
-> **结构不是排版，而是交付语义。**
-
-> **认知步骤不等于导航节点。**
-
-> **Research taxonomy 不自动成为 Report taxonomy。**
-
-Research Contract 决定报告必须回答什么；Report Brief 决定怎样组织这些答案。“覆盖主要技术路线”默认是内容要求，除非用户明确要求布局，不应自动变成“按技术路线逐章组织”。
-
-## 2. 从认知路径到可见层级
-
-先确定读者完成报告后应形成的总体认识，再安排建立这一认识所需的背景、机制、比较和闭合顺序。只有当一个认知分组值得专业读者之后扫描、回访、比较或定位时，才把它设为 section 导航节点。
-
-`ReportBrief.sections` 是按阅读顺序排列的扁平树表示：
+默认输入是 `ReportConstructionInput`：
 
 ```text
-outline_depth 0 → Markdown H2
-outline_depth 1 → Markdown H3
-outline_depth 2 → Markdown H4
+ReportConstructionContext
++
+optional BriefRepairContext
 ```
 
-首个 section 必须为 depth 0，向下最多逐级进入，向上可以回到任意已有层级。深度表达语义归属，不表达重要性评分。
+`ReportConstructionContext` 只暴露 Contract、accepted approach semantics、Findings、
+Open Problems、未解决的 Delivery-relevant gaps 与 stable semantic refs。它不默认暴露：
 
-`ReportBriefSection.title` 是最终 reader-visible heading 的正式文本，不是内部 label。Constructor 提交 Brief 前必须同时判断标题是否专业、自然、有导航价值，并适合作为最终成品标题；Writer 不负责重新命名。所有报告标题和 section heading 使用 ATX syntax，`outline_depth` 对应 ATX H2+。
+- paper inventory；
+- representative-paper refs；
+- Finding / Open Problem source inventories；
+- authors、DOI、canonical URL；
+- raw evidence locators 或成批实验数字。
 
-## 3. 专业技术调研的宏观体裁
+需要解释细节时，先声明信息需要，再用 `delivery-inspect` / `delivery-read-source`
+按 stable ref 定向下钻。不要让已经看到的材料反向决定全文结构。
 
-强默认是：
+## 2. 同一次构造工作的认知顺序
+
+Constructor 在一次语义工作内依次完成：
 
 ```text
-摘要
-领域概览
-主体综合
-横向比较（适用时）
-开放问题（适用时）
-结论
+Framing
+→ Information Architecture
+→ Evidence Selection
+→ Material Economy Audit
+→ Report Brief
 ```
 
-以下部分按任务条件选用：
+这些不是新的 Agent、stage 或持久化 work product。
+
+### Framing
+
+先确定 audience、report promise、精确 report title、读者 takeaway，以及组织全文所需的
+最小 conceptual model。不要先围绕论文清单、benchmark 或 exact metric 设计报告。
+
+### Information Architecture
+
+确定认知推进顺序、稳定比较坐标和 reader-visible section tree。只有具有独立导航与
+回访价值的认知分组才成为 heading；段落级 semantic move 不自动升级为 heading。
+
+Constructor 精确拥有：
+
+- H1 报告标题；
+- H2+ heading 文本、顺序、深度与父子归属；
+- report taxonomy；
+- 每节的 purpose、takeaway 与有序 `semantic_moves`。
+
+### Evidence Selection
+
+认知设计形成后，再选择建立、区分或校准当前判断所需的最小充分材料。保留 requirement
+与 research refs，明确每节 `evidence_boundary`。
+
+### Material Economy Audit
+
+对材料执行删除测试：“删掉它，读者会失去什么？”
+
+- `reader_visible_obligation = null`：support-only 候选池；Authoring 可以综合、压缩或省略。
+- 非空 `reader_visible_obligation`：所描述的认知功能必须送达读者；不要求复现原句或 exact number。
+
+不要把所有合法材料都变成正文消费清单。
+
+## 3. Report Brief v0.5
+
+Brief 必须表达：
 
 ```text
-最新进展与趋势
-研究范围与证据说明
-方法说明
+report_title
+audience
+report_goal
+conceptual_model
+reader_takeaway
+narrative_logic
+
+sections[]:
+  title
+  outline_depth
+  purpose
+  reader_takeaway
+  semantic_moves[]
+  requirement_refs[]
+  research_refs[]
+  material[]
+  evidence_boundary
+
+terminology[]
+intentional_omissions[]
 ```
 
-这些是 semantic defaults，不是固定模板。标题名称、数量和深度应服从当前问题、目标读者和认知路径；不适用的槽位可通过既有 `intentional_omissions` 说明。
+`semantic_moves` 是建立 section takeaway 所需的有序语义动作，不是段落计划、句子模板或
+reasoning trace。Brief 不保存 Constructor 的推理过程或 review history。
 
-## 4. 防止欠结构化与过度标题化
+## 4. BRIEF repair
 
-不要把需要回访的重要机制或比较全部压进长段落和粗体段首。也不要机械地把以下内容升级为 heading：
+repair mode 必须读取 previous Brief，以及每项 root-cause problem、downstream effect、
+resolution condition 和 optional location。反馈只规定修复后必须成立什么，不规定具体
+heading、新 section 数量或固定文本。
 
-- 一篇论文；
-- 一个实验；
-- `argument_flow` 中的每一步；
-- Research State 中每个既有分类。
+默认保留没有被反馈推翻的有效设计，执行 minimal sufficient reconstruction。如果 accepted
+research semantics 足以满足条件，重建 Brief。如果不形成新的 contract-facing research
+judgment 就无法满足条件，Constructor 才升级到 Research；Fresh Reader 不做这一判断。
 
-标题树应反映真实认知分组，而不是材料清单。多个代表工作服务于同一判断时，应在共同的认知节点内综合，而不是形成“一篇论文一个 H4”。
+## 5. 权限边界
 
-## 5. Semantic Ceiling
+Constructor 可以恢复 accepted semantics 的解释密度，但不能创造新 consensus、更强
+generalization、新 Approach relationship、新 Open Problem 或新的研究判断。它不写正文，
+不替 Authoring 决定段落、句子、过渡、prose/list/table 或局部节奏。
 
-Constructor 可以从已接受材料中恢复建立连续理解所必需的：
+最终原则：
 
-- 背景；
-- 机制解释；
-- 概念桥；
-- 代表例子；
-- 比较条件；
-- 规模校准。
-
-这些恢复不得形成 Research State 尚未接受的新共识、更强泛化、新路线关系、新开放问题或面向 Contract 的新研究判断。若缺失内容需要新的研究裁决，应请求具有 Research Authority 的阶段确认，而不是在 Brief 中补造。
-
-## 6. 交付前检查
-
-提交 Report Brief 前确认：
-
-1. sections 已覆盖交付要求，但没有把 Contract 的内容要求机械改写成章节布局；
-2. 顺序形成连续的认知路径；
-3. 每个 `section.title` 都专业、自然，并作为最终 heading 具有真实导航价值；
-4. `outline_depth` 准确表达各 section 的父子归属且没有跳级；
-5. 重要比较、开放问题和结论在适用时可被快速定位；
-6. Brief 没有越过已接受 Research semantics 的上限。
-
-若这些条件不能同时成立，先重构 Brief；不要把结构裁决留给 Writer 猜测。
+> 先设计读者必须形成的最小心智模型，再选择足以送达它的最少材料。

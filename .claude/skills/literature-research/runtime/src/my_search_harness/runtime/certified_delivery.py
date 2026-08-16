@@ -24,8 +24,11 @@ from .delivery import PublishReportResult, _ReportPublicationAuthorization
 from .reporting import (
     BlindBlockingIssue,
     BlindReadResult,
+    BriefRepairContext,
+    BriefRepairFeedback,
     BriefMaterial,
     CitationReference,
+    CognitiveFrictionObservation,
     IntegrityDisposition,
     IntegrityPass,
     LocalReportCaptureSink,
@@ -33,14 +36,15 @@ from .reporting import (
     RepairTarget,
     ReportBrief,
     ReportBriefSection,
+    ReportConstructionInput,
     ReportManuscript,
     ReportReviewResult,
-    ResearchConfirmationRequiredResult,
     ResearchIntegrityReview,
     blind_read_digest,
     brief_digest,
     delivery_basis_key,
     manuscript_digest,
+    reader_repair_target,
     validate_blind_read,
     validate_integrity_review,
     validate_report_brief,
@@ -60,7 +64,6 @@ class _PendingAction(StrEnum):
     NONE = "NONE"
     MANUSCRIPT_REPAIR_REQUIRED = "MANUSCRIPT_REPAIR_REQUIRED"
     BRIEF_REBUILD_REQUIRED = "BRIEF_REBUILD_REQUIRED"
-    RESEARCH_CONFIRMATION_REQUIRED = "RESEARCH_CONFIRMATION_REQUIRED"
     RESEARCH_REOPEN_REQUIRED = "RESEARCH_REOPEN_REQUIRED"
 
 
@@ -98,7 +101,7 @@ class ReaderPreviewResult:
 class CertifiedReportDelivery:
     """Production orchestrator for Claude-driven staged report delivery."""
 
-    _SCHEMA_VERSION = 3
+    _SCHEMA_VERSION = 4
     _OLDER_SCHEMA_MESSAGE = (
         "report delivery session uses an older schema and must rebuild "
         "the Report Brief"
@@ -114,6 +117,27 @@ class CertifiedReportDelivery:
         self._captures = LocalReportCaptureSink(self._workspace_root / "scratch")
         self._renderer = DeterministicCitationRenderer()
 
+    def construction_input(self, run_id: str) -> ReportConstructionInput:
+        """Build the authoritative staged input for a Constructor invocation."""
+
+        context = self._delivery.report_construction_context(run_id)
+        basis_key = delivery_basis_key(context.delivery_basis)
+        session = self._load_if_exists(run_id, basis_key)
+        if session is None:
+            return ReportConstructionInput(context=context)
+        pending = self._pending_action(session)
+        if pending is not _PendingAction.BRIEF_REBUILD_REQUIRED:
+            return ReportConstructionInput(context=context)
+        previous = self._require_brief(session)
+        feedback = self._brief_repair_feedback(session)
+        return ReportConstructionInput(
+            context=context,
+            repair=BriefRepairContext(
+                previous_brief=previous,
+                feedback=feedback,
+            ),
+        )
+
     def put_brief(self, run_id: str, brief: ReportBrief) -> CertifiedDeliveryStatus:
         view = self._delivery.view(run_id)
         validate_report_brief(view, brief)
@@ -127,7 +151,6 @@ class CertifiedReportDelivery:
                 pending
                 in {
                     _PendingAction.BRIEF_REBUILD_REQUIRED,
-                    _PendingAction.RESEARCH_CONFIRMATION_REQUIRED,
                 }
                 and existing.get("brief_digest") == b_digest
             ):
@@ -149,14 +172,11 @@ class CertifiedReportDelivery:
         brief = self._require_brief(session)
         validate_report_manuscript(manuscript)
         validate_outline_fidelity(brief, manuscript)
+        self._renderer.audit(self._delivery.view(run_id), manuscript)
         new_digest = manuscript_digest(manuscript)
         pending = self._pending_action(session)
         if (
-            pending
-            in {
-                _PendingAction.MANUSCRIPT_REPAIR_REQUIRED,
-                _PendingAction.RESEARCH_CONFIRMATION_REQUIRED,
-            }
+            pending is _PendingAction.MANUSCRIPT_REPAIR_REQUIRED
             and session.get("manuscript_digest") == new_digest
         ):
             raise CertifiedDeliveryError(
@@ -212,7 +232,7 @@ class CertifiedReportDelivery:
 
     def submit_reader_review(
         self, run_id: str, review: ReportReviewResult
-    ) -> CertifiedDeliveryStatus | ResearchConfirmationRequiredResult:
+    ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
         self._require_action_allowed(session, "submit-reader-review")
         brief = self._require_brief(session)
@@ -247,19 +267,6 @@ class CertifiedReportDelivery:
         self._captures.capture(
             run_id, f"reader_review_{m_digest[:12]}.json", _pretty(review)
         )
-        if any(
-            issue.repair_target is RepairTarget.POSSIBLE_RESEARCH_ISSUE
-            for issue in review.blocking_issues
-        ):
-            return ResearchConfirmationRequiredResult(
-                rationale=(
-                    "Reader reported a possible Research-layer issue; an actor "
-                    "with Research Authority must confirm before reopen-research"
-                ),
-                issues=review.blocking_issues,
-                brief_digest=b_digest,
-                manuscript_digest=m_digest,
-            )
         stage = "READER_PASS" if not review.blocking_issues else "READER_BLOCKED"
         return self._status(run_id, stage, session)
 
@@ -443,12 +450,16 @@ class CertifiedReportDelivery:
             raise CertifiedDeliveryError(
                 "report delivery session is unreadable"
             ) from exc
-        if isinstance(value, dict) and value.get("schema_version") == 2:
-            raise CertifiedDeliveryError(self._OLDER_SCHEMA_MESSAGE)
+        schema_version = (
+            value.get("schema_version") if isinstance(value, dict) else None
+        )
         if (
-            not isinstance(value, dict)
-            or value.get("schema_version") != self._SCHEMA_VERSION
+            isinstance(schema_version, int)
+            and not isinstance(schema_version, bool)
+            and schema_version < self._SCHEMA_VERSION
         ):
+            raise CertifiedDeliveryError(self._OLDER_SCHEMA_MESSAGE)
+        if not isinstance(value, dict) or schema_version != self._SCHEMA_VERSION:
             raise CertifiedDeliveryError("report delivery session is invalid")
         return value
 
@@ -521,9 +532,13 @@ class CertifiedReportDelivery:
     @staticmethod
     def _pending_action(session: Mapping[str, object]) -> _PendingAction:
         raw = session.get("pending_action")
+        if not isinstance(raw, str):
+            raise CertifiedDeliveryError(
+                "report delivery session has invalid pending_action"
+            )
         try:
             return _PendingAction(raw)
-        except (TypeError, ValueError) as exc:
+        except ValueError as exc:
             raise CertifiedDeliveryError(
                 "report delivery session has invalid pending_action"
             ) from exc
@@ -537,10 +552,6 @@ class CertifiedReportDelivery:
             _PendingAction.NONE: None,
             _PendingAction.MANUSCRIPT_REPAIR_REQUIRED: {"put-report-manuscript"},
             _PendingAction.BRIEF_REBUILD_REQUIRED: {"put-report-brief"},
-            _PendingAction.RESEARCH_CONFIRMATION_REQUIRED: {
-                "put-report-brief",
-                "put-report-manuscript",
-            },
             _PendingAction.RESEARCH_REOPEN_REQUIRED: set(),
         }[pending]
         if allowed is None or command in allowed:
@@ -551,14 +562,71 @@ class CertifiedReportDelivery:
 
     @staticmethod
     def _pending_for_reader(review: ReportReviewResult) -> _PendingAction:
-        targets = {issue.repair_target for issue in review.blocking_issues}
-        if RepairTarget.POSSIBLE_RESEARCH_ISSUE in targets:
-            return _PendingAction.RESEARCH_CONFIRMATION_REQUIRED
-        if RepairTarget.BRIEF in targets:
+        target = reader_repair_target(review.blocking_issues)
+        if target is RepairTarget.BRIEF:
             return _PendingAction.BRIEF_REBUILD_REQUIRED
-        if RepairTarget.MANUSCRIPT in targets:
+        if target is RepairTarget.MANUSCRIPT:
             return _PendingAction.MANUSCRIPT_REPAIR_REQUIRED
         raise CertifiedDeliveryError("Reader blockers carry no repair target")
+
+    @staticmethod
+    def _brief_repair_feedback(
+        session: Mapping[str, object],
+    ) -> tuple[BriefRepairFeedback, ...]:
+        """Adapt stored downstream review into neutral Constructor feedback."""
+
+        reader = session.get("reader_review")
+        if isinstance(reader, Mapping):
+            raw_issues = reader.get("blocking_issues")
+            if not isinstance(raw_issues, list):
+                raise CertifiedDeliveryError(
+                    "stored Reader review blocking_issues are invalid"
+                )
+            feedback: list[BriefRepairFeedback] = []
+            for raw in raw_issues:
+                if not isinstance(raw, Mapping):
+                    raise CertifiedDeliveryError("stored Reader blocker is invalid")
+                if raw.get("repair_target") != RepairTarget.BRIEF.value:
+                    continue
+                feedback.append(
+                    BriefRepairFeedback(
+                        problem=_mapping_string(raw, "problem"),
+                        downstream_effect=_mapping_string(raw, "reader_effect"),
+                        resolution_condition=_mapping_string(
+                            raw, "resolution_condition"
+                        ),
+                        location=_optional_stored_string(raw, "location"),
+                    )
+                )
+            if feedback:
+                return tuple(feedback)
+
+        integrity = session.get("integrity_review")
+        if isinstance(integrity, Mapping):
+            if integrity.get("revise_target") != RepairTarget.BRIEF.value:
+                raise CertifiedDeliveryError(
+                    "stored Integrity review does not require Brief repair"
+                )
+            raw_issues = integrity.get("issues")
+            issues = _strings_from(raw_issues, "Integrity issues")
+            if issues:
+                return tuple(
+                    BriefRepairFeedback(
+                        problem=issue,
+                        downstream_effect=(
+                            "The current Report Brief cannot receive Research "
+                            "Integrity certification"
+                        ),
+                        resolution_condition=(
+                            "The rebuilt Report Brief must represent the accepted "
+                            "research semantics within its evidence boundary"
+                        ),
+                    )
+                    for issue in issues
+                )
+        raise CertifiedDeliveryError(
+            "Brief rebuild is pending but semantic repair feedback is unavailable"
+        )
 
     @staticmethod
     def _pending_for_integrity(review: ResearchIntegrityReview) -> _PendingAction:
@@ -680,7 +748,7 @@ def _text_digest(value: str) -> str:
 
 def _mapping_string(value: Mapping[str, object], name: str) -> str:
     item = value.get(name)
-    if not isinstance(item, str) or not item:
+    if not isinstance(item, str) or not item.strip():
         raise CertifiedDeliveryError(f"stored {name} is invalid")
     return item
 
@@ -699,6 +767,19 @@ def _optional_mapping_string(value: Mapping[str, object], name: str) -> str | No
     return _mapping_string(value, name)
 
 
+def _optional_stored_string(value: Mapping[str, object], name: str) -> str | None:
+    """Read an explicitly stored nullable string and fail closed on bad types."""
+
+    if name not in value:
+        raise CertifiedDeliveryError(f"stored {name} is missing")
+    item = value[name]
+    if item is None:
+        return None
+    if not isinstance(item, str) or not item.strip():
+        raise CertifiedDeliveryError(f"stored {name} is invalid")
+    return item
+
+
 def _locator_from(value: object) -> SourceLocator | None:
     if value is None:
         return None
@@ -712,10 +793,17 @@ def _locator_from(value: object) -> SourceLocator | None:
 
 def _strings_from(value: object, name: str) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(
-        isinstance(item, str) and item for item in value
+        isinstance(item, str) and item.strip() for item in value
     ):
         raise CertifiedDeliveryError(f"stored {name} is invalid")
     return tuple(value)
+
+
+def _nonempty_strings_from(value: object, name: str) -> tuple[str, ...]:
+    result = _strings_from(value, name)
+    if not result:
+        raise CertifiedDeliveryError(f"stored {name} is invalid")
+    return result
 
 
 def _brief_from(value: Mapping[str, object]) -> ReportBrief:
@@ -736,15 +824,14 @@ def _brief_from(value: Mapping[str, object]) -> ReportBrief:
             material.append(
                 BriefMaterial(
                     content=_mapping_string(raw, "content"),
-                    role=raw.get("role") if isinstance(raw.get("role"), str) else None,
+                    role=_optional_stored_string(raw, "role"),
+                    reader_visible_obligation=_optional_stored_string(
+                        raw, "reader_visible_obligation"
+                    ),
                     research_refs=_strings_from(
-                        raw.get("research_refs", []), "material research_refs"
+                        raw.get("research_refs"), "material research_refs"
                     ),
-                    source_ref=(
-                        raw.get("source_ref")
-                        if isinstance(raw.get("source_ref"), str)
-                        else None
-                    ),
+                    source_ref=_optional_stored_string(raw, "source_ref"),
                     locator=_locator_from(raw.get("locator")),
                 )
             )
@@ -753,25 +840,21 @@ def _brief_from(value: Mapping[str, object]) -> ReportBrief:
                 title=_mapping_string(raw_section, "title"),
                 purpose=_mapping_string(raw_section, "purpose"),
                 reader_takeaway=_mapping_string(raw_section, "reader_takeaway"),
-                argument_flow=_mapping_string(raw_section, "argument_flow"),
-                outline_depth=_mapping_non_negative_int(
-                    raw_section, "outline_depth"
+                semantic_moves=_nonempty_strings_from(
+                    raw_section.get("semantic_moves"), "semantic_moves"
                 ),
+                outline_depth=_mapping_non_negative_int(raw_section, "outline_depth"),
                 requirement_refs=_strings_from(
-                    raw_section.get("requirement_refs", []), "requirement_refs"
+                    raw_section.get("requirement_refs"), "requirement_refs"
                 ),
                 research_refs=_strings_from(
-                    raw_section.get("research_refs", []), "research_refs"
+                    raw_section.get("research_refs"), "research_refs"
                 ),
                 material=tuple(material),
-                evidence_boundary=(
-                    raw_section.get("evidence_boundary")
-                    if isinstance(raw_section.get("evidence_boundary"), str)
-                    else None
-                ),
+                evidence_boundary=_mapping_string(raw_section, "evidence_boundary"),
             )
         )
-    raw_terms = value.get("terminology", [])
+    raw_terms = value.get("terminology")
     if not isinstance(raw_terms, list):
         raise CertifiedDeliveryError("stored terminology is invalid")
     terminology: list[tuple[str, str]] = []
@@ -784,14 +867,16 @@ def _brief_from(value: Mapping[str, object]) -> ReportBrief:
             raise CertifiedDeliveryError("stored terminology entry is invalid")
         terminology.append((item[0], item[1]))
     return ReportBrief(
+        report_title=_mapping_string(value, "report_title"),
         audience=_mapping_string(value, "audience"),
         report_goal=_mapping_string(value, "report_goal"),
+        conceptual_model=_mapping_string(value, "conceptual_model"),
         reader_takeaway=_mapping_string(value, "reader_takeaway"),
         narrative_logic=_mapping_string(value, "narrative_logic"),
         sections=tuple(sections),
         terminology=tuple(terminology),
         intentional_omissions=_strings_from(
-            value.get("intentional_omissions", []), "intentional_omissions"
+            value.get("intentional_omissions"), "intentional_omissions"
         ),
     )
 
@@ -825,15 +910,28 @@ def _blind_read_from(value: Mapping[str, object]) -> BlindReadResult:
     for raw in raw_issues:
         if not isinstance(raw, Mapping):
             raise CertifiedDeliveryError("stored BlindBlockingIssue is invalid")
-        location = raw.get("location")
-        if location is not None and not isinstance(location, str):
-            raise CertifiedDeliveryError("stored BlindBlockingIssue location is invalid")
         issues.append(
             BlindBlockingIssue(
                 problem=_mapping_string(raw, "problem"),
                 reader_effect=_mapping_string(raw, "reader_effect"),
                 why_blocking=_mapping_string(raw, "why_blocking"),
-                location=location,
+                location=_optional_stored_string(raw, "location"),
+            )
+        )
+    raw_friction = value.get("cognitive_friction")
+    if not isinstance(raw_friction, list):
+        raise CertifiedDeliveryError("stored cognitive_friction is invalid")
+    friction: list[CognitiveFrictionObservation] = []
+    for raw in raw_friction:
+        if not isinstance(raw, Mapping):
+            raise CertifiedDeliveryError(
+                "stored CognitiveFrictionObservation is invalid"
+            )
+        friction.append(
+            CognitiveFrictionObservation(
+                location=_mapping_string(raw, "location"),
+                observation=_mapping_string(raw, "observation"),
+                reader_cost=_mapping_string(raw, "reader_cost"),
             )
         )
     return BlindReadResult(
@@ -841,6 +939,9 @@ def _blind_read_from(value: Mapping[str, object]) -> BlindReadResult:
         domain_model=_mapping_string(value, "domain_model"),
         comparison_coordinates=_mapping_string(value, "comparison_coordinates"),
         reverse_outline=_mapping_string(value, "reverse_outline"),
+        material_economy=_mapping_string(value, "material_economy"),
+        professional_finish=_mapping_string(value, "professional_finish"),
         manuscript_digest=_mapping_string(value, "manuscript_digest"),
+        cognitive_friction=tuple(friction),
         blocking_issues=tuple(issues),
     )

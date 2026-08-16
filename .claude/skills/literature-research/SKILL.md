@@ -49,7 +49,7 @@ Read only the supporting material needed for the current stage:
 - [Report construction guide](references/REPORT_CONSTRUCTION_GUIDE.md): the
   Constructor's authority for cognitive grouping and reader-visible hierarchy.
 - [Report writing guide](references/REPORT_WRITING_GUIDE.md): the authoritative style
-  and realization rules used by the Writer and Reviser.
+  and realization rules used by Authoring for both WRITE and REVISE actions.
 - [Report review guide](references/REPORT_REVIEW_GUIDE.md): the two-phase Reader Gate,
   including visible-outline scanning and fault attribution.
 - [Research integrity guide](references/RESEARCH_INTEGRITY_GUIDE.md): evidence-strength,
@@ -429,15 +429,17 @@ authorizes complete Delivery.
 
 ## Deliver a report
 
-In DELIVERY, build the report from a fresh `delivery-view` and targeted
-inspections. Load the five authority documents separately — each drives a
+In DELIVERY, begin each Constructor call with `report-construction-input`; use
+`delivery-inspect` / `delivery-read-source` only for an explicit information need.
+The narrow input excludes paper and source inventories by default while preserving
+stable semantic refs. Load the five authority documents separately — each drives a
 different role and must not be handed to a role it does not govern:
 
 ```text
 ${CLAUDE_SKILL_DIR}/references/REPORT_QUALITY_STANDARD.md      → Constructor + Reader shared quality target
 ${CLAUDE_SKILL_DIR}/references/REPORT_CONSTRUCTION_GUIDE.md   → Report Constructor
-${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md        → Report Writer / Reviser
-${CLAUDE_SKILL_DIR}/references/REPORT_REVIEW_GUIDE.md         → Report Reviewer (Reader Gate)
+${CLAUDE_SKILL_DIR}/references/REPORT_WRITING_GUIDE.md        → Authoring (WRITE / REVISE)
+${CLAUDE_SKILL_DIR}/references/REPORT_REVIEW_GUIDE.md         → Fresh Reader (Reader Gate)
 ${CLAUDE_SKILL_DIR}/references/RESEARCH_INTEGRITY_GUIDE.md    → Research Integrity Reviewer
 ```
 
@@ -446,43 +448,45 @@ expands, organizes, and omits from accepted Research State for a target
 audience. It is a Delivery work product, not a Research Domain entity — it is
 never stored in the run, has no stable identity, and no `ArtifactKind`. The
 Constructor reads the Quality Standard and Construction Guide (not the Writing
-Guide); the Writer reads the Writing Guide (not the Quality Standard). Keep
+Guide); Authoring reads the Writing Guide (not the Quality Standard). Keep
 these inputs separated by role. The Contract determines what the report must
 answer; the Brief determines how those answers are organized. Do not turn a
 content requirement such as coverage of major approaches into a chapter layout
 unless the user explicitly requested that layout.
 
-Every `ReportBriefSection` must carry an explicit non-negative `outline_depth`.
+Every Brief must carry the exact `report_title`, a non-empty `conceptual_model`, and
+reader takeaway / narrative logic. Every `ReportBriefSection` carries ordered
+`semantic_moves`, an evidence boundary, and an explicit `outline_depth` from 0 to 4.
 Depth 0 maps to Markdown H2, depth 1 to H3, and so on; H1 is the report title
 and is not a Brief section. The first section must be depth 0 and adjacent
 sections may descend by at most one level. `ReportBriefSection.title` is the
 reader-visible heading identity. Constructor decides its exact text, order,
-depth, and parent-child ownership; Writer must preserve all four under the
+depth, and parent-child ownership; Authoring must preserve all four under the
 mechanical ATX normalization rules. If a heading or hierarchy is not workable,
 return `BriefInsufficient` to Constructor rather than renaming or rearranging it.
-The Writer must use ATX headings. `put-report-manuscript` validates heading
-count, order, depth, identity, and exactly one reader-visible H1 appearing
-before every H2+ heading.
+Authoring must use ATX headings. `put-report-manuscript` validates heading count,
+order, depth, identity, exactly one reader-visible H1 appearing before every H2+
+heading, and exact H1 identity with `report_title`.
 
 The semantic stages are an Action loop, not a Report FSM — no new lifecycle
 mode is introduced, everything runs inside DELIVERY:
 
 ```text
-Report Constructor → Report Brief
-→ Report Writer → Manuscript
-→ deterministic outline-fidelity check
-→ deterministic reader citation preview
-→ Report Reviewer (fresh instance, two-phase cold reading)
+ReportConstructionContext → Report Constructor → Report Brief
+→ Authoring WRITE → Manuscript
+→ deterministic Presentation preflight + reader render
+→ Fresh Reader (fresh instance, two-phase cold reading)
    Phase 1 Blind Read: deliverable + audience + quality standard + review guide
-                       + manuscript — NO Brief, NO Writing Guide
-   → frozen BlindReadResult (understanding + cognitive structure + reader failures,
+                       + Reader Surface — NO Brief, NO Writing Guide
+   → frozen BlindReadResult (understanding + mental model + cognitive friction
+                             + material economy + professional finish + blockers,
                              bound to manuscript_digest; no repair targets)
-   Phase 2 Brief Check: frozen blind_read_digest + Brief + manuscript + review guide
+   Phase 2 Brief Check: frozen blind_read_digest + Brief + Reader Surface + review guide
    → ReviewResult{blocking_issues}
    ├─ blocking_issues → earliest repair layer (most-upstream fault wins):
-   │     MANUSCRIPT → Reviser → new manuscript → fresh Reader again
-   │     BRIEF → Constructor → new Brief → Writer → new manuscript → fresh Reader again
-   │     POSSIBLE_RESEARCH_ISSUE → escalate (Reader cannot mutate State)
+   │     MANUSCRIPT → Authoring REVISE → new manuscript → fresh Reader again
+   │     BRIEF → previous Brief + neutral repair feedback → Constructor
+   │             → new Brief → Authoring WRITE → new manuscript → fresh Reader again
    └─ blocking_issues == () → Reader PASS (brief_digest + manuscript_digest)
 → Research Integrity Reviewer (independent of the Reader Gate)
    → IntegrityReview{PASS | REVISE_DELIVERY(target=MANUSCRIPT|BRIEF) | REOPEN_RESEARCH}
@@ -497,22 +501,21 @@ factory creates a new reviewer each revision), so it re-reads cold and cannot
 confirm "you fixed what I asked." Phase 1 is frozen before Phase 2 sees the
 Brief; Phase 2 must not rewrite or reinterpret the blind read. Blocking
 issues are root-cause consolidated — one issue per cognitive root cause, no
-score, no severity rank. The pipeline routes by precedence
-(POSSIBLE_RESEARCH_ISSUE > BRIEF > MANUSCRIPT); Python routes, it does not rank "which
-problem is worse."
+score, no severity rank. Reader targets are only `MANUSCRIPT | BRIEF`; BRIEF wins when
+both occur. Python routes mechanically and does not rank semantic quality.
 
 A frozen Blind Read with any blocking issue cannot become a Phase 2 PASS. Phase 2 may
 consolidate or reattribute those failures, but it must return at least one blocking
 issue. A Reader or Integrity blocker also establishes a pending repair obligation:
 `MANUSCRIPT` requires a new manuscript digest, `BRIEF` requires a new Brief digest,
-`POSSIBLE_RESEARCH_ISSUE` pauses certification for Research-authority confirmation,
 and `REOPEN_RESEARCH` requires the explicit lifecycle transition. Submitting different
 PASS JSON for the same work-product versions never clears an obligation.
 
 Use the production staged commands in this order:
 
 ```text
-put-report-brief
+report-construction-input
+→ put-report-brief
 → put-report-manuscript
 → render-reader-preview
 → submit-blind-review
@@ -521,6 +524,13 @@ put-report-brief
 → render-certified-report
 → publish-certified-report
 ```
+
+Before initial construction, and again whenever `pending_action` is
+`BRIEF_REBUILD_REQUIRED`, call `report-construction-input`. In repair mode it carries
+the previous Brief plus neutral problem, downstream effect, resolution condition and
+optional location. Preserve unaffected design and perform minimal sufficient
+reconstruction. If accepted research cannot support the required condition, Constructor
+may explicitly reopen Research; Fresh Reader never makes that sufficiency judgment.
 
 Claude supplies the semantic values; the Harness persists Runtime-owned operational
 certification data at `runs/<run_id>/delivery/report_session.json` and enforces order,
@@ -541,15 +551,16 @@ certification and forces a re-run of the affected gate. Render and publish
 happen only when the current version carries BOTH a Reader PASS and an
 Integrity PASS.
 
-The Report Reviewer judges whether the report works as an article for the
+The Fresh Reader judges whether the report works as an article and professional finished
+product for the
 target reader: whether the reader can form a continuous, stable, retellable
 domain understanding from the prose alone. Sections must be driven by research
 questions or judgments rather than paper order; taxonomy must state its
 classification criterion; each paragraph should make one main judgment and
 start with a self-contained claim; giant paragraphs, abstract-noun chains,
-bureaucratic or translated prose should be repaired. Representative methods
-must serve synthesis, carry the required first-use hyperlink, and lead
-naturally from evidence to gaps. These are semantic judgments, not Python
+systematic AI-like, bureaucratic or translated prose can block when it materially
+violates professional finished-product quality. Representative methods must serve
+synthesis and lead naturally from evidence to gaps. These are semantic judgments, not Python
 paragraph-length or style validators.
 
 The Research Integrity Reviewer is independent of the Reader Gate and checks
@@ -574,18 +585,19 @@ boundaries separate.
 Delivery can restore detail density and cognitive continuity, but it cannot
 expand the accepted semantic scope: no new consensus, no stronger
 generalization, no new approach relationship, no new Open Problem, no
-contract-facing judgment. If a stage needs any of those, request confirmation from an
-actor with Research Authority. A Reader's `POSSIBLE_RESEARCH_ISSUE` result does not
-reopen Research. Only after confirmation may that actor explicitly call
-`reopen-research` and return to the research loop; do not manufacture the judgment in
+contract-facing judgment. If a stage needs any of those, Constructor or Integrity may
+explicitly call `reopen-research` and return to the research loop; do not manufacture the judgment in
 Delivery. Use `delivery-inspect` / `delivery-read-source` for targeted confirmation. If
 Research is sufficient and the fault is in Delivery, submit a genuinely new Brief or
 manuscript version and run the affected gates again; the same-version Reader PASS is
 blocked.
 
-When a retained primary paper has a canonical URL, hyperlink the first formal occurrence
-of its method or system name to that URL. This navigation link never replaces a structured
-citation. Keep citations close to the technical judgments they support.
+For method-name navigation, Authoring writes
+`{{paper:citation_id|Method Name}}` beside the corresponding structured citation. The
+deterministic Presentation renderer resolves the first such paper use to its canonical
+URL; when no navigation token is present, it links the first rendered citation instead.
+Authoring must not copy URLs or hand-build the bibliography. Navigation never replaces a
+structured citation close to the technical judgment it supports.
 
 Paragraph rhythm, natural Chinese, terminology, title density, and appropriate table use
 are semantic editorial criteria. Do not ask the Harness to encode them as structural

@@ -1,7 +1,7 @@
 # Report Review Guide
 
-> 版本：v0.4
-> 适用角色：Report Reviewer / Reader Gate  
+> 版本：v0.5
+> 适用角色：Fresh Reader / Reader Acceptance Gate
 > 目标：验证最终稿是否真正作为面向目标读者的认知载体成立  
 > 不负责：研究完成性判断、Research State 修改、Primary Evidence 最终核验、事实修复
 
@@ -9,7 +9,7 @@
 
 ## 1. Purpose and Boundary｜目的与边界
 
-Report Reviewer 回答的是：
+Fresh Reader 回答的是：
 
 > **这篇报告作为文章是否成立？目标读者能否仅凭正文形成连续、稳定、可复述的领域理解？**
 
@@ -27,6 +27,8 @@ Reader Gate 主要检查：
 - 认知路径是否连续；
 - 主要判断是否被文章真正建立；
 - 材料是否服务于论证；
+- 哪里需要回读、由读者自行补桥、无法判断材料用途或发生章节认知重启；
+- 材料经济性与专业成品质量是否成立；
 - 报告是否存在认知跳步、认知重启、认知债务或论证孤岛；
 - 文章实际呈现的认知结构是否与 Report Brief 一致；
 - 问题究竟属于 Manuscript，还是属于 Report Brief / Report Construction。
@@ -44,7 +46,7 @@ Reader Gate 不负责：
 
 ## 2. Review Principle｜审查原则
 
-Reader Reviewer 不是“编辑老师”，也不是“风格打分器”。
+Fresh Reader 不是“编辑老师”，也不是“风格打分器”。
 
 它的核心任务不是问：
 
@@ -154,11 +156,11 @@ Manuscript
 
 Phase 1 不接收 Report Writing Guide。
 
-`Audience` 可以来自当前 Report Brief 的窄投影，但只能暴露目标读者描述本身；不得因此暴露 Brief 的 `reader_takeaway`、`narrative_logic`、section 设计、material 或 `intentional_omissions`。
+`Audience` 可以来自当前 Report Brief 的窄投影，但只能暴露目标读者描述本身；不得因此暴露 Brief 的 `conceptual_model`、`reader_takeaway`、`narrative_logic`、section 设计、material 或 `intentional_omissions`。
 
-Phase 1 也不接收 Research State、Primary Evidence、Report Constructor / Writer notes 或前一轮 Reviewer 的推理记录。
+Phase 1 也不接收 Research State、Primary Evidence、Report Constructor / Authoring notes 或前一轮 Reviewer 的推理记录。
 
-原因是 Reader Gate 审查的是**成品实际产生的读者理解**，而不是 Writer 是否遵守了生成指导。Writer 接受过什么写作建议、研究者原本知道什么，都不应帮助 Reviewer 解释正文中本身没有建立起来的关系。
+原因是 Reader Gate 审查的是**成品实际产生的读者理解**，而不是 Authoring 是否遵守了生成指导。Authoring 接受过什么写作建议、研究者原本知道什么，都不应帮助 Reviewer 解释正文中本身没有建立起来的关系。
 
 不接收：
 
@@ -171,7 +173,7 @@ Finding
 Open Problem
 Primary Source
 Constructor notes
-Writer notes
+Authoring notes
 previous Reviewer reasoning
 ```
 
@@ -198,6 +200,10 @@ Reviewer 应尽可能模拟一个真实专业读者，而不是逐句寻找问�
 Blind Read 的重点不是尽量发现更多问题，而是观察：
 
 > **真实阅读状态如何变化。**
+
+Phase 1 的结构化结果必须同时记录：actual core understanding、mental model、comparison
+coordinates、reverse outline、cognitive friction、material economy 与 professional finish。
+这些观察不自动成为 blocker；只有实质破坏主要认知交付或专业成品要求的根因才阻塞。
 
 ### 5.1 不得用 Reviewer 自身知识替正文补桥
 
@@ -724,7 +730,7 @@ Blind Read 实际复述结果
 以及：
 
 ```text
-Brief narrative_logic / argument_flow
+Brief conceptual_model / narrative_logic / semantic_moves
 vs
 Blind Read reverse outline
 ```
@@ -749,11 +755,11 @@ Brief 中存在重要限定，但正文为了顺滑而删除。
 
 ### 15.3 正文加入了 Brief 未授权的重要判断
 
-这可能是 Writer 越界。
+这可能是 Authoring 越界。
 
 最终是否研究上错误，由 Integrity 判断。
 
-Reader Reviewer 只指出：
+Fresh Reader 只指出：
 
 > 正文出现了蓝图之外的重要认知。
 
@@ -767,14 +773,14 @@ Manuscript 忠实执行 Brief
 Blind Read 仍然无法形成连续理解
 ```
 
-说明问题可能不在 Writer。
+说明问题可能不在 Authoring。
 
 例如：
 
 - Brief 本身把不同类别设计成彼此孤立的章节；
 - Brief 缺少稳定比较坐标；
 - Brief 没有安排跨路线 synthesis；
-- Brief 的 argument_flow 本身存在跳步。
+- Brief 的 semantic_moves 本身存在跳步。
 
 此时应路由到 Report Construction。
 
@@ -784,7 +790,7 @@ Blind Read 仍然无法形成连续理解
 
 Reviewer 必须尽量定位**最早错误层**。
 
-### 16.1 Manuscript Fault → Reviser
+### 16.1 Manuscript Fault → Authoring
 
 典型：
 
@@ -793,13 +799,13 @@ Reviewer 必须尽量定位**最早错误层**。
 - 一个限制条件被正文弱化；
 - 表格与正文重复；
 - 某段语言明显难读；
-- Brief 已明确比较坐标，但 Writer 没有贯彻。
+- Brief 已明确比较坐标，但 Authoring 没有贯彻。
 
 路由：
 
 ```text
 MANUSCRIPT
-→ Reviser
+→ Authoring
 ```
 
 ### 16.2 Brief Fault → Report Constructor
@@ -810,7 +816,7 @@ MANUSCRIPT
 - 章节设计导致持续认知重启；
 - 关键 synthesis 没有被设计；
 - Brief material 本身不足以建立目标判断；
-- argument_flow 本身存在认知跳步；
+- semantic_moves 本身存在认知跳步；
 - intentional_omissions 错误导致关键认知环节缺失。
 
 路由：
@@ -820,25 +826,14 @@ BRIEF
 → Report Constructor
 ```
 
-### 16.3 疑似研究层问题 → 升级确认
+### 16.3 Reader 不归因 RESEARCH
 
-Reader Reviewer 通常不负责确认 Research Fault。
+Fresh Reader 的 repair target 只有 `MANUSCRIPT | BRIEF`。如果正文需要的认知条件在 Brief
+中不存在，归因 `BRIEF`；随后由能看到 accepted research semantics 的 Constructor 判断是
+重建 Brief，还是升级 Research。Reader 不返回疑似或确认的 Research fault。
 
-但如果文章暴露明显研究层问题，例如：
-
-> “要完成当前交付，必须形成一个 Research State 尚不存在的领域判断。”
-
-可以标记：
-
-```text
-POSSIBLE_RESEARCH_ISSUE
-```
-
-这不是 `Research Fault` 的最终裁决，也不意味着自动修改 Research State 或自动进入 RESEARCH。
-
-最终是否需要回到 RESEARCH，应由具有相应研究判断权限的阶段确认。
-
-Reader Reviewer 只有**发现 / 升级权**，没有研究裁决权，也不应自行研究来解决。
+同一轮同时出现 Brief 与 Manuscript blocker 时，most-upstream fault wins：归因 BRIEF。
+Brief 重建后，旧 Manuscript blocker 不作为新稿的强制修复清单；新稿接受全新冷读。
 
 ---
 
@@ -858,7 +853,7 @@ Blocking Issue 必须满足：
 - 大量关键材料无论证功能；
 - Brief 与正文认知结构显著不一致；
 - 结论没有由正文建立；
-- 语言问题持续阻碍理解。
+- 系统性 AI-like、翻译腔或公文腔使报告不再达到专业成品要求。
 
 通常不应成为 blocker：
 
@@ -904,7 +899,7 @@ Reviewer 不应把同一个上游认知缺陷拆成大量重复 Blocking Issues�
 
 > **抓根因，不抓噪声。**
 
-这可以降低 Reviewer ↔ Reviser 因重复、细碎和审美性意见产生的活锁风险。
+这可以降低 Reviewer ↔ Authoring 因重复、细碎和审美性意见产生的活锁风险。
 
 ---
 
@@ -917,6 +912,7 @@ location
 problem
 reader_effect
 why_blocking
+resolution_condition
 repair_target
 ```
 
@@ -925,7 +921,6 @@ repair_target
 ```text
 brief_ref
 related_takeaway
-suggested_repair_direction
 ```
 
 示例：
@@ -945,6 +940,9 @@ reader_effect:
 why_blocking:
 这一缺失使后续排序建立在尚未说明的比较前提上，
 影响全文主要判断。
+
+resolution_condition:
+正文必须在比较结论之前建立 C1 与 C2 的可比边界。
 
 repair_target:
 MANUSCRIPT
@@ -1099,10 +1097,10 @@ Phase 2 必须至少回答：
 
 ```text
 11. Blind Read 得到的认识是否与 Brief reader_takeaway 一致？
-12. 实际反向提纲是否与 Brief argument_flow 一致？
+12. 实际反向提纲是否与 Brief semantic_moves 一致？
 13. 是否遗漏、弱化或新增重要认知？
 14. 多个症状是否应合并为同一根因级 Blocking Issue？
-15. 最早错误层属于 Manuscript、Brief 还是需要进一步升级确认？
+15. 最早错误层属于 Manuscript 还是 Brief？
 16. 是否仍存在 Blocking Issue？
 ```
 
@@ -1110,11 +1108,11 @@ Phase 2 必须至少回答：
 
 # Final Principle｜最终原则
 
-Report Reviewer 的职责不是替作者把文章改得更漂亮。
+Fresh Reader 的职责不是替作者把文章改得更漂亮。
 
 它的职责是验证：
 
-> **一个不知道作者内部意图的真实专业读者，是否能够仅凭最终文章，沿着连续而不过度压缩的认知路径，形成 Report Brief 预期的领域理解。**
+> **一个不知道作者内部意图的真实专业读者，是否能够仅凭最终 Reader Surface，以合理认知成本形成 Report Brief 预期的领域理解，并把它当作成熟的专业成品。**
 
 因此 Reader Gate 的核心不是：
 
