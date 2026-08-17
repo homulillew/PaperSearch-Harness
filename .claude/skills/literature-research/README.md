@@ -382,7 +382,6 @@ literature-research/
 │   ├── RESEARCH_PROTOCOL.md
 │   ├── RUNTIME_API.md
 │   ├── COMPLETION_GUIDE.md
-│   ├── REPORT_QUALITY_STANDARD.md
 │   ├── REPORT_CONSTRUCTION_GUIDE.md
 │   ├── REPORT_WRITING_GUIDE.md
 │   ├── REPORT_REVIEW_GUIDE.md
@@ -405,10 +404,9 @@ literature-research/
 | `RESEARCH_PROTOCOL.md`        | 研究流程、证据获取和状态更新规则              |
 | `RUNTIME_API.md`              | Harness 命令及输入格式               |
 | `COMPLETION_GUIDE.md`         | Completion Check 判断规则         |
-| `REPORT_QUALITY_STANDARD.md`  | Constructor 与 Reader 共享的成品质量目标 |
-| `REPORT_CONSTRUCTION_GUIDE.md` | Constructor 的认知分组与文档层级规范     |
-| `REPORT_WRITING_GUIDE.md`     | Writer / Reviser 的语言与局部呈现规范     |
-| `REPORT_REVIEW_GUIDE.md`      | Reader Gate 的盲读、可见提纲扫描与归因规范   |
+| `REPORT_CONSTRUCTION_GUIDE.md` | Constructor 的编辑设计与 Lean Report Brief 规范 |
+| `REPORT_WRITING_GUIDE.md`     | Authoring 的正文实现规范     |
+| `REPORT_REVIEW_GUIDE.md`      | Reader Gate 的两阶段盲读与归因规范   |
 | `RESEARCH_INTEGRITY_GUIDE.md` | 证据强度、比较有效性和研究诚信要求             |
 | `scripts/setup.py`            | 创建本地运行环境                      |
 | `scripts/doctor.py`           | 检查安装和 workspace               |

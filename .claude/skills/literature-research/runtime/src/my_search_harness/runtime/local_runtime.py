@@ -142,7 +142,6 @@ class LocalV1Runtime:
         reviewer_factory: ReportReviewerFactory,
         reviser: ReportReviser,
         integrity_reviewer: ResearchIntegrityReviewer,
-        quality_standard_path: str | Path,
         construction_guide_path: str | Path,
         writing_guide_path: str | Path,
         review_guide_path: str | Path,
@@ -150,14 +149,15 @@ class LocalV1Runtime:
     ) -> ReportPipeline:
         """Bind the compatibility/reference in-process report runner.
 
-        The five guides are loaded here (not interpreted): the Report Quality
-        Standard defines the shared target, the Construction Guide drives the
-        Constructor, the Writing Guide drives Authoring's WRITE and REVISE
-        actions, the Review Guide drives the two-phase Reader, and the
-        Integrity Guide drives the Research Integrity Reviewer. Each is a
-        non-empty string the pipeline validates at construction time. Formal
-        production delivery uses ``certified_report_delivery`` and staged
-        commands.
+        The four guides are loaded here (not interpreted): the Construction
+        Guide drives the Constructor, the Writing Guide drives Authoring's
+        WRITE and REVISE actions, the Review Guide drives the two-phase Reader,
+        and the Integrity Guide drives the Research Integrity Reviewer. Each
+        is a non-empty string the pipeline validates at construction time.
+        v0.6 removes the separate Report Quality Standard — editorial quality
+        is owned by the Constructor/Authoring/Reader authority boundary, not a
+        standalone rubric. Formal production delivery uses
+        ``certified_report_delivery`` and staged commands.
         """
 
         return ReportPipeline(
@@ -168,7 +168,6 @@ class LocalV1Runtime:
             reviser=reviser,
             integrity_reviewer=integrity_reviewer,
             citation_renderer=DeterministicCitationRenderer(),
-            quality_standard=_read_guide(quality_standard_path),
             construction_guide=_read_guide(construction_guide_path),
             writing_guide=load_report_writing_guide(writing_guide_path),
             review_guide=_read_guide(review_guide_path),

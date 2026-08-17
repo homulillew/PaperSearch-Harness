@@ -324,6 +324,72 @@ def report_construction_context_for(
     )
 
 
+@dataclass(slots=True, frozen=True, kw_only=True)
+class ReportAuthoringContext:
+    """Thin rebuildable Context projection for report Authoring.
+
+    Authoring realizes a frozen Brief; it does not redesign the report. This
+    projection carries the accepted research semantics the Authoring authority
+    needs to express the Brief faithfully, and nothing else: no open gaps, no
+    paper inventory, no representative-paper refs, no sources, URLs, or raw
+    evidence locators. Those remain behind targeted Delivery evidence access.
+    """
+
+    state_revision: int
+    lifecycle: LifecycleMode
+    contract: ContractContext
+    delivery_basis: DeliveryBasis
+    approach_families: tuple[ReportConstructionApproachContext, ...]
+    findings: tuple[ReportConstructionFindingContext, ...]
+    open_problems: tuple[ReportConstructionOpenProblemContext, ...]
+
+
+def report_authoring_context_for(
+    view: DeliveryView,
+) -> ReportAuthoringContext:
+    """Pure projection helper for adapters that already hold a Delivery View.
+
+    Authoring deliberately sees a narrower slice than the Constructor: no open
+    gaps (those are a design input, not a realization input) and no paper
+    inventory (Authoring cites via the Brief, not by browsing the corpus).
+    """
+
+    if not isinstance(view, DeliveryView):
+        raise ContextProjectionError(
+            "Report Authoring Context projection requires a DeliveryView"
+        )
+    return ReportAuthoringContext(
+        state_revision=view.state_revision,
+        lifecycle=view.lifecycle,
+        contract=view.contract,
+        delivery_basis=deepcopy(view.delivery_basis),
+        approach_families=tuple(
+            ReportConstructionApproachContext(
+                ref=approach.ref,
+                name=approach.name,
+                core_idea=approach.core_idea,
+            )
+            for approach in view.approach_families
+        ),
+        findings=tuple(
+            ReportConstructionFindingContext(
+                ref=finding.ref,
+                statement=finding.statement,
+                approach_refs=finding.approach_refs,
+            )
+            for finding in view.findings
+        ),
+        open_problems=tuple(
+            ReportConstructionOpenProblemContext(
+                ref=problem.ref,
+                statement=problem.statement,
+                approach_refs=problem.approach_refs,
+            )
+            for problem in view.open_problems
+        ),
+    )
+
+
 ContextView: TypeAlias = ResearchView | CompletionView | DeliveryView
 InspectableDomainObject: TypeAlias = (
     ResearchRequirement
@@ -517,6 +583,74 @@ class ContextProjectionService:
             + len(result.findings)
             + len(result.open_problems)
             + len(result.open_gaps)
+            + len(result.contract.requirements),
+            self._limits.delivery_max_items,
+        )
+        self._enforce_character_limit(result)
+        return result
+
+    def report_authoring_context(self, run_id: str) -> ReportAuthoringContext:
+        """Project the current DELIVERY state for report Authoring.
+
+        Authoring realizes a frozen Brief; it does not redesign the report. This
+        projection is deliberately narrower versus the Constructor's: no open
+        gaps (a design input) and no paper inventory (Authoring cites via the
+        Brief, not by browsing the corpus).
+        """
+
+        run = self._repository.load(run_id)
+        if run.lifecycle is not LifecycleMode.DELIVERY:
+            raise ContextProjectionError(
+                "Report Authoring Context requires DELIVERY lifecycle"
+            )
+        if run.delivery_basis is None:
+            raise ContextProjectionError(
+                "Report Authoring Context requires a DeliveryBasis"
+            )
+        landscape = run.literature_landscape
+        result = ReportAuthoringContext(
+            state_revision=run.state_revision,
+            lifecycle=run.lifecycle,
+            contract=self._contract_context(run),
+            delivery_basis=deepcopy(run.delivery_basis),
+            approach_families=tuple(
+                ReportConstructionApproachContext(
+                    ref=approach.id,
+                    name=approach.name,
+                    core_idea=approach.core_idea,
+                )
+                for approach in (
+                    landscape.approach_families[ref]
+                    for ref in sorted(landscape.approach_families)
+                )
+            ),
+            findings=tuple(
+                ReportConstructionFindingContext(
+                    ref=finding.id,
+                    statement=finding.statement,
+                    approach_refs=tuple(sorted(finding.approach_refs)),
+                )
+                for finding in (
+                    landscape.findings[ref] for ref in sorted(landscape.findings)
+                )
+            ),
+            open_problems=tuple(
+                ReportConstructionOpenProblemContext(
+                    ref=problem.id,
+                    statement=problem.statement,
+                    approach_refs=tuple(sorted(problem.approach_refs)),
+                )
+                for problem in (
+                    landscape.open_problems[ref]
+                    for ref in sorted(landscape.open_problems)
+                )
+            ),
+        )
+        self._enforce_item_limit(
+            "Report Authoring Context",
+            len(result.approach_families)
+            + len(result.findings)
+            + len(result.open_problems)
             + len(result.contract.requirements),
             self._limits.delivery_max_items,
         )

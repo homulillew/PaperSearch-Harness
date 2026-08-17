@@ -81,44 +81,26 @@ def _invoke(harness, workspace: Path, *args: str) -> tuple[int, dict[str, object
     return code, json.loads(raw)
 
 
-def _brief(requirement_ref: str, *, goal: str = "explain") -> dict[str, object]:
+# ---------------------------------------------------------------------------
+# Lean v0.6 payload helpers
+# ---------------------------------------------------------------------------
+#
+# The Report Brief is the lean editorial design: audience, promise, frame,
+# arc, focus. It carries no section list, no heading text, no outline depth,
+# no semantic moves, no material. The Reader issue has no per-issue repair
+# target or resolution condition; the repair target is a Phase 2 top-level
+# decision. Brief repair feedback carries problem / resolution_condition /
+# location and no downstream_effect.
+
+
+def _brief(*, promise: str = "explain the result") -> dict[str, object]:
     return {
-        "report_title": "Report",
         "audience": "technical reader",
-        "report_goal": goal,
-        "conceptual_model": "premise and consequence form one causal model",
-        "reader_takeaway": "understand the result",
-        "narrative_logic": "premise to conclusion",
-        "sections": [
-            {
-                "title": "Result",
-                "purpose": "explain",
-                "reader_takeaway": "result understood",
-                "semantic_moves": ["establish premise", "derive consequence"],
-                "outline_depth": 0,
-                "requirement_refs": [requirement_ref],
-                "research_refs": [],
-                "material": [],
-                "evidence_boundary": "accepted state only",
-            }
-        ],
-        "terminology": [],
-        "intentional_omissions": [],
+        "promise": promise,
+        "frame": "premise and consequence form one causal model",
+        "arc": ("establish the premise", "derive the consequence"),
+        "focus": ("the consequence follows from the premise",),
     }
-
-
-def _brief_with_depths(
-    requirement_ref: str,
-    depths: tuple[int, ...],
-) -> dict[str, object]:
-    brief = _brief(requirement_ref)
-    base = brief["sections"][0]
-    assert isinstance(base, dict)
-    brief["sections"] = [
-        {**base, "title": f"Section {index}", "outline_depth": depth}
-        for index, depth in enumerate(depths, start=1)
-    ]
-    return brief
 
 
 def _manuscript(
@@ -127,14 +109,21 @@ def _manuscript(
     return {"markdown": markdown, "citations": []}
 
 
-def _reader_issue(target: str) -> dict[str, object]:
-    return {
-        "problem": f"{target.lower()} repair needed",
-        "reader_effect": "reader cannot rely on the report",
-        "why_blocking": "the report promise is not met",
-        "resolution_condition": "the report promise is delivered without the gap",
-        "repair_target": target,
+def _reader_issue(
+    *,
+    observation: str = "a key transition is missing",
+    reader_effect: str = "the reader cannot connect premise and result",
+    why_blocking: str = "the main conclusion cannot be reconstructed",
+    location: str | None = "Result",
+) -> dict[str, object]:
+    issue: dict[str, object] = {
+        "observation": observation,
+        "reader_effect": reader_effect,
+        "why_blocking": why_blocking,
     }
+    if location is not None:
+        issue["location"] = location
+    return issue
 
 
 def _brief_repair_feedback() -> dict[str, object]:
@@ -142,7 +131,6 @@ def _brief_repair_feedback() -> dict[str, object]:
         "feedback": [
             {
                 "problem": "the current comparison cannot be realized faithfully",
-                "downstream_effect": "Authoring would have to redesign the Brief",
                 "resolution_condition": (
                     "the Brief supplies a realizable comparison boundary"
                 ),
@@ -157,14 +145,11 @@ def _put_brief_and_manuscript(
     workspace: Path,
     tmp_path: Path,
     run_id: str,
-    requirement_ref: str,
     *,
-    goal: str = "explain",
+    promise: str = "explain the result",
     markdown: str = "# Report\n\n## Result\n\nCertified content.",
 ) -> tuple[str, str]:
-    brief_path = _input(
-        tmp_path, f"brief-{goal}.json", _brief(requirement_ref, goal=goal)
-    )
+    brief_path = _input(tmp_path, f"brief-{promise}.json", _brief(promise=promise))
     code, envelope = _invoke(
         harness,
         workspace,
@@ -176,7 +161,7 @@ def _put_brief_and_manuscript(
     )
     assert code == 0, envelope
     b_digest = envelope["result"]["brief_digest"]
-    manuscript_path = _input(tmp_path, f"manuscript-{goal}.json", _manuscript(markdown))
+    manuscript_path = _input(tmp_path, f"manuscript-{promise}.json", _manuscript(markdown))
     code, envelope = _invoke(
         harness,
         workspace,
@@ -190,6 +175,38 @@ def _put_brief_and_manuscript(
     return b_digest, envelope["result"]["manuscript_digest"]
 
 
+def _blind_read(
+    manuscript_digest: str,
+    *,
+    received_understanding: str = "understood",
+    blocking_issues: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    return {
+        "received_understanding": received_understanding,
+        "manuscript_digest": manuscript_digest,
+        "blocking_issues": blocking_issues or [],
+    }
+
+
+def _reader_review(
+    *,
+    blind_read_digest: str,
+    brief_digest: str,
+    manuscript_digest: str,
+    repair_target: str | None,
+    rationale: str,
+    blocking_issues: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    return {
+        "blind_read_digest": blind_read_digest,
+        "brief_digest": brief_digest,
+        "manuscript_digest": manuscript_digest,
+        "repair_target": repair_target,
+        "rationale": rationale,
+        "blocking_issues": blocking_issues or [],
+    }
+
+
 def _reader_pass(
     harness,
     workspace: Path,
@@ -199,21 +216,24 @@ def _reader_pass(
     manuscript_digest: str,
     *,
     blind_issues: list[dict[str, object]] | None = None,
+    repair_target: str | None = None,
+    rationale: str = "the report delivers the promised understanding",
     reader_issues: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
+    """Run Phase 1 (blind) then Phase 2 (attribution) and return the envelope.
+
+    v0.6: a PASS is ``repair_target is None`` with no blocking issues. A
+    non-None target requires a non-empty rationale and at least one issue.
+    """
+
     blind_path = _input(
         tmp_path,
         "blind.json",
-        {
-            "core_understanding": "understood",
-            "domain_model": "model",
-            "comparison_coordinates": "coordinates",
-            "reverse_outline": "outline",
-            "material_economy": "materials serve the main argument",
-            "professional_finish": "professional finished product",
-            "manuscript_digest": manuscript_digest,
-            "blocking_issues": blind_issues or [],
-        },
+        _blind_read(
+            manuscript_digest,
+            received_understanding="understood",
+            blocking_issues=blind_issues,
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -229,12 +249,14 @@ def _reader_pass(
     review_path = _input(
         tmp_path,
         "reader.json",
-        {
-            "blind_read_digest": frozen_digest,
-            "brief_digest": brief_digest,
-            "manuscript_digest": manuscript_digest,
-            "blocking_issues": reader_issues or [],
-        },
+        _reader_review(
+            blind_read_digest=frozen_digest,
+            brief_digest=brief_digest,
+            manuscript_digest=manuscript_digest,
+            repair_target=repair_target,
+            rationale=rationale,
+            blocking_issues=reader_issues,
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -275,22 +297,28 @@ def _certify(
     workspace: Path,
     tmp_path: Path,
     run_id: str,
-    requirement_ref: str,
 ) -> tuple[str, str]:
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
-    envelope = _reader_pass(harness, workspace, tmp_path, run_id, b_digest, m_digest)
+    envelope = _reader_pass(
+        harness, workspace, tmp_path, run_id, b_digest, m_digest
+    )
     assert envelope["result"]["stage"] == "READER_PASS"
     envelope = _integrity_pass(harness, workspace, tmp_path, run_id)
     assert envelope["result"]["stage"] == "INTEGRITY_PASS"
     return b_digest, m_digest
 
 
+# ---------------------------------------------------------------------------
+# Certified publication path
+# ---------------------------------------------------------------------------
+
+
 def test_harness_has_one_certified_publication_path(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, revision, requirement_ref = _delivery_run(workspace)
+    run_id, revision, _requirement_ref = _delivery_run(workspace)
 
     # The old direct publication commands are no longer part of the parser.
     for command in ("render-report", "publish-report"):
@@ -311,7 +339,7 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     assert code == 2
 
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
     session_before_preview = session_path.read_text(encoding="utf-8")
@@ -381,10 +409,21 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     session = workspace / "runs" / run_id / "delivery" / "report_session.json"
     assert session.is_file()
     session_value = json.loads(session.read_text(encoding="utf-8"))
-    assert session_value["schema_version"] == 4
-    assert session_value["brief"]["conceptual_model"]
-    assert session_value["brief"]["sections"][0]["semantic_moves"]
-    assert session_value["brief"]["sections"][0]["outline_depth"] == 0
+    # v0.6 schema migration: schema_version is 5, and the lean Brief carries
+    # only the five editorial fields — no sections, no semantic_moves, no
+    # outline_depth, no material.
+    assert session_value["schema_version"] == 5
+    assert set(session_value["brief"]) == {
+        "audience",
+        "promise",
+        "frame",
+        "arc",
+        "focus",
+    }
+    assert "sections" not in session_value["brief"]
+    assert "semantic_moves" not in session_value["brief"]
+    assert "outline_depth" not in session_value["brief"]
+    assert "material" not in session_value["brief"]
     assert not (
         workspace / "scratch" / run_id / "report_delivery" / "session.json"
     ).exists()
@@ -392,6 +431,124 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     assert "report_brief" not in state
     assert "reader_pass" not in state
     assert set(item.value for item in ArtifactKind) == {"REPORT"}
+
+
+# ---------------------------------------------------------------------------
+# Lean Report Brief adapter (ADR §16: Lean Brief)
+# ---------------------------------------------------------------------------
+
+
+def test_report_brief_adapter_accepts_lean_five_field_schema(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+
+    brief_path = _input(tmp_path, "lean-brief.json", _brief())
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(brief_path),
+    )
+    assert code == 0, envelope
+    assert envelope["result"]["stage"] == "BRIEF_ACCEPTED"
+    assert envelope["result"]["brief_digest"]
+    assert envelope["result"]["pending_action"] == "NONE"
+
+
+def test_report_brief_adapter_rejects_empty_editorial_fields(tmp_path):
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+
+    for field in ("audience", "promise", "frame"):
+        brief = _brief()
+        brief[field] = "   "
+        path = _input(tmp_path, f"empty-{field}.json", brief)
+        code, envelope = _invoke(
+            harness,
+            workspace,
+            "put-report-brief",
+            "--run-id",
+            run_id,
+            "--input",
+            str(path),
+        )
+        assert code == 2
+        assert field in envelope["error"]["message"]
+
+    for field in ("arc", "focus"):
+        brief = _brief()
+        brief[field] = []
+        path = _input(tmp_path, f"empty-{field}.json", brief)
+        code, envelope = _invoke(
+            harness,
+            workspace,
+            "put-report-brief",
+            "--run-id",
+            run_id,
+            "--input",
+            str(path),
+        )
+        assert code == 2
+        assert field in envelope["error"]["message"]
+
+
+def test_report_brief_adapter_rejects_v05_section_material_schema(tmp_path):
+    """No compatibility migration: the old section/material schema is unknown.
+
+    The lean five fields are present (so the required-fields check passes),
+    but the legacy section/material/terminology fields are unknown inputs and
+    are rejected — Python does not auto-convert the v0.5 schema.
+    """
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+
+    legacy = dict(_brief())
+    legacy.update(
+        {
+            "report_title": "Report",
+            "report_goal": "explain",
+            "conceptual_model": "model",
+            "reader_takeaway": "takeaway",
+            "narrative_logic": "logic",
+            "sections": [
+                {
+                    "title": "Result",
+                    "purpose": "explain",
+                    "semantic_moves": ["establish premise"],
+                    "outline_depth": 0,
+                    "requirement_refs": [],
+                    "research_refs": [],
+                    "material": [],
+                    "evidence_boundary": "accepted state only",
+                }
+            ],
+            "terminology": [],
+            "intentional_omissions": [],
+        }
+    )
+    path = _input(tmp_path, "legacy-brief.json", legacy)
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(path),
+    )
+    assert code == 2
+    assert "unknown input fields" in envelope["error"]["message"]
+
+
+# ---------------------------------------------------------------------------
+# Report Construction & Authoring Context (ADR §16: Authoring context)
+# ---------------------------------------------------------------------------
 
 
 def test_report_construction_input_is_narrow_and_deterministic(tmp_path):
@@ -414,165 +571,128 @@ def test_report_construction_input_is_narrow_and_deterministic(tmp_path):
     )
     assert all("sources" not in item for item in context["findings"])
     assert all("sources" not in item for item in context["open_problems"])
+    # Constructor sees open gaps (a design input); Authoring does not.
+    assert "open_gaps" in context
     assert first["result"]["repair"] is None
 
 
-def test_report_brief_adapter_requires_valid_outline_depth(tmp_path):
+def test_report_authoring_context_excludes_paper_inventory_and_gaps(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
 
-    missing = _brief(requirement_ref)
-    del missing["sections"][0]["outline_depth"]
-    missing_path = _input(tmp_path, "brief-missing-depth.json", missing)
     code, envelope = _invoke(
+        harness, workspace, "report-authoring-context", "--run-id", run_id
+    )
+    assert code == 0, envelope
+    context = envelope["result"]
+    # Authoring sees the accepted high-level semantics...
+    assert context["lifecycle"] == LifecycleMode.DELIVERY.value
+    assert context["contract"]["mission"] == "test certified delivery"
+    # Empty tuples are serialized as JSON arrays, so they come back as [].
+    assert context["approach_families"] == []
+    assert context["findings"] == []
+    assert context["open_problems"] == []
+    # ...but not the paper inventory, representative-paper refs, sources, or
+    # open gaps (those are design inputs, not realization inputs).
+    assert "papers" not in context
+    assert "open_gaps" not in context
+    assert "representative_paper_refs" not in context
+
+
+# ---------------------------------------------------------------------------
+# Outline freedom (ADR §16: Outline freedom)
+# ---------------------------------------------------------------------------
+
+
+def test_manuscript_outline_freedom_accepts_distinct_heading_structures(tmp_path):
+    """The Lean Brief carries no heading contract, so Python does not match
+    heading count, depth, or order. Two mechanically valid manuscripts with
+    different titles and H2/H3 structures both enter the Reader."""
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+
+    brief_path = _input(tmp_path, "brief.json", _brief())
+    code, _ = _invoke(
         harness,
         workspace,
         "put-report-brief",
         "--run-id",
         run_id,
         "--input",
-        str(missing_path),
+        str(brief_path),
     )
-    assert code == 2
-    assert "outline_depth" in envelope["error"]["message"]
+    assert code == 0
 
-    boolean = _brief(requirement_ref)
-    boolean["sections"][0]["outline_depth"] = True
-    boolean_path = _input(tmp_path, "brief-bool-depth.json", boolean)
-    code, envelope = _invoke(
+    flat = _input(
+        tmp_path,
+        "flat-manuscript.json",
+        _manuscript("# Survey\n\n## Result\n\nContent."),
+    )
+    nested = _input(
+        tmp_path,
+        "nested-manuscript.json",
+        _manuscript(
+            "# Deep Report\n\n## Background\n\n### Prior\n\nText.\n\n## Result\n\n"
+            "### Sub\n\nMore text.\n"
+        ),
+    )
+    for path in (flat, nested):
+        code, envelope = _invoke(
+            harness,
+            workspace,
+            "put-report-manuscript",
+            "--run-id",
+            run_id,
+            "--input",
+            str(path),
+        )
+        assert code == 0, envelope
+
+
+def test_manuscript_does_not_match_title_against_brief(tmp_path):
+    """No H1/title invariant: a manuscript whose H1 differs from any Brief
+    field is accepted. Authoring owns the title."""
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+
+    brief_path = _input(tmp_path, "brief.json", _brief())
+    code, _ = _invoke(
         harness,
         workspace,
         "put-report-brief",
         "--run-id",
         run_id,
         "--input",
-        str(boolean_path),
+        str(brief_path),
     )
-    assert code == 2
-    assert "integer" in envelope["error"]["message"]
+    assert code == 0
 
-
-def test_v05_brief_round_trip_preserves_material_obligation(tmp_path):
-    harness = _load_harness()
-    workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief = _brief(requirement_ref)
-    brief["sections"][0]["material"] = [
-        {
-            "content": "supporting calibration",
-            "role": "calibrate",
-            "reader_visible_obligation": (
-                "the reader perceives the boundary on the conclusion"
-            ),
-            "research_refs": [],
-            "source_ref": None,
-            "locator": None,
-        },
-        {
-            "content": "optional example",
-            "role": "illustrate",
-            "reader_visible_obligation": None,
-            "research_refs": [],
-            "source_ref": None,
-            "locator": None,
-        },
-    ]
-    path = _input(tmp_path, "v05-brief.json", brief)
+    path = _input(
+        tmp_path,
+        "unmatched-title.json",
+        _manuscript("# A Completely Different Title\n\n## Result\n\nContent."),
+    )
     code, envelope = _invoke(
         harness,
         workspace,
-        "put-report-brief",
+        "put-report-manuscript",
         "--run-id",
         run_id,
         "--input",
         str(path),
     )
     assert code == 0, envelope
-    manuscript_path = _input(tmp_path, "v05-manuscript.json", _manuscript())
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-manuscript",
-        "--run-id",
-        run_id,
-        "--input",
-        str(manuscript_path),
-    )
-    assert code == 0, envelope
-    session = json.loads(
-        (workspace / "runs" / run_id / "delivery" / "report_session.json").read_text()
-    )
-    material = session["brief"]["sections"][0]["material"]
-    assert material[0]["reader_visible_obligation"]
-    assert material[1]["reader_visible_obligation"] is None
-
-
-def test_invalid_stored_optional_brief_value_fails_closed(tmp_path):
-    harness = _load_harness()
-    workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    _put_brief_and_manuscript(harness, workspace, tmp_path, run_id, requirement_ref)
-    session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
-    session = json.loads(session_path.read_text(encoding="utf-8"))
-    session["brief"]["sections"][0]["material"] = [
-        {
-            "content": "support",
-            "role": 7,
-            "reader_visible_obligation": None,
-            "research_refs": [],
-            "source_ref": None,
-            "locator": None,
-        }
-    ]
-    session_path.write_text(json.dumps(session), encoding="utf-8")
-    code, envelope = _invoke(
-        harness, workspace, "render-reader-preview", "--run-id", run_id
-    )
-    assert code == 2
-    assert "stored role is invalid" in envelope["error"]["message"]
-
-
-def test_staged_manuscript_boundary_rejects_outline_mismatch(tmp_path):
-    harness = _load_harness()
-    workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief_path = _input(tmp_path, "brief.json", _brief(requirement_ref))
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-brief",
-        "--run-id",
-        run_id,
-        "--input",
-        str(brief_path),
-    )
-    assert code == 0, envelope
-
-    manuscript_path = _input(
-        tmp_path,
-        "flat-manuscript.json",
-        _manuscript("# Report\n\n**Result**\n\nContent."),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-manuscript",
-        "--run-id",
-        run_id,
-        "--input",
-        str(manuscript_path),
-    )
-    assert code == 2
-    assert "visible outline" in envelope["error"]["message"]
 
 
 def test_staged_presentation_preflight_rejects_bad_tokens_and_math(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief_path = _input(tmp_path, "presentation-brief.json", _brief(requirement_ref))
-    code, envelope = _invoke(
+    run_id, _, _ = _delivery_run(workspace)
+    brief_path = _input(tmp_path, "presentation-brief.json", _brief())
+    code, _ = _invoke(
         harness,
         workspace,
         "put-report-brief",
@@ -581,7 +701,7 @@ def test_staged_presentation_preflight_rejects_bad_tokens_and_math(tmp_path):
         "--input",
         str(brief_path),
     )
-    assert code == 0, envelope
+    assert code == 0
 
     for index, (markdown, expected) in enumerate(
         (
@@ -609,124 +729,19 @@ def test_staged_presentation_preflight_rejects_bad_tokens_and_math(tmp_path):
         assert expected in envelope["error"]["message"]
 
 
-def test_staged_boundary_rejects_same_depth_sibling_reorder(tmp_path):
+# ---------------------------------------------------------------------------
+# Schema migration (ADR §5.1: schema v4 → v5 fail-closed)
+# ---------------------------------------------------------------------------
+
+
+def test_schema_v4_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief_path = _input(
-        tmp_path,
-        "ordered-brief.json",
-        _brief_with_depths(requirement_ref, (0, 1, 1)),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-brief",
-        "--run-id",
-        run_id,
-        "--input",
-        str(brief_path),
-    )
-    assert code == 0, envelope
-
-    reordered_path = _input(
-        tmp_path,
-        "reordered-manuscript.json",
-        _manuscript(
-            "# Report\n\n" "## Section 1\n\n" "### Section 3\n\n" "### Section 2\n"
-        ),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-manuscript",
-        "--run-id",
-        run_id,
-        "--input",
-        str(reordered_path),
-    )
-    assert code == 2
-    assert "visible outline" in envelope["error"]["message"]
-    assert "Section 2" in envelope["error"]["message"]
-
-
-def test_staged_boundary_enforces_h1_and_atx_closing_hashes(tmp_path):
-    harness = _load_harness()
-    workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief_path = _input(tmp_path, "h1-brief.json", _brief(requirement_ref))
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-brief",
-        "--run-id",
-        run_id,
-        "--input",
-        str(brief_path),
-    )
-    assert code == 0, envelope
-
-    invalid_markdowns = (
-        ("## Result\n", "exactly one reader-visible H1"),
-        (
-            "# Report\n\n## Result\n\n# Another Root\n",
-            "exactly one reader-visible H1",
-        ),
-        ("## Result\n\n# Report\n", "H1 must be the first reader-visible heading"),
-        (
-            "# Different Report\n\n## Result\n",
-            "does not match ReportBrief report_title",
-        ),
-    )
-    for index, (markdown, message) in enumerate(invalid_markdowns):
-        path = _input(
-            tmp_path,
-            f"invalid-h1-{index}.json",
-            _manuscript(markdown),
-        )
-        code, envelope = _invoke(
-            harness,
-            workspace,
-            "put-report-manuscript",
-            "--run-id",
-            run_id,
-            "--input",
-            str(path),
-        )
-        assert code == 2
-        assert message in envelope["error"]["message"]
-
-    valid_path = _input(
-        tmp_path,
-        "closing-hashes.json",
-        _manuscript("# Report ###\n\n## Result ###\n\nContent."),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-manuscript",
-        "--run-id",
-        run_id,
-        "--input",
-        str(valid_path),
-    )
-    assert code == 0, envelope
-
-
-def test_schema_v3_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
-    harness = _load_harness()
-    workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    _put_brief_and_manuscript(
-        harness,
-        workspace,
-        tmp_path,
-        run_id,
-        requirement_ref,
-    )
+    run_id, _, _ = _delivery_run(workspace)
+    _put_brief_and_manuscript(harness, workspace, tmp_path, run_id)
     session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
     session = json.loads(session_path.read_text(encoding="utf-8"))
-    session["schema_version"] = 3
+    session["schema_version"] = 4
     session_path.write_text(json.dumps(session), encoding="utf-8")
 
     code, envelope = _invoke(
@@ -740,7 +755,7 @@ def test_schema_v3_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
     assert "older schema" in envelope["error"]["message"]
     assert "rebuild the Report Brief" in envelope["error"]["message"]
 
-    rebuilt_path = _input(tmp_path, "rebuilt-brief.json", _brief(requirement_ref))
+    rebuilt_path = _input(tmp_path, "rebuilt-brief.json", _brief())
     code, envelope = _invoke(
         harness,
         workspace,
@@ -752,65 +767,30 @@ def test_schema_v3_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
     )
     assert code == 0, envelope
     rebuilt = json.loads(session_path.read_text(encoding="utf-8"))
-    assert rebuilt["schema_version"] == 4
+    assert rebuilt["schema_version"] == 5
     assert rebuilt["manuscript"] is None
 
 
-def test_outline_change_invalidates_certification_without_changing_research(tmp_path):
+# ---------------------------------------------------------------------------
+# Certification invalidation (ADR §16: Certification)
+# ---------------------------------------------------------------------------
+
+
+def test_brief_change_invalidates_certification_without_changing_research(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     runtime = _runtime(workspace)
     basis_before = runtime.delivery.view(run_id).delivery_basis
     state_path = workspace / "runs" / run_id / "state.json"
     state_before = state_path.read_bytes()
 
-    nested_path = _input(
-        tmp_path,
-        "nested-brief.json",
-        _brief_with_depths(requirement_ref, (0, 1)),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-brief",
-        "--run-id",
-        run_id,
-        "--input",
-        str(nested_path),
-    )
-    assert code == 0, envelope
-    old_brief_digest = envelope["result"]["brief_digest"]
-    manuscript_path = _input(
-        tmp_path,
-        "nested-manuscript.json",
-        _manuscript("# Report\n\n## Section 1\n\n### Section 2\n\nContent."),
-    )
-    code, envelope = _invoke(
-        harness,
-        workspace,
-        "put-report-manuscript",
-        "--run-id",
-        run_id,
-        "--input",
-        str(manuscript_path),
-    )
-    assert code == 0, envelope
-    manuscript_digest = envelope["result"]["manuscript_digest"]
-    _reader_pass(
-        harness,
-        workspace,
-        tmp_path,
-        run_id,
-        old_brief_digest,
-        manuscript_digest,
-    )
-    _integrity_pass(harness, workspace, tmp_path, run_id)
+    _certify(harness, workspace, tmp_path, run_id)
+    code, _ = _invoke(harness, workspace, "render-certified-report", "--run-id", run_id)
+    assert code == 0
 
-    flat_path = _input(
-        tmp_path,
-        "flat-brief.json",
-        _brief_with_depths(requirement_ref, (0, 0)),
+    changed_brief = _input(
+        tmp_path, "changed-brief.json", _brief(promise="a different promise")
     )
     code, envelope = _invoke(
         harness,
@@ -819,10 +799,9 @@ def test_outline_change_invalidates_certification_without_changing_research(tmp_
         "--run-id",
         run_id,
         "--input",
-        str(flat_path),
+        str(changed_brief),
     )
     assert code == 0, envelope
-    assert envelope["result"]["brief_digest"] != old_brief_digest
     assert envelope["result"]["reader_pass"] is None
     assert envelope["result"]["integrity_pass"] is None
     assert envelope["result"]["manuscript_digest"] is None
@@ -842,8 +821,8 @@ def test_outline_change_invalidates_certification_without_changing_research(tmp_
 def test_integrity_input_without_reader_pass_is_rejected(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    _put_brief_and_manuscript(harness, workspace, tmp_path, run_id, requirement_ref)
+    run_id, _, _ = _delivery_run(workspace)
+    _put_brief_and_manuscript(harness, workspace, tmp_path, run_id)
     path = _input(
         tmp_path,
         "integrity-without-reader.json",
@@ -865,8 +844,8 @@ def test_integrity_input_without_reader_pass_is_rejected(tmp_path):
 def test_stale_manuscript_and_brief_invalidate_certification(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, revision, requirement_ref = _delivery_run(workspace)
-    _certify(harness, workspace, tmp_path, run_id, requirement_ref)
+    run_id, revision, _ = _delivery_run(workspace)
+    _certify(harness, workspace, tmp_path, run_id)
     code, _ = _invoke(harness, workspace, "render-certified-report", "--run-id", run_id)
     assert code == 0
 
@@ -897,9 +876,9 @@ def test_stale_manuscript_and_brief_invalidate_certification(tmp_path):
     assert code == 2
 
     # Re-certify, then changing the Brief invalidates Manuscript and both gates.
-    _certify(harness, workspace, tmp_path, run_id, requirement_ref)
+    _certify(harness, workspace, tmp_path, run_id)
     changed_brief = _input(
-        tmp_path, "changed-brief.json", _brief(requirement_ref, goal="changed goal")
+        tmp_path, "changed-brief.json", _brief(promise="changed promise")
     )
     code, _ = _invoke(
         harness,
@@ -915,12 +894,20 @@ def test_stale_manuscript_and_brief_invalidate_certification(tmp_path):
     assert code == 2
 
 
+# ---------------------------------------------------------------------------
+# v0.6 one-shot Reader decision (ADR §5.7, §7)
+# ---------------------------------------------------------------------------
+
+
 def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tmp_path):
+    """v0.6: a MANUSCRIPT repair target is a resource stop. The host must
+    re-author and re-run the Reader; the same manuscript cannot clear the
+    obligation, and a fresh blind read is required before Phase 2 again."""
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     blocked = _reader_pass(
         harness,
@@ -929,19 +916,22 @@ def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tm
         run_id,
         b_digest,
         m_digest,
-        reader_issues=[_reader_issue("MANUSCRIPT")],
+        repair_target="MANUSCRIPT",
+        rationale="a key transition is missing from the manuscript",
+        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
 
     pass_path = _input(
         tmp_path,
         "reader-pass-without-repair.json",
-        {
-            "blind_read_digest": blocked["result"]["blind_read_digest"],
-            "brief_digest": b_digest,
-            "manuscript_digest": m_digest,
-            "blocking_issues": [],
-        },
+        _reader_review(
+            blind_read_digest=blocked["result"]["blind_read_digest"],
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target=None,
+            rationale="the report now delivers the promised understanding",
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1001,6 +991,8 @@ def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tm
     assert accepted["result"]["reader_pass"] is None
     assert accepted["result"]["integrity_pass"] is None
 
+    # The old frozen blind read is gone; Phase 2 cannot run without a fresh
+    # blind read on the new manuscript.
     code, envelope = _invoke(
         harness,
         workspace,
@@ -1019,10 +1011,8 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
 ):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    old_brief_digest, _ = _certify(
-        harness, workspace, tmp_path, run_id, requirement_ref
-    )
+    run_id, _, _ = _delivery_run(workspace)
+    old_brief_digest, _ = _certify(harness, workspace, tmp_path, run_id)
     state_path = workspace / "runs" / run_id / "state.json"
     state_before = state_path.read_bytes()
     view_before = _runtime(workspace).delivery.view(run_id)
@@ -1059,10 +1049,13 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
     )
     assert code == 0, construction
     repair = construction["result"]["repair"]
-    assert repair["previous_brief"]["report_goal"] == "explain"
+    assert repair["previous_brief"]["promise"] == "explain the result"
     assert repair["feedback"] == feedback["feedback"]
+    # v0.6: Brief repair feedback carries no downstream_effect.
+    assert "downstream_effect" not in repair["feedback"][0]
+    assert set(repair["feedback"][0]) == {"problem", "resolution_condition", "location"}
 
-    same_path = _input(tmp_path, "same-authoring-brief.json", _brief(requirement_ref))
+    same_path = _input(tmp_path, "same-authoring-brief.json", _brief())
     code, _ = _invoke(
         harness,
         workspace,
@@ -1077,7 +1070,7 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
     changed_path = _input(
         tmp_path,
         "changed-authoring-brief.json",
-        _brief(requirement_ref, goal="realizable comparison"),
+        _brief(promise="a realizable comparison"),
     )
     code, accepted = _invoke(
         harness,
@@ -1098,7 +1091,7 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
 
     session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
     session = json.loads(session_path.read_text(encoding="utf-8"))
-    assert session["schema_version"] == 4
+    assert session["schema_version"] == 5
     assert session["brief_repair_feedback"] is None
     assert state_path.read_bytes() == state_before
     view_after = _runtime(workspace).delivery.view(run_id)
@@ -1115,8 +1108,8 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
 def test_authoring_brief_insufficient_is_legal_before_initial_manuscript(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
-    brief_path = _input(tmp_path, "initial-brief.json", _brief(requirement_ref))
+    run_id, _, _ = _delivery_run(workspace)
+    brief_path = _input(tmp_path, "initial-brief.json", _brief())
     code, accepted = _invoke(
         harness,
         workspace,
@@ -1151,7 +1144,7 @@ def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
 ):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     feedback_path = _input(
         tmp_path, "brief-insufficient-required.json", _brief_repair_feedback()
     )
@@ -1167,7 +1160,7 @@ def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
     assert code == 2
 
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     blocked = _reader_pass(
         harness,
@@ -1176,7 +1169,9 @@ def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
         run_id,
         b_digest,
         m_digest,
-        reader_issues=[_reader_issue("MANUSCRIPT")],
+        repair_target="MANUSCRIPT",
+        rationale="a key transition is missing",
+        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
 
@@ -1199,9 +1194,9 @@ def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
 def test_reader_brief_blocker_requires_changed_brief(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     blocked = _reader_pass(
         harness,
@@ -1210,7 +1205,9 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
         run_id,
         b_digest,
         m_digest,
-        reader_issues=[_reader_issue("BRIEF")],
+        repair_target="BRIEF",
+        rationale="the Brief's arc has a cognitive gap",
+        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "BRIEF_REBUILD_REQUIRED"
 
@@ -1223,13 +1220,14 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
     )
     assert code == 0, construction
     repair = construction["result"]["repair"]
-    assert repair["previous_brief"]["report_goal"] == "explain"
+    assert repair["previous_brief"]["promise"] == "explain the result"
     assert repair["feedback"]
     assert repair["feedback"][0]["problem"]
-    assert repair["feedback"][0]["downstream_effect"]
     assert repair["feedback"][0]["resolution_condition"]
+    # v0.6: no downstream_effect in the projected repair feedback.
+    assert "downstream_effect" not in repair["feedback"][0]
 
-    same_path = _input(tmp_path, "same-brief.json", _brief(requirement_ref))
+    same_path = _input(tmp_path, "same-brief.json", _brief())
     code, _ = _invoke(
         harness,
         workspace,
@@ -1244,7 +1242,7 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
     changed_path = _input(
         tmp_path,
         "repaired-brief.json",
-        _brief(requirement_ref, goal="repaired explanation"),
+        _brief(promise="a repaired explanation"),
     )
     code, accepted = _invoke(
         harness,
@@ -1265,9 +1263,9 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
 def test_manuscript_blocker_does_not_create_brief_repair_context(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     _reader_pass(
         harness,
@@ -1276,7 +1274,9 @@ def test_manuscript_blocker_does_not_create_brief_repair_context(tmp_path):
         run_id,
         b_digest,
         m_digest,
-        reader_issues=[_reader_issue("MANUSCRIPT")],
+        repair_target="MANUSCRIPT",
+        rationale="a key transition is missing",
+        reader_issues=[_reader_issue()],
     )
     code, construction = _invoke(
         harness,
@@ -1289,12 +1289,17 @@ def test_manuscript_blocker_does_not_create_brief_repair_context(tmp_path):
     assert construction["result"]["repair"] is None
 
 
+# ---------------------------------------------------------------------------
+# Integrity repair routing (ADR §16: Certification)
+# ---------------------------------------------------------------------------
+
+
 def test_integrity_manuscript_repair_cannot_be_overwritten_by_pass(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     _reader_pass(harness, workspace, tmp_path, run_id, b_digest, m_digest)
     revise_path = _input(
@@ -1377,9 +1382,9 @@ def test_integrity_manuscript_repair_cannot_be_overwritten_by_pass(tmp_path):
 def test_integrity_brief_repair_requires_changed_brief(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     _reader_pass(harness, workspace, tmp_path, run_id, b_digest, m_digest)
     revise_path = _input(
@@ -1403,7 +1408,7 @@ def test_integrity_brief_repair_requires_changed_brief(tmp_path):
     assert code == 0, blocked
     assert blocked["result"]["pending_action"] == "BRIEF_REBUILD_REQUIRED"
 
-    same_path = _input(tmp_path, "same-integrity-brief.json", _brief(requirement_ref))
+    same_path = _input(tmp_path, "same-integrity-brief.json", _brief())
     code, _ = _invoke(
         harness,
         workspace,
@@ -1418,7 +1423,7 @@ def test_integrity_brief_repair_requires_changed_brief(tmp_path):
     changed_path = _input(
         tmp_path,
         "integrity-repaired-brief.json",
-        _brief(requirement_ref, goal="integrity repaired explanation"),
+        _brief(promise="an integrity-repaired explanation"),
     )
     code, accepted = _invoke(
         harness,
@@ -1437,8 +1442,8 @@ def test_integrity_brief_repair_requires_changed_brief(tmp_path):
 def test_stale_delivery_basis_rejects_old_certification(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, revision, requirement_ref = _delivery_run(workspace)
-    _certify(harness, workspace, tmp_path, run_id, requirement_ref)
+    run_id, revision, _ = _delivery_run(workspace)
+    _certify(harness, workspace, tmp_path, run_id)
 
     runtime = _runtime(workspace)
     reopened = runtime.delivery.reopen_research(run_id, revision)
@@ -1460,38 +1465,38 @@ def test_stale_delivery_basis_rejects_old_certification(tmp_path):
     assert passed.state_revision > revision
 
 
+# ---------------------------------------------------------------------------
+# Blind → Phase 2 staged lock (ADR §5.6, §16: Frozen Blind)
+# ---------------------------------------------------------------------------
+
+
 def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
-    blind_issue = {
-        "location": "section 1",
-        "problem": "missing bridge",
-        "reader_effect": "reader cannot connect premise and result",
-        "why_blocking": "the main conclusion cannot be reconstructed",
-    }
-    second_blind_issue = {
-        "location": "section 2",
-        "problem": "unstable comparison",
-        "reader_effect": "reader cannot compare the approaches",
-        "why_blocking": "the promised synthesis cannot be reconstructed",
-    }
+    blind_issue = _reader_issue(
+        observation="missing bridge between premise and result",
+        reader_effect="the reader cannot connect premise and result",
+        why_blocking="the main conclusion cannot be reconstructed",
+        location="section 1",
+    )
+    second_blind_issue = _reader_issue(
+        observation="unstable comparison coordinate",
+        reader_effect="the reader cannot compare the approaches",
+        why_blocking="the promised synthesis cannot be reconstructed",
+        location="section 2",
+    )
     blind_path = _input(
         tmp_path,
         "blind-with-issue.json",
-        {
-            "core_understanding": "partial",
-            "domain_model": "incomplete",
-            "comparison_coordinates": "none",
-            "reverse_outline": "one disconnected section",
-            "material_economy": "material is overloaded",
-            "professional_finish": "not yet a finished product",
-            "manuscript_digest": m_digest,
-            "blocking_issues": [blind_issue, second_blind_issue],
-        },
+        _blind_read(
+            m_digest,
+            received_understanding="partial understanding",
+            blocking_issues=[blind_issue, second_blind_issue],
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1514,18 +1519,28 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
             / f"blind_review_{m_digest[:12]}.json"
         ).read_text()
     )
+    # v0.6: a ReaderIssue has no per-issue repair_target and no
+    # resolution_condition. Attribution is a Phase 2 top-level decision.
     assert "repair_target" not in capture["blocking_issues"][0]
+    assert "resolution_condition" not in capture["blocking_issues"][0]
+    assert set(capture["blocking_issues"][0]) == {
+        "observation",
+        "reader_effect",
+        "why_blocking",
+        "location",
+    }
 
     # A different digest represents an attempted rewrite of the frozen read.
     bad_review = _input(
         tmp_path,
         "rewritten-reader.json",
-        {
-            "blind_read_digest": "0" * 64,
-            "brief_digest": b_digest,
-            "manuscript_digest": m_digest,
-            "blocking_issues": [],
-        },
+        _reader_review(
+            blind_read_digest="0" * 64,
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target=None,
+            rationale="the report delivers the promised understanding",
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1539,17 +1554,19 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
     assert code == 2
     assert "frozen Blind Read" in envelope["error"]["message"]
 
-    # The right frozen digest is still insufficient: Blind FAIL cannot become
-    # a Phase 2 PASS. Python does not require one-to-one issue mapping.
+    # The right frozen digest is still insufficient: a frozen Blind Read with
+    # blocking issues cannot become a Phase 2 PASS. The staged lock rejects
+    # a PASS (repair_target is None) while the blind read has blockers.
     disappearing_review = _input(
         tmp_path,
         "disappearing-reader.json",
-        {
-            "blind_read_digest": frozen_digest,
-            "brief_digest": b_digest,
-            "manuscript_digest": m_digest,
-            "blocking_issues": [],
-        },
+        _reader_review(
+            blind_read_digest=frozen_digest,
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target=None,
+            rationale="the report delivers the promised understanding",
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1563,21 +1580,19 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
     assert code == 2
     assert "frozen Blind Read" in envelope["error"]["message"]
 
+    # Attribution with a real repair target is accepted. v0.6: the repair
+    # target is top-level, not per-issue.
     attributed = _input(
         tmp_path,
         "attributed-reader.json",
-        {
-            "blind_read_digest": frozen_digest,
-            "brief_digest": b_digest,
-            "manuscript_digest": m_digest,
-            "blocking_issues": [
-                {
-                    **blind_issue,
-                    "resolution_condition": "the missing bridge is explicit",
-                    "repair_target": "MANUSCRIPT",
-                }
-            ],
-        },
+        _reader_review(
+            blind_read_digest=frozen_digest,
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target="MANUSCRIPT",
+            rationale="the manuscript must add the missing bridge",
+            blocking_issues=[blind_issue],
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1594,37 +1609,28 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
 
 
 def test_reader_research_target_is_rejected(tmp_path):
+    """The Reader's repair_target is MANUSCRIPT | BRIEF only. There is no
+    RESEARCH target — a suspected research gap must go through Integrity."""
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, _, requirement_ref = _delivery_run(workspace)
+    run_id, _, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
-    issue = {
-        "problem": "support may be insufficient",
-        "reader_effect": "claim cannot be trusted",
-        "why_blocking": "possible state-level gap",
-        "resolution_condition": "accepted support is represented faithfully",
-    }
     blind_path = _input(
         tmp_path,
         "blind-research-suspicion.json",
-        {
-            "core_understanding": "partial",
-            "domain_model": "incomplete",
-            "comparison_coordinates": "none",
-            "reverse_outline": "disconnected",
-            "material_economy": "unclear",
-            "professional_finish": "unfinished",
-            "manuscript_digest": m_digest,
-            "blocking_issues": [
-                {
-                    key: value
-                    for key, value in issue.items()
-                    if key != "resolution_condition"
-                }
+        _blind_read(
+            m_digest,
+            received_understanding="partial understanding",
+            blocking_issues=[
+                _reader_issue(
+                    observation="support may be insufficient",
+                    reader_effect="the claim cannot be trusted",
+                    why_blocking="a possible state-level gap",
+                )
             ],
-        },
+        ),
     )
     code, frozen = _invoke(
         harness,
@@ -1639,12 +1645,20 @@ def test_reader_research_target_is_rejected(tmp_path):
     review_path = _input(
         tmp_path,
         "reader-research-target.json",
-        {
-            "blind_read_digest": frozen["result"]["blind_read_digest"],
-            "brief_digest": b_digest,
-            "manuscript_digest": m_digest,
-            "blocking_issues": [{**issue, "repair_target": "POSSIBLE_RESEARCH_ISSUE"}],
-        },
+        _reader_review(
+            blind_read_digest=frozen["result"]["blind_read_digest"],
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target="POSSIBLE_RESEARCH_ISSUE",
+            rationale="the support may be insufficient",
+            blocking_issues=[
+                _reader_issue(
+                    observation="support may be insufficient",
+                    reader_effect="the claim cannot be trusted",
+                    why_blocking="a possible state-level gap",
+                )
+            ],
+        ),
     )
     code, envelope = _invoke(
         harness,
@@ -1660,12 +1674,90 @@ def test_reader_research_target_is_rejected(tmp_path):
     assert _runtime(workspace).delivery.view(run_id).lifecycle is LifecycleMode.DELIVERY
 
 
+def test_reader_pass_requires_rationale_and_issue_when_target_set(tmp_path):
+    """v0.6: a non-None repair_target requires a non-empty rationale and at
+    least one blocking issue. A target with no rationale or no issues is
+    rejected. PASS (target is None) requires no blocking issues."""
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+    b_digest, m_digest = _put_brief_and_manuscript(
+        harness, workspace, tmp_path, run_id
+    )
+    blind_path = _input(
+        tmp_path,
+        "blind.json",
+        _blind_read(m_digest),
+    )
+    code, blind_env = _invoke(
+        harness,
+        workspace,
+        "submit-blind-review",
+        "--run-id",
+        run_id,
+        "--input",
+        str(blind_path),
+    )
+    assert code == 0, blind_env
+    frozen_digest = blind_env["result"]["blind_read_digest"]
+
+    # Target with empty rationale is rejected.
+    no_rationale = _input(
+        tmp_path,
+        "no-rationale.json",
+        _reader_review(
+            blind_read_digest=frozen_digest,
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target="MANUSCRIPT",
+            rationale="   ",
+            blocking_issues=[_reader_issue()],
+        ),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "submit-reader-review",
+        "--run-id",
+        run_id,
+        "--input",
+        str(no_rationale),
+    )
+    assert code == 2
+    assert "rationale" in envelope["error"]["message"]
+
+    # Target with no blocking issues is rejected.
+    no_issues = _input(
+        tmp_path,
+        "no-issues.json",
+        _reader_review(
+            blind_read_digest=frozen_digest,
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target="MANUSCRIPT",
+            rationale="a transition is missing",
+            blocking_issues=[],
+        ),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "submit-reader-review",
+        "--run-id",
+        run_id,
+        "--input",
+        str(no_issues),
+    )
+    assert code == 2
+    assert "blocking issue" in envelope["error"]["message"]
+
+
 def test_confirmed_research_insufficiency_requires_explicit_reopen(tmp_path):
     harness = _load_harness()
     workspace = tmp_path / "workspace"
-    run_id, revision, requirement_ref = _delivery_run(workspace)
+    run_id, revision, _ = _delivery_run(workspace)
     b_digest, m_digest = _put_brief_and_manuscript(
-        harness, workspace, tmp_path, run_id, requirement_ref
+        harness, workspace, tmp_path, run_id
     )
     _reader_pass(harness, workspace, tmp_path, run_id, b_digest, m_digest)
     confirmation = _input(

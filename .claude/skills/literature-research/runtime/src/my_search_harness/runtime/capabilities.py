@@ -37,6 +37,7 @@ from .context import (
     ContextProjectionService,
     DeliveryView,
     InspectResult,
+    ReportAuthoringContext,
     ReportConstructionContext,
     ResearchView,
 )
@@ -467,6 +468,12 @@ class DeliveryCapabilities:
 
         self._require_delivery(run_id)
         return self._context.report_construction_context(run_id)
+
+    def report_authoring_context(self, run_id: str) -> ReportAuthoringContext:
+        """Return the thin realization projection for report Authoring."""
+
+        self._require_delivery(run_id)
+        return self._context.report_authoring_context(run_id)
 
     def inspect(
         self,

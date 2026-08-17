@@ -22,20 +22,18 @@ from .capabilities import DeliveryCapabilities
 from .citations import DeterministicCitationRenderer
 from .delivery import PublishReportResult, _ReportPublicationAuthorization
 from .reporting import (
-    BlindBlockingIssue,
     BlindReadResult,
     BriefRepairContext,
     BriefRepairFeedback,
-    BriefMaterial,
     CitationReference,
-    CognitiveFrictionObservation,
     IntegrityDisposition,
     IntegrityPass,
     LocalReportCaptureSink,
+    ReaderIssue,
     ReaderPass,
     RepairTarget,
+    ReportAuthoringContext,
     ReportBrief,
-    ReportBriefSection,
     ReportConstructionInput,
     ReportManuscript,
     ReportReviewResult,
@@ -44,14 +42,12 @@ from .reporting import (
     brief_digest,
     delivery_basis_key,
     manuscript_digest,
-    reader_repair_target,
     validate_blind_read,
     validate_brief_repair_feedback,
     validate_integrity_review,
     validate_report_brief,
     validate_report_manuscript,
     validate_report_review,
-    validate_outline_fidelity,
 )
 
 
@@ -102,7 +98,7 @@ class ReaderPreviewResult:
 class CertifiedReportDelivery:
     """Production orchestrator for Claude-driven staged report delivery."""
 
-    _SCHEMA_VERSION = 4
+    _SCHEMA_VERSION = 5
     _OLDER_SCHEMA_MESSAGE = (
         "report delivery session uses an older schema and must rebuild "
         "the Report Brief"
@@ -138,6 +134,11 @@ class CertifiedReportDelivery:
                 feedback=feedback,
             ),
         )
+
+    def authoring_context(self, run_id: str) -> ReportAuthoringContext:
+        """Build the thin realization projection for an Authoring invocation."""
+
+        return self._delivery.report_authoring_context(run_id)
 
     def put_brief(self, run_id: str, brief: ReportBrief) -> CertifiedDeliveryStatus:
         view = self._delivery.view(run_id)
@@ -194,9 +195,8 @@ class CertifiedReportDelivery:
     ) -> CertifiedDeliveryStatus:
         session = self._load_current(run_id)
         self._require_action_allowed(session, "put-report-manuscript")
-        brief = self._require_brief(session)
+        self._require_brief(session)  # a manuscript requires a frozen Brief
         validate_report_manuscript(manuscript)
-        validate_outline_fidelity(brief, manuscript)
         self._renderer.audit(self._delivery.view(run_id), manuscript)
         new_digest = manuscript_digest(manuscript)
         pending = self._pending_action(session)
@@ -227,7 +227,6 @@ class CertifiedReportDelivery:
         self._require_action_allowed(session, "render-reader-preview")
         brief = self._require_brief(session)
         manuscript = self._require_manuscript(session)
-        validate_outline_fidelity(brief, manuscript)
         content = self._renderer.render(self._delivery.view(run_id), manuscript)
         if not content.strip():
             raise CertifiedDeliveryError("citation renderer returned empty preview")
@@ -269,16 +268,20 @@ class CertifiedReportDelivery:
         validate_blind_read(frozen_blind, m_digest)
         if blind_read_digest(frozen_blind) != frozen_digest:
             raise CertifiedDeliveryError("stored Blind Read digest is stale")
-        if frozen_blind.blocking_issues and not review.blocking_issues:
+        # Blind→Phase2 staged lock: a frozen Blind Read with blocking issues
+        # cannot be papered over by a Phase 2 PASS. The PASS signal in v0.6 is
+        # ``repair_target is None``; the validator enforces the matching issue
+        # invariant, but this guard raises a clearer staged-lock error first.
+        if (
+            frozen_blind.blocking_issues
+            and review.repair_target is None
+        ):
             raise CertifiedDeliveryError(
                 "Phase 2 cannot PASS while the frozen Blind Read has blocking issues"
             )
         validate_report_review(review, frozen_blind, b_digest, m_digest)
         session["reader_review"] = _jsonable(review)
-        if review.blocking_issues:
-            session["reader_pass"] = None
-            pending = self._pending_for_reader(review)
-        else:
+        if review.repair_target is None:
             session["reader_pass"] = _jsonable(
                 ReaderPass(
                     brief_digest=b_digest,
@@ -286,13 +289,16 @@ class CertifiedReportDelivery:
                 )
             )
             pending = _PendingAction.NONE
+        else:
+            session["reader_pass"] = None
+            pending = self._pending_for_reader(review)
         self._clear_from(session, "integrity_review")
         session["pending_action"] = pending.value
         self._save(run_id, session)
         self._captures.capture(
             run_id, f"reader_review_{m_digest[:12]}.json", _pretty(review)
         )
-        stage = "READER_PASS" if not review.blocking_issues else "READER_BLOCKED"
+        stage = "READER_PASS" if review.repair_target is None else "READER_BLOCKED"
         return self._status(run_id, stage, session)
 
     def submit_integrity_review(
@@ -591,12 +597,12 @@ class CertifiedReportDelivery:
 
     @staticmethod
     def _pending_for_reader(review: ReportReviewResult) -> _PendingAction:
-        target = reader_repair_target(review.blocking_issues)
+        target = review.repair_target
         if target is RepairTarget.BRIEF:
             return _PendingAction.BRIEF_REBUILD_REQUIRED
         if target is RepairTarget.MANUSCRIPT:
             return _PendingAction.MANUSCRIPT_REPAIR_REQUIRED
-        raise CertifiedDeliveryError("Reader blockers carry no repair target")
+        raise CertifiedDeliveryError("Reader review carries no repair target")
 
     @staticmethod
     def _brief_repair_feedback(
@@ -616,29 +622,14 @@ class CertifiedReportDelivery:
 
         reader = session.get("reader_review")
         if isinstance(reader, Mapping):
-            raw_issues = reader.get("blocking_issues")
-            if not isinstance(raw_issues, list):
-                raise CertifiedDeliveryError(
-                    "stored Reader review blocking_issues are invalid"
-                )
-            reader_feedback: list[BriefRepairFeedback] = []
-            for raw in raw_issues:
-                if not isinstance(raw, Mapping):
-                    raise CertifiedDeliveryError("stored Reader blocker is invalid")
-                if raw.get("repair_target") != RepairTarget.BRIEF.value:
-                    continue
-                reader_feedback.append(
+            if reader.get("repair_target") == RepairTarget.BRIEF.value:
+                rationale = _mapping_string(reader, "rationale")
+                return (
                     BriefRepairFeedback(
-                        problem=_mapping_string(raw, "problem"),
-                        downstream_effect=_mapping_string(raw, "reader_effect"),
-                        resolution_condition=_mapping_string(
-                            raw, "resolution_condition"
-                        ),
-                        location=_optional_stored_string(raw, "location"),
-                    )
+                        problem=rationale,
+                        resolution_condition=rationale,
+                    ),
                 )
-            if reader_feedback:
-                return tuple(reader_feedback)
 
         integrity = session.get("integrity_review")
         if isinstance(integrity, Mapping):
@@ -652,10 +643,6 @@ class CertifiedReportDelivery:
                 return tuple(
                     BriefRepairFeedback(
                         problem=issue,
-                        downstream_effect=(
-                            "The current Report Brief cannot receive Research "
-                            "Integrity certification"
-                        ),
                         resolution_condition=(
                             "The rebuilt Report Brief must represent the accepted "
                             "research semantics within its evidence boundary"
@@ -792,13 +779,6 @@ def _mapping_string(value: Mapping[str, object], name: str) -> str:
     return item
 
 
-def _mapping_non_negative_int(value: Mapping[str, object], name: str) -> int:
-    item = value.get(name)
-    if not isinstance(item, int) or isinstance(item, bool) or item < 0:
-        raise CertifiedDeliveryError(f"stored {name} is invalid")
-    return item
-
-
 def _optional_mapping_string(value: Mapping[str, object], name: str) -> str | None:
     item = value.get(name)
     if item is None:
@@ -824,7 +804,6 @@ def _brief_repair_feedback_from(value: object) -> BriefRepairFeedback:
         raise CertifiedDeliveryError("stored BriefRepairFeedback is invalid")
     return BriefRepairFeedback(
         problem=_mapping_string(value, "problem"),
-        downstream_effect=_mapping_string(value, "downstream_effect"),
         resolution_condition=_mapping_string(value, "resolution_condition"),
         location=_optional_stored_string(value, "location"),
     )
@@ -857,77 +836,12 @@ def _nonempty_strings_from(value: object, name: str) -> tuple[str, ...]:
 
 
 def _brief_from(value: Mapping[str, object]) -> ReportBrief:
-    raw_sections = value.get("sections")
-    if not isinstance(raw_sections, list):
-        raise CertifiedDeliveryError("stored Report Brief sections are invalid")
-    sections: list[ReportBriefSection] = []
-    for raw_section in raw_sections:
-        if not isinstance(raw_section, Mapping):
-            raise CertifiedDeliveryError("stored Report Brief section is invalid")
-        raw_material = raw_section.get("material", [])
-        if not isinstance(raw_material, list):
-            raise CertifiedDeliveryError("stored Brief material is invalid")
-        material: list[BriefMaterial] = []
-        for raw in raw_material:
-            if not isinstance(raw, Mapping):
-                raise CertifiedDeliveryError("stored BriefMaterial is invalid")
-            material.append(
-                BriefMaterial(
-                    content=_mapping_string(raw, "content"),
-                    role=_optional_stored_string(raw, "role"),
-                    reader_visible_obligation=_optional_stored_string(
-                        raw, "reader_visible_obligation"
-                    ),
-                    research_refs=_strings_from(
-                        raw.get("research_refs"), "material research_refs"
-                    ),
-                    source_ref=_optional_stored_string(raw, "source_ref"),
-                    locator=_locator_from(raw.get("locator")),
-                )
-            )
-        sections.append(
-            ReportBriefSection(
-                title=_mapping_string(raw_section, "title"),
-                purpose=_mapping_string(raw_section, "purpose"),
-                reader_takeaway=_mapping_string(raw_section, "reader_takeaway"),
-                semantic_moves=_nonempty_strings_from(
-                    raw_section.get("semantic_moves"), "semantic_moves"
-                ),
-                outline_depth=_mapping_non_negative_int(raw_section, "outline_depth"),
-                requirement_refs=_strings_from(
-                    raw_section.get("requirement_refs"), "requirement_refs"
-                ),
-                research_refs=_strings_from(
-                    raw_section.get("research_refs"), "research_refs"
-                ),
-                material=tuple(material),
-                evidence_boundary=_mapping_string(raw_section, "evidence_boundary"),
-            )
-        )
-    raw_terms = value.get("terminology")
-    if not isinstance(raw_terms, list):
-        raise CertifiedDeliveryError("stored terminology is invalid")
-    terminology: list[tuple[str, str]] = []
-    for item in raw_terms:
-        if (
-            not isinstance(item, list)
-            or len(item) != 2
-            or not all(isinstance(term, str) and term for term in item)
-        ):
-            raise CertifiedDeliveryError("stored terminology entry is invalid")
-        terminology.append((item[0], item[1]))
     return ReportBrief(
-        report_title=_mapping_string(value, "report_title"),
         audience=_mapping_string(value, "audience"),
-        report_goal=_mapping_string(value, "report_goal"),
-        conceptual_model=_mapping_string(value, "conceptual_model"),
-        reader_takeaway=_mapping_string(value, "reader_takeaway"),
-        narrative_logic=_mapping_string(value, "narrative_logic"),
-        sections=tuple(sections),
-        terminology=tuple(terminology),
-        intentional_omissions=_strings_from(
-            value.get("intentional_omissions"), "intentional_omissions"
-        ),
+        promise=_mapping_string(value, "promise"),
+        frame=_mapping_string(value, "frame"),
+        arc=_nonempty_strings_from(value.get("arc"), "arc"),
+        focus=_nonempty_strings_from(value.get("focus"), "focus"),
     )
 
 
@@ -956,42 +870,20 @@ def _blind_read_from(value: Mapping[str, object]) -> BlindReadResult:
     raw_issues = value.get("blocking_issues", [])
     if not isinstance(raw_issues, list):
         raise CertifiedDeliveryError("stored Blind Read blocking_issues are invalid")
-    issues: list[BlindBlockingIssue] = []
+    issues: list[ReaderIssue] = []
     for raw in raw_issues:
         if not isinstance(raw, Mapping):
-            raise CertifiedDeliveryError("stored BlindBlockingIssue is invalid")
+            raise CertifiedDeliveryError("stored ReaderIssue is invalid")
         issues.append(
-            BlindBlockingIssue(
-                problem=_mapping_string(raw, "problem"),
+            ReaderIssue(
+                observation=_mapping_string(raw, "observation"),
                 reader_effect=_mapping_string(raw, "reader_effect"),
                 why_blocking=_mapping_string(raw, "why_blocking"),
                 location=_optional_stored_string(raw, "location"),
             )
         )
-    raw_friction = value.get("cognitive_friction")
-    if not isinstance(raw_friction, list):
-        raise CertifiedDeliveryError("stored cognitive_friction is invalid")
-    friction: list[CognitiveFrictionObservation] = []
-    for raw in raw_friction:
-        if not isinstance(raw, Mapping):
-            raise CertifiedDeliveryError(
-                "stored CognitiveFrictionObservation is invalid"
-            )
-        friction.append(
-            CognitiveFrictionObservation(
-                location=_mapping_string(raw, "location"),
-                observation=_mapping_string(raw, "observation"),
-                reader_cost=_mapping_string(raw, "reader_cost"),
-            )
-        )
     return BlindReadResult(
-        core_understanding=_mapping_string(value, "core_understanding"),
-        domain_model=_mapping_string(value, "domain_model"),
-        comparison_coordinates=_mapping_string(value, "comparison_coordinates"),
-        reverse_outline=_mapping_string(value, "reverse_outline"),
-        material_economy=_mapping_string(value, "material_economy"),
-        professional_finish=_mapping_string(value, "professional_finish"),
+        received_understanding=_mapping_string(value, "received_understanding"),
         manuscript_digest=_mapping_string(value, "manuscript_digest"),
-        cognitive_friction=tuple(friction),
         blocking_issues=tuple(issues),
     )

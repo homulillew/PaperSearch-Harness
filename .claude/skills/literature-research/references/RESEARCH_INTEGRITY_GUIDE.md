@@ -1,6 +1,6 @@
 # Research Integrity Guide
 
-> 版本：v0.5
+> 版本：v0.6
 > 适用角色：Research Integrity Reviewer / Research Claim Integrity Authority
 
 本指南定义 AI / ML 技术调研报告的 Research Integrity 检查标准。

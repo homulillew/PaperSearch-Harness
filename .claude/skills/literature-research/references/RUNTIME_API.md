@@ -206,6 +206,7 @@ Submission input contains `completion_check_ref`, `verdict`, `reasons`, and opti
 ```text
 delivery-view --run-id RUN
 report-construction-input --run-id RUN
+report-authoring-context --run-id RUN
 delivery-inspect --run-id RUN --expected-revision REV --refs REF [REF ...]
 delivery-read-source --run-id RUN --expected-revision REV --paper-ref PAPER ...
 put-report-brief --run-id RUN --input FILE
@@ -227,28 +228,31 @@ artifact. No direct manuscript-to-publication command is exposed: arbitrary text
 cross the artifact boundary without matching current Reader and
 Integrity certifications.
 
-`put-report-brief` accepts the Report Brief schema. Python validates Requirement and
-Research ref namespaces independently; a material `source_ref` must name a retained
-paper, and a material `locator` requires `source_ref`. Accepting a new Brief binds it to
-the current `DeliveryBasis` and invalidates all downstream work. Required top-level
-semantic fields are `report_title`, `audience`, `report_goal`, `conceptual_model`,
-`reader_takeaway`, `narrative_logic`, and `sections`. Every section requires ordered
-non-empty `semantic_moves`, a non-empty `evidence_boundary`, and
-an integer `0 <= outline_depth <= 4` (`bool` is not an integer here): depth 0 maps to
-Markdown H2, depth 1 to H3, and depth 4 to H6. Sections form an ordered implicit tree; the first depth is
-0 and a descent cannot skip a level. Brief material may carry
-`reader_visible_obligation`: null means support-only material that Authoring may
-compress or omit; non-null names the cognitive function that must reach the reader.
-These fields have no compatibility migration.
+`put-report-brief` accepts the Lean Report Brief schema. Required fields are
+`audience`, `promise`, `frame` (non-empty strings) and `arc`, `focus`
+(non-empty arrays of non-empty strings). The Brief is an editorial-intent
+declaration: it carries no section list, no heading text, no outline depth, no
+semantic moves, no material economy audit. Accepting a new Brief binds it to
+the current `DeliveryBasis` and invalidates all downstream work. These fields
+have no compatibility migration.
 
 `report-construction-input` is the Constructor's default production input. Its
 `context` contains Contract and accepted approach/finding/open-problem/gap semantics
 with stable refs, but excludes paper inventory, representative-paper refs and source
 inventories. Its optional `repair` is non-null only for a pending BRIEF rebuild and
-contains the previous Brief plus neutral `problem`, `downstream_effect`,
-`resolution_condition`, and optional `location`. Call it before initial construction
-and again before rebuilding a Brief. Targeted evidence remains available through
-`delivery-inspect` and `delivery-read-source`.
+contains the previous Brief plus neutral `problem`, `resolution_condition`, and
+optional `location`. Call it before initial construction and again before rebuilding a
+Brief. Targeted evidence remains available through `delivery-inspect` and
+`delivery-read-source`.
+
+`report-authoring-context` is Authoring's read-only production input. It returns a
+thin `ReportAuthoringContext` projection of the current run: `state_revision`,
+`lifecycle`, `contract`, `delivery_basis`, `approach_families`, `findings`, and
+`open_problems`. It deliberately excludes paper inventory, representative-paper refs,
+source inventories, authors, DOI, canonical URL, raw evidence locators, and open gaps.
+It is narrower than the construction context: Authoring realizes the Brief, it does
+not re-derive it. Targeted evidence remains available through `delivery-inspect` and
+`delivery-read-source`.
 
 `submit-brief-insufficient` is Authoring's staged return path when the current Brief
 cannot be faithfully realized. It requires an existing current Brief and accepts:
@@ -258,7 +262,6 @@ cannot be faithfully realized. It requires an existing current Brief and accepts
   "feedback": [
     {
       "problem": "The comparison boundary is not realizable",
-      "downstream_effect": "Authoring would have to redesign the Brief",
       "resolution_condition": "The Brief supplies a realizable comparison boundary",
       "location": "Comparison"
     }
@@ -276,16 +279,11 @@ state only and never mutates `ResearchRun`.
 `put-report-manuscript` input contains `markdown` and optional `citations`. Markdown uses
 tokens such as `{{cite:method}}`; each citation declares `citation_id`, `paper_ref`, and
 optional `locator`. A new manuscript invalidates Blind, Reader, Integrity, and render
-results. Python rejects the manuscript before Reader unless its H2+ heading count,
-order, depth, and normalized text exactly match the Brief section titles and depths.
-Normalization removes only outer whitespace and valid optional ATX closing hashes; it
-does not perform case folding, punctuation removal, fuzzy matching, or synonym matching.
-The Manuscript must contain exactly one reader-visible H1, and that H1 must be the first
-reader-visible heading. Its normalized text must exactly equal Brief `report_title`.
-Fenced-code,
-blockquote, and indented-code headings do not count.
+results. The Lean Brief carries no heading contract, so Python performs no heading-count,
+heading-depth, or heading-order check and does not match the manuscript title against the
+Brief. Authoring owns heading text, order, depth, and parent-child structure.
 
-Authoring must use ATX syntax for the report title and every section heading (`# Title`,
+Authoring should use ATX syntax for the report title and every section heading (`# Title`,
 `## Section`, `### Subsection`). Setext headings are outside this protocol.
 
 When the report first formally introduces a named method/system whose retained primary
@@ -307,32 +305,33 @@ than raw `{{cite:id}}` tokens; its results remain bound to the returned source
 `manuscript_digest`.
 
 Before Reader review, `put-report-manuscript` and preview run deterministic Presentation
-preflight: exact headings, citation declarations/tokens, internal-ref leakage,
-unsupported deterministic tokens, fenced-block closure, and the supported mechanical
-Markdown-LaTeX delimiter invariants. Presentation rejects rather than semantically
-rewriting content.
+preflight: citation declarations/tokens, internal-ref leakage, unsupported deterministic
+tokens, fenced-block closure, and the supported mechanical Markdown-LaTeX delimiter
+invariants. Presentation rejects rather than semantically rewriting content. It performs
+no heading or outline check.
 
-`submit-blind-review` accepts `core_understanding`, `domain_model`,
-`comparison_coordinates`, `reverse_outline`, `material_economy`,
-`professional_finish`, `manuscript_digest`, and optional `cognitive_friction` /
-`blocking_issues`. Each friction observation has `location`, `observation`, and
-`reader_cost`; it is not automatically a blocker. Each Blind issue has `problem`,
-`reader_effect`, `why_blocking`, and optional `location`; it has no repair target.
-An issue blocks only when it materially damages primary cognitive delivery or materially
-prevents the required professional finished-product quality; isolated wording preferences
-do not block.
-Python freezes the complete result and returns `blind_read_digest`.
+`submit-blind-review` accepts `received_understanding`, `manuscript_digest`, and
+optional `blocking_issues`. Each blocking issue is a `ReaderIssue` with `observation`,
+`reader_effect`, `why_blocking`, and optional `location`; it has no repair target and no
+resolution condition. An issue blocks only when it materially damages primary cognitive
+delivery or materially prevents the required professional finished-product quality;
+isolated wording preferences do not block. Python freezes the complete result and
+returns `blind_read_digest`.
 
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
-current `manuscript_digest`, and Phase 2 `blocking_issues`. Each Phase 2 issue adds a
-non-empty `resolution_condition` and `repair_target` (`MANUSCRIPT` or `BRIEF`). A mismatched Blind
-digest is rejected. If the frozen Blind Read has blockers, Phase 2 must retain at least
-one blocker (consolidation is allowed). A `MANUSCRIPT` or `BRIEF` blocker creates a
-pending repair obligation that only a changed digest at that layer can clear.
+current `manuscript_digest`, a top-level `repair_target` (`MANUSCRIPT`, `BRIEF`, or
+`null`), a non-empty `rationale`, and optional `blocking_issues` (each a `ReaderIssue`).
+A mismatched Blind digest is rejected. `repair_target = null` with no blocking issues is
+a Reader PASS; a non-null `repair_target` requires a non-empty `rationale` and at least
+one blocking issue. If the frozen Blind Read has blockers, Phase 2 must retain at least
+one blocker (consolidation is allowed): a frozen blind FAIL cannot become a Phase 2 PASS.
+A `MANUSCRIPT` or `BRIEF` repair target creates a pending repair obligation that only a
+changed digest at that layer can clear. v0.6 removes the automatic Reader convergence
+loop: a `MANUSCRIPT` target is a resource stop (re-author and re-run), not an auto-revise.
 Reader cannot attribute RESEARCH. A condition missing from Brief routes to BRIEF;
 Constructor then decides whether accepted semantics support a rebuild or Research must
-be reopened. When both targets occur, BRIEF wins and stale Manuscript blockers do not
-become obligations for the new Brief/manuscript pair.
+be reopened. When both targets could apply, BRIEF wins and stale Manuscript blockers do
+not become obligations for the new Brief/manuscript pair.
 
 `submit-integrity-review` accepts `disposition`, `issues`, and optional `revise_target`.
 It requires a matching current Reader PASS. `PASS` creates the version-bound Integrity
@@ -353,12 +352,11 @@ but no Research semantic authority, never enters `state.json` / `ResearchRun` or
 remain removable at `workspace/scratch/<run_id>/captures/report/`. Validate the
 published artifact before closing.
 
-`report_session.json` uses schema version 4. Any older Delivery session cannot continue
-as a current certified session because its Brief and Blind Read lack required v0.5
-semantics; rebuild the Report Brief with `put-report-brief`. Missing semantic values are
-not fabricated. `brief_repair_feedback` is an additive optional operational field in
-schema version 4; an existing v4 session without it remains readable. `ResearchRun`,
-`state.json`, and `DeliveryBasis` are not migrated or changed.
+`report_session.json` uses schema version 5. Any older Delivery session cannot continue
+as a current certified session because its Brief, Blind Read, and Reader Review lack
+the v0.6 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing semantic
+values are not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis` are not
+migrated or changed.
 
 ## Wiki projection and publication
 

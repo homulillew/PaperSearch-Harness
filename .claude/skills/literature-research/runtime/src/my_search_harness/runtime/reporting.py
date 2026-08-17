@@ -34,8 +34,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
-from collections.abc import Iterable
 from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -45,7 +43,12 @@ from typing import Protocol, TypeAlias
 from my_search_harness.domain.model import DeliveryBasis, SourceLocator
 
 from .capabilities import DeliveryCapabilities
-from .context import DeliveryView, InspectResult, ReportConstructionContext
+from .context import (
+    DeliveryView,
+    InspectResult,
+    ReportAuthoringContext,
+    ReportConstructionContext,
+)
 from .delivery import PublishReportResult, _ReportPublicationAuthorization
 from .source_access import ReadSourceResult, SourceAccessAttemptError
 
@@ -108,63 +111,38 @@ class ReportManuscript:
 
 
 # ---------------------------------------------------------------------------
-# Report Brief — the single report-semantic middle layer
+# Report Brief — the lean editorial design middle layer (v0.6)
 # ---------------------------------------------------------------------------
-# Report Brief replaces NarrativePlan. It is a Delivery work product, not a
-# Research Domain entity: it is NOT stored in ResearchRun, has no stable
-# identity, no independent lifecycle, and no ArtifactKind. Its freshness binds
-# the DeliveryBasis (not a generic state_revision). Sections carry stable-ref
-# validation; material is a lightweight value object (no MaterialRole enum).
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class BriefMaterial:
-    """Candidate support material with an optional reader-visible obligation.
-
-    A Delivery-specific distillation, not new Research truth and not a cache of
-    raw SourceContent. ``role`` remains a natural-language cognitive function.
-    When ``reader_visible_obligation`` is ``None``, Authoring may synthesize,
-    compress, or omit the item.  Otherwise that named cognitive function must
-    reach the reader, without requiring verbatim wording or an exact number.
-    There is intentionally no MaterialRole enum.
-    """
-
-    content: str
-    role: str | None = None
-    reader_visible_obligation: str | None = None
-    research_refs: tuple[str, ...] = ()
-    source_ref: str | None = None
-    locator: SourceLocator | None = None
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class ReportBriefSection:
-    title: str
-    purpose: str
-    reader_takeaway: str
-    semantic_moves: tuple[str, ...]
-    outline_depth: int
-    requirement_refs: tuple[str, ...] = ()
-    research_refs: tuple[str, ...] = ()
-    material: tuple[BriefMaterial, ...] = ()
-    evidence_boundary: str = ""
+# The Report Brief is a Delivery work product, not a Research Domain entity:
+# it is NOT stored in ResearchRun, has no stable identity, no independent
+# lifecycle, and no ArtifactKind. v0.6 shrinks it to five editorial fields.
+# The Constructor owns only these; Authoring owns the manuscript realization.
+# There is no section/material IR, no outline_depth, no semantic_moves —
+# Claude owns semantic judgment; Python owns only the deterministic invariant
+# that the five fields are present and non-empty.
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class ReportBrief:
-    report_title: str
+    """Lean editorial design: who it is for and what it must deliver.
+
+    Five fields, no semantic IR. ``audience`` and ``promise`` name the reader
+    and the claim the report must land. ``frame`` is the conceptual vantage
+    point. ``arc`` is the ordered narrative spine; ``focus`` is the ordered
+    set of load-bearing claims the report must establish. Both are tuples of
+    non-empty strings — ordering is the only deterministic invariant; the
+    meaning of each entry is the Constructor's semantic judgment.
+    """
+
     audience: str
-    report_goal: str
-    conceptual_model: str
-    reader_takeaway: str
-    narrative_logic: str
-    sections: tuple[ReportBriefSection, ...]
-    terminology: tuple[tuple[str, str], ...] = ()
-    intentional_omissions: tuple[str, ...] = ()
+    promise: str
+    frame: str
+    arc: tuple[str, ...]
+    focus: tuple[str, ...]
 
 
 # ---------------------------------------------------------------------------
-# Reviewer result types
+# Reviewer result types (v0.6)
 # ---------------------------------------------------------------------------
 
 
@@ -176,76 +154,56 @@ class RepairTarget(StrEnum):
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
-class BlockingIssue:
-    """A root-cause reader/argument failure that blocks the report promise.
+class ReaderIssue:
+    """A reader-observed failure with no repair-layer authority.
 
-    One issue per cognitive root cause (symptoms with the same root are
-    consolidated). No score, no severity rank — the pipeline routes by target
-    layer and precedence, never by "which problem is worse".
+    Phase 1 (Blind Read) emits these without attribution. Phase 2 (Brief
+    Check) may carry the same shape to describe the consolidated reader
+    failure that drives a single repair target. No score, no severity, no
+    per-issue ``repair_target`` — attribution is a Phase 2 top-level decision.
     """
 
-    problem: str
-    reader_effect: str
-    why_blocking: str
-    resolution_condition: str
-    repair_target: RepairTarget
-    location: str | None = None
-    brief_ref: str | None = None
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class BlindBlockingIssue:
-    """A Phase 1 reader failure with no repair-layer authority."""
-
-    problem: str
-    reader_effect: str
-    why_blocking: str
-    location: str | None = None
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class CognitiveFrictionObservation:
-    """A non-scored observation about the cost of reading the surface."""
-
-    location: str
     observation: str
-    reader_cost: str
+    reader_effect: str
+    why_blocking: str
+    location: str | None = None
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class BlindReadResult:
-    """Frozen Phase 1 reconstruction of what a first reader actually understood.
+    """Frozen Phase 1 record of what a first reader actually understood.
 
     Bound to the manuscript digest it read. Produced before the Brief is
     exposed to the same review; Phase 2 must not rewrite or reinterpret it.
+    v0.6 keeps only the received understanding, the digest binding, and the
+    blind blocking issues — no reverse outline, no material economy, no
+    professional-finish score.
     """
 
-    core_understanding: str
-    domain_model: str
-    comparison_coordinates: str
-    reverse_outline: str
-    material_economy: str
-    professional_finish: str
+    received_understanding: str
     manuscript_digest: str
-    cognitive_friction: tuple[CognitiveFrictionObservation, ...] = ()
-    blocking_issues: tuple[BlindBlockingIssue, ...] = ()
+    blocking_issues: tuple[ReaderIssue, ...] = ()
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
 class ReportReviewResult:
     """Phase 2 attribution for one frozen Blind Read.
 
-    ``blocking_issues == ()`` is the only semantic PASS condition.
+    ``repair_target is None`` with no blocking issues is the only semantic
+    PASS condition. A non-None target requires a non-empty ``rationale``.
+    Attribution is a single top-level decision, not a per-issue field.
     """
 
     blind_read_digest: str
     brief_digest: str
     manuscript_digest: str
-    blocking_issues: tuple[BlockingIssue, ...] = ()
+    repair_target: RepairTarget | None
+    rationale: str
+    blocking_issues: tuple[ReaderIssue, ...] = ()
 
 
 # ---------------------------------------------------------------------------
-# Integrity review (disposition kept stable; REVISE_DELIVERY now carries a target)
+# Integrity review (disposition kept stable; REVISE_DELIVERY carries a target)
 # ---------------------------------------------------------------------------
 
 
@@ -273,12 +231,13 @@ class ResearchIntegrityReview:
 class BriefRepairFeedback:
     """Neutral condition a rebuilt Brief must satisfy.
 
-    This is a deterministic projection of stored downstream review, not
-    Research truth, review history, or another report-semantic IR.
+    A deterministic projection of stored downstream review, not Research
+    truth, review history, or another report-semantic IR. v0.6 drops the
+    ``downstream_effect`` field — the resolution condition alone carries the
+    operational requirement.
     """
 
     problem: str
-    downstream_effect: str
     resolution_condition: str
     location: str | None = None
 
@@ -343,128 +302,9 @@ def _delivery_basis_key(basis: DeliveryBasis) -> str:
 
 
 def brief_digest(brief: ReportBrief) -> str:
-    """A canonical digest of the Report Brief's semantic content."""
+    """A canonical digest of the Report Brief's editorial content."""
 
     return _digest(_canonical(brief))
-
-
-_ATX_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:[ \t]+(.*)|[ \t]*)$")
-_FENCE_OPEN = re.compile(r"^ {0,3}(`{3,}|~{3,})(?:[^\r\n]*)$")
-_ATX_CLOSING_HASHES = re.compile(r"(?:^|[ \t]+)#+[ \t]*$")
-
-
-def _normalize_heading_identity(value: str) -> str:
-    """Remove only outer whitespace and valid optional ATX closing hashes."""
-
-    normalized = value.strip()
-    closing = _ATX_CLOSING_HASHES.search(normalized)
-    if closing is not None:
-        normalized = normalized[: closing.start()].rstrip()
-    return normalized
-
-
-def _visible_atx_headings(manuscript: ReportManuscript) -> tuple[tuple[int, str], ...]:
-    """Extract reader-visible ATX heading levels and normalized text."""
-
-    if not isinstance(manuscript, ReportManuscript):
-        raise ReportPipelineError("outline signature requires a ReportManuscript")
-    if not isinstance(manuscript.markdown, str):
-        raise ReportPipelineError("ReportManuscript markdown must be text")
-
-    headings: list[tuple[int, str]] = []
-    fence_character: str | None = None
-    fence_length = 0
-    for line in manuscript.markdown.splitlines():
-        if fence_character is not None:
-            close = re.match(
-                rf"^ {{0,3}}{re.escape(fence_character)}{{{fence_length},}}[ \t]*$",
-                line,
-            )
-            if close is not None:
-                fence_character = None
-                fence_length = 0
-            continue
-
-        fence = _FENCE_OPEN.match(line)
-        if fence is not None:
-            marker = fence.group(1)
-            fence_character = marker[0]
-            fence_length = len(marker)
-            continue
-
-        heading = _ATX_HEADING.match(line)
-        if heading is None:
-            continue
-        headings.append(
-            (
-                len(heading.group(1)),
-                _normalize_heading_identity(heading.group(2) or ""),
-            )
-        )
-    return tuple(headings)
-
-
-def brief_outline_signature(brief: ReportBrief) -> tuple[int, ...]:
-    """Return the depth-only Brief projection retained for API compatibility."""
-
-    if not isinstance(brief, ReportBrief):
-        raise ReportPipelineError("outline signature requires a ReportBrief")
-    return tuple(section.outline_depth for section in brief.sections)
-
-
-def manuscript_outline_signature(manuscript: ReportManuscript) -> tuple[int, ...]:
-    """Return the depth-only H2+ projection retained for API compatibility."""
-
-    return tuple(
-        level - 2 for level, _ in _visible_atx_headings(manuscript) if level >= 2
-    )
-
-
-def _brief_visible_outline_signature(
-    brief: ReportBrief,
-) -> tuple[tuple[int, str], ...]:
-    if not isinstance(brief, ReportBrief):
-        raise ReportPipelineError("outline signature requires a ReportBrief")
-    return tuple(
-        (section.outline_depth, _normalize_heading_identity(section.title))
-        for section in brief.sections
-    )
-
-
-def validate_outline_fidelity(
-    brief: ReportBrief,
-    manuscript: ReportManuscript,
-) -> None:
-    """Reject a manuscript that does not realize the Brief heading hierarchy."""
-
-    visible_headings = _visible_atx_headings(manuscript)
-    h1_positions = tuple(
-        index for index, (level, _) in enumerate(visible_headings) if level == 1
-    )
-    if len(h1_positions) != 1:
-        raise ReportPipelineError(
-            "ReportManuscript must contain exactly one reader-visible H1; "
-            f"found {len(h1_positions)}"
-        )
-    if h1_positions[0] != 0:
-        raise ReportPipelineError(
-            "ReportManuscript H1 must be the first reader-visible heading"
-        )
-    actual_title = visible_headings[h1_positions[0]][1]
-    expected_title = _normalize_heading_identity(brief.report_title)
-    if actual_title != expected_title:
-        raise ReportPipelineError(
-            "ReportManuscript H1 does not match ReportBrief report_title: "
-            f"expected {expected_title!r}, got {actual_title!r}"
-        )
-
-    expected = _brief_visible_outline_signature(brief)
-    actual = tuple((level - 2, text) for level, text in visible_headings if level >= 2)
-    if actual != expected:
-        raise ReportPipelineError(
-            "ReportManuscript visible outline does not match ReportBrief: "
-            f"expected {expected!r}, got {actual!r}"
-        )
 
 
 def delivery_basis_key(basis: DeliveryBasis) -> str:
@@ -557,33 +397,6 @@ class DeliveryEvidenceAccess:
 
 
 # ---------------------------------------------------------------------------
-# Citation metadata projection for Authoring (narrowest read-only surface)
-# ---------------------------------------------------------------------------
-
-
-@dataclass(slots=True, frozen=True, kw_only=True)
-class CitationMetadata:
-    """Narrow read-only navigation/citation metadata for Authoring.
-
-    Authoring must NOT receive the full DeliveryView or broad evidence access.
-    This projection carries only the retained-paper identity needed to bind a
-    named method or citation to a paper. Canonical URL resolution belongs to
-    deterministic Presentation.
-    """
-
-    papers: tuple[tuple[str, str], ...]
-    """Each entry: (paper_ref, title)."""
-
-
-def citation_metadata_for(view: DeliveryView) -> CitationMetadata:
-    """Project the narrowest citation/navigation metadata from a DeliveryView."""
-
-    return CitationMetadata(
-        papers=tuple((paper.ref, paper.title) for paper in view.papers)
-    )
-
-
-# ---------------------------------------------------------------------------
 # Capture sink — observability without authority
 # ---------------------------------------------------------------------------
 
@@ -653,13 +466,12 @@ class LocalReportCaptureSink:
 
 
 class ReportConstructor(Protocol):
-    """Construct the Report Brief: select, expand, organize, omit.
+    """Construct the lean Report Brief: audience, promise, frame, arc, focus.
 
-    Reads the narrow Report Construction Context, the shared Report Quality
-    Standard, and the Report Construction Guide. A rebuild also receives the
-    previous Brief plus neutral repair conditions. Does NOT read the
-    Report Writing Guide (language is not its job). May targeted inspect/read
-    source to recover explanatory detail,
+    Reads the narrow Report Construction Context and the Report Construction
+    Guide. A rebuild also receives the previous Brief plus neutral repair
+    conditions. Does NOT read the Report Writing Guide (language is not its
+    job). May targeted inspect/read source to recover explanatory detail,
     but must not produce new consensus, stronger generalization, new approach
     relationships, or contract-facing research judgments — those require
     reopening RESEARCH via ``ResearchEscalationRequired``.
@@ -668,7 +480,6 @@ class ReportConstructor(Protocol):
     def construct(
         self,
         construction_input: ReportConstructionInput,
-        quality_standard: str,
         construction_guide: str,
         evidence: DeliveryEvidenceAccess,
     ) -> ReportBrief: ...
@@ -677,28 +488,28 @@ class ReportConstructor(Protocol):
 class ReportWriter(Protocol):
     """Authoring WRITE action: implement the Brief as a finished manuscript.
 
-    Reads the Report Brief, the Report Writing Guide, and the narrow citation
-    metadata. Does NOT receive the full DeliveryView or broad evidence access.
-    If the Brief is insufficient, raise ``BriefInsufficient`` to return to the
-    Constructor rather than re-doing research or re-designing the report.
-    This and ``ReportReviser`` are compatibility action facets of one Authoring
-    authority, not independent semantic roles.
+    Reads the Report Brief, the Report Writing Guide, and the thin Report
+    Authoring Context. Does NOT receive the full DeliveryView or broad
+    evidence access. If the Brief is insufficient, raise ``BriefInsufficient``
+    to return to the Constructor rather than re-doing research or re-designing
+    the report. This and ``ReportReviser`` are compatibility action facets of
+    one Authoring authority, not independent semantic roles.
     """
 
     def write(
         self,
         brief: ReportBrief,
         writing_guide: str,
-        citation_metadata: CitationMetadata,
+        authoring_context: ReportAuthoringContext,
     ) -> ReportManuscript: ...
 
 
 class ReportReviewer(Protocol):
     """One-use two-phase cold reader for a single manuscript version.
 
-    Phase 1 (Blind Read) receives only deliverable/audience/quality standard/
-    review guide/manuscript — never the Brief or Writing Guide. Phase 2 (Brief
-    Check) receives the frozen Blind Read result plus the Brief. The runtime
+    Phase 1 (Blind Read) receives only deliverable/audience/review guide/
+    manuscript — never the Brief or Writing Guide. Phase 2 (Brief Check)
+    receives the frozen Blind Read result plus the Brief. The runtime
     guarantees Phase 1 is frozen before Phase 2 sees the Brief.
     """
 
@@ -706,7 +517,6 @@ class ReportReviewer(Protocol):
         self,
         deliverable_description: str,
         audience: str,
-        quality_standard: str,
         review_guide: str,
         reader_surface: str,
         manuscript_digest: str,
@@ -736,19 +546,19 @@ class ReportReviser(Protocol):
     """Authoring REVISE action: fix explicit Manuscript blockers.
 
     Reads the Brief, current manuscript, reader/integrity issues, the Writing
-    Guide, and narrow citation metadata. If an issue belongs to the Brief, it
-    must be routed back to the Constructor; if it needs new research judgment,
-    it must be escalated — Authoring does neither itself. This is the same
-    authority as ``ReportWriter`` with a repair-shaped input.
+    Guide, and the thin Report Authoring Context. If an issue belongs to the
+    Brief, it must be routed back to the Constructor; if it needs new research
+    judgment, it must be escalated — Authoring does neither itself. This is the
+    same authority as ``ReportWriter`` with a repair-shaped input.
     """
 
     def revise(
         self,
         brief: ReportBrief,
         manuscript: ReportManuscript,
-        issues: tuple[BlockingIssue, ...],
+        issues: tuple[ReaderIssue, ...],
         writing_guide: str,
-        citation_metadata: CitationMetadata,
+        authoring_context: ReportAuthoringContext,
     ) -> ReportManuscript: ...
 
 
@@ -801,10 +611,6 @@ class BriefInsufficient(ReportPipelineError):
         selected_feedback = feedback or (
             BriefRepairFeedback(
                 problem=rationale,
-                downstream_effect=(
-                    "Authoring cannot realize a compliant manuscript from the "
-                    "current Report Brief"
-                ),
                 resolution_condition=(
                     "The rebuilt Report Brief must make the intended cognitive "
                     "design and evidence boundary sufficient for Authoring"
@@ -851,7 +657,6 @@ ReportPipelineResult: TypeAlias = (
 # ReportResourceExhausted — never interpreted as PASS. Defaults are generous;
 # the host may lower them for bounded environments.
 _DEFAULT_MAX_CONSTRUCTOR_REBUILDS = 8
-_DEFAULT_MAX_READER_ROUNDS = 12
 _DEFAULT_MAX_INTEGRITY_ROUNDS = 12
 
 
@@ -861,7 +666,10 @@ class ReportPipeline:
     It is an Action pipeline, not a Report FSM. No new lifecycle mode is
     introduced; everything here runs inside the existing DELIVERY mode. The
     persisted staged ``CertifiedReportDelivery`` path remains production
-    authority.
+    authority. v0.6 removes the automatic Reader convergence loop: Authoring
+    WRITE is followed by exactly one Reader decision; a MANUSCRIPT or BRIEF
+    route returns to the host rather than auto-revising until PASS. The host
+    (Claude) owns re-authoring.
     """
 
     def __init__(
@@ -874,18 +682,15 @@ class ReportPipeline:
         reviser: ReportReviser,
         integrity_reviewer: ResearchIntegrityReviewer,
         citation_renderer: ReportCitationRenderer,
-        quality_standard: str,
         construction_guide: str,
         writing_guide: str,
         review_guide: str,
         integrity_guide: str,
         capture_sink: ReportCaptureSink | None = None,
         max_constructor_rebuilds: int = _DEFAULT_MAX_CONSTRUCTOR_REBUILDS,
-        max_reader_rounds: int = _DEFAULT_MAX_READER_ROUNDS,
         max_integrity_rounds: int = _DEFAULT_MAX_INTEGRITY_ROUNDS,
     ) -> None:
         self._validate_guides(
-            quality_standard,
             construction_guide,
             writing_guide,
             review_guide,
@@ -893,7 +698,6 @@ class ReportPipeline:
         )
         for name, value in (
             ("max_constructor_rebuilds", max_constructor_rebuilds),
-            ("max_reader_rounds", max_reader_rounds),
             ("max_integrity_rounds", max_integrity_rounds),
         ):
             if not isinstance(value, int) or isinstance(value, bool) or value < 1:
@@ -905,14 +709,12 @@ class ReportPipeline:
         self._reviser = reviser
         self._integrity_reviewer = integrity_reviewer
         self._citation_renderer = citation_renderer
-        self._quality_standard = quality_standard
         self._construction_guide = construction_guide
         self._writing_guide = writing_guide
         self._review_guide = review_guide
         self._integrity_guide = integrity_guide
         self._capture = capture_sink or NoopReportCaptureSink()
         self._max_constructor_rebuilds = max_constructor_rebuilds
-        self._max_reader_rounds = max_reader_rounds
         self._max_integrity_rounds = max_integrity_rounds
 
     def run(self, run_id: str) -> ReportPipelineResult:
@@ -952,7 +754,7 @@ class ReportPipeline:
             self._capture.capture(run_id, "report_brief.json", _brief_json(brief))
 
             try:
-                manuscript, reader_pass = self._writer_then_reader(
+                manuscript, reader_pass = self._write_then_review(
                     run_id, view, brief, b_digest
                 )
             except BriefInsufficient as exc:
@@ -1012,104 +814,64 @@ class ReportPipeline:
                 context=construction_context,
                 repair=repair_context,
             ),
-            self._quality_standard,
             self._construction_guide,
             evidence,
         )
         self._validate_brief(view, brief)
         return brief
 
-    def _writer_then_reader(
+    def _write_then_review(
         self,
         run_id: str,
         view: DeliveryView,
         brief: ReportBrief,
         b_digest: str,
     ) -> tuple[ReportManuscript, ReaderPass]:
-        """Write a manuscript, then run the Reader gate to PASS.
+        """Write a manuscript, then run the Reader gate exactly once.
 
-        Raises ``BriefInsufficient`` (BRIEF route) so the outer loop can react; the
-        MANUSCRIPT route is handled internally by ``_review_until_reader_pass``.
-        Authoring WRITE is invoked exactly once here; downstream re-reads after a
-        revision or an integrity repair never re-write the manuscript.
+        v0.6 removes the automatic revise→re-read convergence loop. The Reader
+        returns a single decision: PASS, or a repair target (MANUSCRIPT/BRIEF).
+        A BRIEF route raises ``BriefInsufficient`` for the outer loop. A
+        MANUSCRIPT route is returned to the host — this compatibility runner
+        does not auto-revise. Authoring WRITE is invoked exactly once here.
         """
 
         manuscript = self._write_manuscript(brief)
         self._capture.capture(run_id, "manuscript_pre_reader.md", manuscript.markdown)
-        return self._review_until_reader_pass(run_id, view, brief, b_digest, manuscript)
-
-    def _review_until_reader_pass(
-        self,
-        run_id: str,
-        view: DeliveryView,
-        brief: ReportBrief,
-        b_digest: str,
-        manuscript: ReportManuscript,
-    ) -> tuple[ReportManuscript, ReaderPass]:
-        """Run the Reader gate on ``manuscript`` to PASS.
-
-        Reviews the given manuscript with a fresh reviewer. On a MANUSCRIPT
-        blocker, revises and re-reviews the revision with another fresh
-        reviewer until PASS — each revision gets its own cold read. BRIEF
-        blockers raise ``BriefInsufficient``. The Reader has no Research
-        routing authority. The manuscript is never re-written
-        here; only Authoring REVISE touches it.
-        """
-
-        current = manuscript
-        for _ in range(self._max_reader_rounds):
-            result = self._fresh_review(run_id, view, brief, current)
-            if not result.blocking_issues:
-                return current, ReaderPass(
-                    brief_digest=b_digest,
-                    manuscript_digest=result.manuscript_digest,
-                )
-            target = self._route_issues(result.blocking_issues)
-            if target is RepairTarget.BRIEF:
-                raise BriefInsufficient(
-                    "report reviewer routed a blocking issue to the Brief",
-                    feedback=self._repair_feedback_from_reader(
-                        issue
-                        for issue in result.blocking_issues
-                        if issue.repair_target is RepairTarget.BRIEF
-                    ),
-                )
-            # MANUSCRIPT → Authoring REVISE. A fresh reviewer re-reads it.
-            rejected_manuscript_digest = manuscript_digest(current)
-            current = self._reviser.revise(
-                brief=brief,
-                manuscript=current,
-                issues=result.blocking_issues,
-                writing_guide=self._writing_guide,
-                citation_metadata=self._current_citation_metadata(),
-            )
-            self._validate_manuscript(current)
-            validate_outline_fidelity(brief, current)
-            if manuscript_digest(current) == rejected_manuscript_digest:
+        result = self._fresh_review(run_id, view, brief, manuscript)
+        if result.repair_target is None:
+            if result.blocking_issues:
                 raise ReportPipelineError(
-                    "Manuscript repair must produce a new Manuscript version"
+                    "Reader PASS requires no blocking issues"
                 )
-            self._capture.capture(
-                run_id, "manuscript_post_revision.md", current.markdown
+            return manuscript, ReaderPass(
+                brief_digest=b_digest,
+                manuscript_digest=result.manuscript_digest,
             )
+        if result.repair_target is RepairTarget.BRIEF:
+            raise BriefInsufficient(
+                result.rationale or "report reviewer routed a blocking issue to the Brief",
+                feedback=self._repair_feedback_from_reader(result),
+            )
+        # MANUSCRIPT route: no auto-convergence in v0.6. Surface the outcome
+        # as a resource stop so the host re-authoring is the only path forward.
         raise ReportResourceExhausted(
-            "reader gate exceeded the revision resource budget; "
-            "this is a resource stop, not a PASS"
+            "Reader routed a MANUSCRIPT repair; v0.6 has no automatic "
+            "convergence — re-author and re-run"
         )
 
     def _write_manuscript(self, brief: ReportBrief) -> ReportManuscript:
-        # Authoring receives only the Brief + Writing Guide + narrow citation
-        # metadata. It does NOT get the full DeliveryView or evidence access.
-        citation_meta = self._current_citation_metadata()
-        manuscript = self._writer.write(brief, self._writing_guide, citation_meta)
+        # Authoring receives only the Brief + Writing Guide + thin Authoring
+        # Context. It does NOT get the full DeliveryView or evidence access.
+        authoring_context = self._current_authoring_context()
+        manuscript = self._writer.write(brief, self._writing_guide, authoring_context)
         self._validate_manuscript(manuscript)
-        validate_outline_fidelity(brief, manuscript)
         return manuscript
 
-    def _current_citation_metadata(self) -> CitationMetadata:
-        # Citation metadata is a narrow projection of the current DeliveryView.
-        # Re-resolved per write so a reconstructed Brief sees consistent metadata.
-        return citation_metadata_for(self._delivery.view(self._current_run_id))
+    def _current_authoring_context(self) -> ReportAuthoringContext:
+        # Thin projection of the current DeliveryView for Authoring. Re-resolved
+        # per write so a reconstructed Brief sees consistent context.
+        return self._delivery.report_authoring_context(self._current_run_id)
 
     # -- reader gate (two-phase, fresh instance, version-bound) -----------------
 
@@ -1122,13 +884,12 @@ class ReportPipeline:
     ) -> ReportReviewResult:
         reviewer = self._reviewer_factory.create()
         m_digest = manuscript_digest(manuscript)
-        reader_surface = self._reader_surface(view, brief, manuscript)
+        reader_surface = self._reader_surface(view, manuscript)
         # Phase 1 — Blind Read. NO Brief, NO Writing Guide. Audience is a narrow
         # projection of the Brief (the audience string only).
         blind = reviewer.blind_read(
             deliverable_description=view.contract.deliverable_description,
             audience=brief.audience,
-            quality_standard=self._quality_standard,
             review_guide=self._review_guide,
             reader_surface=reader_surface,
             manuscript_digest=m_digest,
@@ -1217,10 +978,6 @@ class ReportPipeline:
                     feedback=tuple(
                         BriefRepairFeedback(
                             problem=issue,
-                            downstream_effect=(
-                                "The current Report Brief cannot receive Research "
-                                "Integrity certification"
-                            ),
                             resolution_condition=(
                                 "The rebuilt Report Brief must represent the accepted "
                                 "research semantics within its evidence boundary"
@@ -1236,7 +993,7 @@ class ReportPipeline:
             # Integrity-triggered manuscript edit invalidates the old Reader
             # PASS; re-run the Reader gate (review only — never re-write) on
             # Authoring's revised output before looping back to Integrity.
-            current_ms, reader_pass = self._review_until_reader_pass(
+            current_ms, reader_pass = self._review_after_integrity_repair(
                 run_id, view, current_brief, current_b_digest, current_ms
             )
             current_b_digest = reader_pass.brief_digest
@@ -1245,6 +1002,42 @@ class ReportPipeline:
         raise ReportResourceExhausted(
             "integrity gate exceeded the revision resource budget; "
             "this is a resource stop, not a PASS"
+        )
+
+    def _review_after_integrity_repair(
+        self,
+        run_id: str,
+        view: DeliveryView,
+        brief: ReportBrief,
+        b_digest: str,
+        manuscript: ReportManuscript,
+    ) -> tuple[ReportManuscript, ReaderPass]:
+        """Re-run the Reader gate once on an integrity-repaired manuscript.
+
+        v0.6 has no automatic convergence: a single fresh review either PASSes
+        or surfaces a repair target. A MANUSCRIPT route here is a resource
+        stop (the host must re-author); a BRIEF route raises
+        ``BriefInsufficient`` for the outer loop.
+        """
+
+        result = self._fresh_review(run_id, view, brief, manuscript)
+        if result.repair_target is None:
+            if result.blocking_issues:
+                raise ReportPipelineError(
+                    "Reader PASS requires no blocking issues"
+                )
+            return manuscript, ReaderPass(
+                brief_digest=b_digest,
+                manuscript_digest=result.manuscript_digest,
+            )
+        if result.repair_target is RepairTarget.BRIEF:
+            raise BriefInsufficient(
+                result.rationale or "report reviewer routed a blocking issue to the Brief",
+                feedback=self._repair_feedback_from_reader(result),
+            )
+        raise ReportResourceExhausted(
+            "Reader routed a MANUSCRIPT repair after integrity; v0.6 has no "
+            "automatic convergence — re-author and re-run"
         )
 
     def _revise_for_integrity(
@@ -1256,15 +1049,13 @@ class ReportPipeline:
         integrity: ResearchIntegrityReview,
     ) -> ReportManuscript:
         issues = tuple(
-            BlockingIssue(
-                problem=text,
+            ReaderIssue(
+                observation=text,
                 reader_effect=text,
-                why_blocking=text,
-                resolution_condition=(
+                why_blocking=(
                     "The revised manuscript must faithfully express the accepted "
                     "research semantics within the current Report Brief"
                 ),
-                repair_target=RepairTarget.MANUSCRIPT,
             )
             for text in integrity.issues
         )
@@ -1273,10 +1064,9 @@ class ReportPipeline:
             manuscript=manuscript,
             issues=issues,
             writing_guide=self._writing_guide,
-            citation_metadata=self._current_citation_metadata(),
+            authoring_context=self._current_authoring_context(),
         )
         self._validate_manuscript(revised)
-        validate_outline_fidelity(brief, revised)
         if manuscript_digest(revised) == manuscript_digest(manuscript):
             raise ReportPipelineError(
                 "Integrity Manuscript repair must produce a new Manuscript version"
@@ -1285,19 +1075,6 @@ class ReportPipeline:
         return revised
 
     # -- routing & render/publish ----------------------------------------------
-
-    @staticmethod
-    def _route_issues(issues: tuple[BlockingIssue, ...]) -> RepairTarget:
-        """Compute the single repair target by precedence.
-
-        Most-upstream Reader fault wins: BRIEF > MANUSCRIPT.
-        Python only routes; it does not compute "which problem is worse".
-        """
-
-        target = reader_repair_target(issues)
-        if target is not None:
-            return target
-        raise ReportPipelineError("blocking issues carry no repair target")
 
     @staticmethod
     def _require_integrity_revise_target(
@@ -1313,12 +1090,10 @@ class ReportPipeline:
     def _reader_surface(
         self,
         view: DeliveryView,
-        brief: ReportBrief,
         manuscript: ReportManuscript,
     ) -> str:
         """Run the shared deterministic Presentation boundary for Reader input."""
 
-        validate_outline_fidelity(brief, manuscript)
         rendered = self._citation_renderer.render(view, manuscript)
         if not isinstance(rendered, str) or not rendered.strip():
             raise ReportPipelineError(
@@ -1328,19 +1103,18 @@ class ReportPipeline:
 
     @staticmethod
     def _repair_feedback_from_reader(
-        issues: Iterable[BlockingIssue],
+        review: ReportReviewResult,
     ) -> tuple[BriefRepairFeedback, ...]:
-        feedback = tuple(
+        """Project a BRIEF-routed Reader review into neutral repair feedback."""
+
+        if not review.rationale or not review.rationale.strip():
+            raise ReportPipelineError("Brief repair requires a non-empty rationale")
+        feedback = (
             BriefRepairFeedback(
-                problem=issue.problem,
-                downstream_effect=issue.reader_effect,
-                resolution_condition=issue.resolution_condition,
-                location=issue.location,
-            )
-            for issue in issues
+                problem=review.rationale,
+                resolution_condition=review.rationale,
+            ),
         )
-        if not feedback:
-            raise ReportPipelineError("Brief repair requires semantic feedback")
         return feedback
 
     def _render_and_publish(
@@ -1405,14 +1179,12 @@ class ReportPipeline:
 
     @staticmethod
     def _validate_guides(
-        quality_standard: str,
         construction_guide: str,
         writing_guide: str,
         review_guide: str,
         integrity_guide: str,
     ) -> None:
         for name, value in (
-            ("quality_standard", quality_standard),
             ("construction_guide", construction_guide),
             ("writing_guide", writing_guide),
             ("review_guide", review_guide),
@@ -1422,173 +1194,28 @@ class ReportPipeline:
                 raise ValueError(f"{name} must be a non-empty string")
 
     @staticmethod
-    def _research_refs(view: DeliveryView) -> set[str]:
-        return {
-            *(approach.ref for approach in view.approach_families),
-            *(finding.ref for finding in view.findings),
-            *(problem.ref for problem in view.open_problems),
-            *(gap.ref for gap in view.open_gaps),
-            *(paper.ref for paper in view.papers),
-        }
-
-    @staticmethod
     def _validate_brief(view: DeliveryView, brief: object) -> None:
         if not isinstance(brief, ReportBrief):
             raise ReportPipelineError("constructor must return ReportBrief")
-        for field_name in (
-            "report_title",
-            "audience",
-            "report_goal",
-            "conceptual_model",
-            "reader_takeaway",
-            "narrative_logic",
-        ):
+        for field_name in ("audience", "promise", "frame"):
             value = getattr(brief, field_name)
             if not isinstance(value, str) or not value.strip():
                 raise ReportPipelineError(
                     f"ReportBrief.{field_name} must be non-empty text"
                 )
-        if not brief.sections:
-            raise ReportPipelineError("ReportBrief requires non-empty sections")
-        if not isinstance(brief.sections, tuple):
-            raise ReportPipelineError("ReportBrief sections must be a tuple")
-        research_refs = ReportPipeline._research_refs(view)
-        requirement_refs = {r.ref for r in view.contract.requirements}
-        paper_refs = {paper.ref for paper in view.papers}
-        previous_depth: int | None = None
-        for section in brief.sections:
-            if not isinstance(section, ReportBriefSection):
-                raise ReportPipelineError("ReportBrief contains an invalid section")
-            for field_name in (
-                "title",
-                "purpose",
-                "reader_takeaway",
-                "evidence_boundary",
-            ):
-                value = getattr(section, field_name)
-                if not isinstance(value, str) or not value.strip():
-                    raise ReportPipelineError(
-                        f"ReportBriefSection.{field_name} must be non-empty text"
-                    )
+        for field_name in ("arc", "focus"):
+            value = getattr(brief, field_name)
             if (
-                not isinstance(section.semantic_moves, tuple)
-                or not section.semantic_moves
+                not isinstance(value, tuple)
+                or not value
                 or not all(
-                    isinstance(move, str) and move.strip()
-                    for move in section.semantic_moves
+                    isinstance(item, str) and item.strip() for item in value
                 )
             ):
                 raise ReportPipelineError(
-                    "ReportBriefSection semantic_moves must be a non-empty tuple "
-                    "of non-empty strings"
+                    f"ReportBrief.{field_name} must be a non-empty tuple of "
+                    "non-empty strings"
                 )
-            depth = section.outline_depth
-            if (
-                not isinstance(depth, int)
-                or isinstance(depth, bool)
-                or depth < 0
-                or depth > 4
-            ):
-                raise ReportPipelineError(
-                    "ReportBriefSection outline_depth must be an int from 0 to 4"
-                )
-            if previous_depth is None and depth != 0:
-                raise ReportPipelineError(
-                    "the first ReportBriefSection outline_depth must be 0"
-                )
-            if previous_depth is not None and depth > previous_depth + 1:
-                raise ReportPipelineError(
-                    "ReportBriefSection outline_depth cannot skip a level"
-                )
-            previous_depth = depth
-            for ref_list, label in (
-                (section.requirement_refs, "requirement_refs"),
-                (section.research_refs, "research_refs"),
-            ):
-                if not isinstance(ref_list, tuple) or not all(
-                    isinstance(ref, str) and ref for ref in ref_list
-                ):
-                    raise ReportPipelineError(
-                        f"ReportBriefSection {label} must be a tuple of non-empty strings"
-                    )
-            missing_req = set(section.requirement_refs) - requirement_refs
-            if missing_req:
-                raise ReportPipelineError(
-                    f"ReportBrief has unknown requirement refs: {sorted(missing_req)!r}"
-                )
-            missing_research = set(section.research_refs) - research_refs
-            if missing_research:
-                raise ReportPipelineError(
-                    f"ReportBrief has unknown research refs: {sorted(missing_research)!r}"
-                )
-            if not isinstance(section.material, tuple) or not all(
-                isinstance(m, BriefMaterial) for m in section.material
-            ):
-                raise ReportPipelineError(
-                    "ReportBriefSection material must be a tuple of BriefMaterial"
-                )
-            for material in section.material:
-                if (
-                    not isinstance(material.content, str)
-                    or not material.content.strip()
-                ):
-                    raise ReportPipelineError("BriefMaterial content must be non-empty")
-                if material.role is not None and (
-                    not isinstance(material.role, str) or not material.role.strip()
-                ):
-                    raise ReportPipelineError(
-                        "BriefMaterial role must be a non-empty string"
-                    )
-                if material.reader_visible_obligation is not None and (
-                    not isinstance(material.reader_visible_obligation, str)
-                    or not material.reader_visible_obligation.strip()
-                ):
-                    raise ReportPipelineError(
-                        "BriefMaterial reader_visible_obligation must be a "
-                        "non-empty string or None"
-                    )
-                if not isinstance(material.research_refs, tuple) or not all(
-                    isinstance(ref, str) and ref for ref in material.research_refs
-                ):
-                    raise ReportPipelineError(
-                        "BriefMaterial research_refs must be a tuple of non-empty strings"
-                    )
-                missing_material = set(material.research_refs) - research_refs
-                if missing_material:
-                    raise ReportPipelineError(
-                        f"BriefMaterial has unknown research refs: "
-                        f"{sorted(missing_material)!r}"
-                    )
-                if material.source_ref is not None and (
-                    not isinstance(material.source_ref, str)
-                    or material.source_ref not in paper_refs
-                ):
-                    raise ReportPipelineError(
-                        "BriefMaterial source_ref must be a retained paper ref"
-                    )
-                if material.locator is not None and material.source_ref is None:
-                    raise ReportPipelineError(
-                        "BriefMaterial locator requires source_ref"
-                    )
-                if material.locator is not None and (
-                    not isinstance(material.locator, SourceLocator)
-                    or not isinstance(material.locator.kind, str)
-                    or not material.locator.kind.strip()
-                    or not isinstance(material.locator.value, str)
-                    or not material.locator.value.strip()
-                ):
-                    raise ReportPipelineError("BriefMaterial locator is invalid")
-        if not isinstance(brief.terminology, tuple) or not all(
-            isinstance(term, tuple)
-            and len(term) == 2
-            and all(isinstance(value, str) and value for value in term)
-            for term in brief.terminology
-        ):
-            raise ReportPipelineError("ReportBrief terminology is invalid")
-        if not isinstance(brief.intentional_omissions, tuple) or not all(
-            isinstance(omit, str) and omit for omit in brief.intentional_omissions
-        ):
-            raise ReportPipelineError("ReportBrief intentional_omissions is invalid")
 
     @staticmethod
     def _validate_manuscript(manuscript: object) -> None:
@@ -1607,58 +1234,40 @@ class ReportPipeline:
     def _validate_blind_read(blind: object, expected_manuscript_digest: str) -> None:
         if not isinstance(blind, BlindReadResult):
             raise ReportPipelineError("reviewer blind_read must return BlindReadResult")
-        for field_name in (
-            "core_understanding",
-            "domain_model",
-            "comparison_coordinates",
-            "reverse_outline",
-            "material_economy",
-            "professional_finish",
-        ):
-            value = getattr(blind, field_name)
-            if not isinstance(value, str) or not value.strip():
-                raise ReportPipelineError(
-                    f"BlindReadResult.{field_name} must be a non-empty string"
-                )
+        value = blind.received_understanding
+        if not isinstance(value, str) or not value.strip():
+            raise ReportPipelineError(
+                "BlindReadResult.received_understanding must be a non-empty string"
+            )
         if blind.manuscript_digest != expected_manuscript_digest:
             raise ReportPipelineError(
                 "BlindReadResult must bind to the manuscript digest it read"
             )
         if not isinstance(blind.blocking_issues, tuple) or not all(
-            isinstance(issue, BlindBlockingIssue) for issue in blind.blocking_issues
+            isinstance(issue, ReaderIssue) for issue in blind.blocking_issues
         ):
             raise ReportPipelineError(
-                "BlindReadResult blocking_issues must contain BlindBlockingIssue"
+                "BlindReadResult blocking_issues must contain ReaderIssue"
             )
-        if not isinstance(blind.cognitive_friction, tuple) or not all(
-            isinstance(item, CognitiveFrictionObservation)
-            for item in blind.cognitive_friction
-        ):
-            raise ReportPipelineError(
-                "BlindReadResult cognitive_friction must contain "
-                "CognitiveFrictionObservation"
-            )
-        for item in blind.cognitive_friction:
-            for field_name in ("location", "observation", "reader_cost"):
-                value = getattr(item, field_name)
-                if not isinstance(value, str) or not value.strip():
-                    raise ReportPipelineError(
-                        f"CognitiveFrictionObservation.{field_name} must be "
-                        "a non-empty string"
-                    )
         for issue in blind.blocking_issues:
-            for field_name in ("problem", "reader_effect", "why_blocking"):
-                value = getattr(issue, field_name)
-                if not isinstance(value, str) or not value.strip():
-                    raise ReportPipelineError(
-                        f"BlindBlockingIssue.{field_name} must be a non-empty string"
-                    )
-            if issue.location is not None and (
-                not isinstance(issue.location, str) or not issue.location.strip()
-            ):
+            ReportPipeline._validate_reader_issue(issue)
+
+    @staticmethod
+    def _validate_reader_issue(issue: object) -> None:
+        if not isinstance(issue, ReaderIssue):
+            raise ReportPipelineError("ReaderIssue is invalid")
+        for field_name in ("observation", "reader_effect", "why_blocking"):
+            value = getattr(issue, field_name)
+            if not isinstance(value, str) or not value.strip():
                 raise ReportPipelineError(
-                    "BlindBlockingIssue.location must be a non-empty string or None"
+                    f"ReaderIssue.{field_name} must be a non-empty string"
                 )
+        if issue.location is not None and (
+            not isinstance(issue.location, str) or not issue.location.strip()
+        ):
+            raise ReportPipelineError(
+                "ReaderIssue.location must be a non-empty string or None"
+            )
 
     @staticmethod
     def _validate_review_result(
@@ -1683,38 +1292,47 @@ class ReportPipeline:
                 "ReportReviewResult binds the wrong manuscript digest"
             )
         if not isinstance(result.blocking_issues, tuple) or not all(
-            isinstance(issue, BlockingIssue) for issue in result.blocking_issues
+            isinstance(issue, ReaderIssue) for issue in result.blocking_issues
         ):
             raise ReportPipelineError(
-                "blocking_issues must be a tuple of BlockingIssue"
+                "blocking_issues must be a tuple of ReaderIssue"
             )
+        for issue in result.blocking_issues:
+            ReportPipeline._validate_reader_issue(issue)
+        # PASS condition: no repair target and no blocking issues.
+        if result.repair_target is None:
+            if result.blocking_issues:
+                raise ReportPipelineError(
+                    "Reader PASS requires no blocking issues"
+                )
+            if not isinstance(result.rationale, str) or not result.rationale.strip():
+                raise ReportPipelineError(
+                    "ReportReviewResult.rationale must be non-empty text"
+                )
+            return
+        # A repair target requires a non-empty rationale and at least one
+        # blocking issue describing the failure.
+        if not isinstance(result.repair_target, RepairTarget):
+            raise ReportPipelineError("ReportReviewResult repair_target is invalid")
+        if (
+            result.repair_target is not RepairTarget.MANUSCRIPT
+            and result.repair_target is not RepairTarget.BRIEF
+        ):
+            raise ReportPipelineError("ReportReviewResult repair_target is invalid")
+        if not isinstance(result.rationale, str) or not result.rationale.strip():
+            raise ReportPipelineError(
+                "ReportReviewResult.rationale must be non-empty text"
+            )
+        if not result.blocking_issues:
+            raise ReportPipelineError(
+                "a Reader repair target requires at least one blocking issue"
+            )
+        # Phase 2 cannot paper over a frozen blind FAIL: if the blind read
+        # recorded blocking issues, the review must also carry issues.
         if frozen_blind_read.blocking_issues and not result.blocking_issues:
             raise ReportPipelineError(
                 "Phase 2 cannot PASS while the frozen Blind Read has blocking issues"
             )
-        for issue in result.blocking_issues:
-            for field_name in (
-                "problem",
-                "reader_effect",
-                "why_blocking",
-                "resolution_condition",
-            ):
-                value = getattr(issue, field_name)
-                if not isinstance(value, str) or not value.strip():
-                    raise ReportPipelineError(
-                        f"BlockingIssue.{field_name} must be a non-empty string"
-                    )
-            if not isinstance(issue.repair_target, RepairTarget):
-                raise ReportPipelineError("BlockingIssue repair_target is invalid")
-            for field_name in ("location", "brief_ref"):
-                value = getattr(issue, field_name)
-                if value is not None and (
-                    not isinstance(value, str) or not value.strip()
-                ):
-                    raise ReportPipelineError(
-                        f"BlockingIssue.{field_name} must be a non-empty "
-                        "string or None"
-                    )
 
     @staticmethod
     def _validate_integrity_review(review: object) -> None:
@@ -1847,7 +1465,6 @@ def validate_brief_repair_feedback(feedback: object) -> None:
     for item in feedback:
         for field_name in (
             "problem",
-            "downstream_effect",
             "resolution_condition",
         ):
             value = getattr(item, field_name)
@@ -1861,23 +1478,6 @@ def validate_brief_repair_feedback(feedback: object) -> None:
             raise ReportPipelineError(
                 "BriefRepairFeedback.location must be non-empty text or None"
             )
-
-
-def reader_repair_target(
-    issues: Iterable[BlockingIssue],
-) -> RepairTarget | None:
-    """Return the deterministic most-upstream Reader repair target.
-
-    The shared rule is BRIEF > MANUSCRIPT. Semantic review decides each issue's
-    target; Python only collapses a validated issue set into the next action.
-    """
-
-    targets = {issue.repair_target for issue in issues}
-    if RepairTarget.BRIEF in targets:
-        return RepairTarget.BRIEF
-    if RepairTarget.MANUSCRIPT in targets:
-        return RepairTarget.MANUSCRIPT
-    return None
 
 
 def validate_integrity_review(review: object) -> None:
