@@ -452,14 +452,14 @@ requirement such as coverage of major approaches into a chapter layout unless
 the user explicitly requested that layout.
 
 The Lean Report Brief carries five fields: `audience`, `promise`, `frame`,
-`arc` (ordered cognitive stages), and `focus` (scope boundaries). It is an
-editorial-intent declaration, not a heading plan: it carries no section list,
-no heading text, no outline depth, no semantic moves, no material economy
-audit. The Constructor decides what understanding the reader should form and in
-what order; Authoring decides the concrete headings, paragraphs, and evidence
-placement that realize that intent. If the Brief's intent cannot be faithfully
-realized, return `BriefInsufficient` to Constructor rather than redesigning it
-in prose.
+`arc` (cognitive progression), and `focus` (scope boundary) — each a plain
+string. It is an editorial-intent declaration, not a heading plan: it carries
+no section list, no heading text, no outline depth, no semantic moves, no
+material economy audit. The Constructor decides what understanding the reader
+should form and in what order; Authoring decides the concrete headings,
+paragraphs, and evidence placement that realize that intent. If the Brief's
+intent cannot be faithfully realized, return `BriefInsufficient` to
+Constructor rather than redesigning it in prose.
 
 The semantic stages are an Action loop, not a Report FSM — no new lifecycle
 mode is introduced, everything runs inside DELIVERY:
@@ -468,13 +468,14 @@ mode is introduced, everything runs inside DELIVERY:
 ReportConstructionContext → Report Constructor → Lean Report Brief
 → Authoring WRITE → Manuscript
 → deterministic Presentation preflight + reader render
-→ Fresh Reader (fresh instance, two-phase cold reading)
+→ Fresh Reader (fresh instances, two-phase cold reading)
    Phase 1 Blind Read: deliverable + audience + review guide + Reader Surface
                        — NO Brief, NO Writing Guide
    → frozen BlindReadResult (received_understanding + manuscript_digest
                              + blocking_issues as ReaderIssue; no repair target)
-   Phase 2 Brief Check: frozen blind_read_digest + Brief + Reader Surface + review guide
-   → ReportReviewResult{repair_target, rationale, blocking_issues}
+   Phase 2 Brief Check: frozen blind_read + Brief + review guide
+                        — NO manuscript, NO reader surface (fresh instance)
+   → ReportReviewResult{repair_target, rationale}
    ├─ repair_target = None  → Reader PASS (brief_digest + manuscript_digest)
    ├─ repair_target = MANUSCRIPT → resource stop; re-author and re-run
    └─ repair_target = BRIEF → previous Brief + neutral repair feedback → Constructor
@@ -486,13 +487,16 @@ ReportConstructionContext → Report Constructor → Lean Report Brief
 → validate-delivery → close-run
 ```
 
-A fresh Reviewer instance is created for every manuscript version (the factory
-creates a new reviewer each revision), so it re-reads cold and cannot confirm
-"you fixed what I asked." Phase 1 is frozen before Phase 2 sees the Brief;
-Phase 2 must not rewrite or reinterpret the blind read. The Reader makes a
-single decision: `repair_target` is top-level on `ReportReviewResult`, not
-per-issue. Reader targets are only `MANUSCRIPT | BRIEF`; BRIEF wins when both
-occur. Python routes mechanically and does not rank semantic quality.
+A fresh Reviewer instance is created for each phase of every review (the
+factory creates one instance for Phase 1 and a second for Phase 2), so Phase 2
+re-reads cold against the frozen Blind and cannot confirm "you fixed what I
+asked." Phase 1 is frozen before Phase 2 sees the Brief; the only bridge
+between the two phases is the frozen Blind Read result. Phase 2 must not
+rewrite or reinterpret the blind read, and receives no manuscript or reader
+surface. The Reader makes a single decision: `repair_target` is top-level on
+`ReportReviewResult`, not per-issue. Reader targets are only
+`MANUSCRIPT | BRIEF`; BRIEF wins when both occur. Python routes mechanically
+and does not rank semantic quality.
 
 v0.6 removes the automatic Reader convergence loop: a single Reader pass
 either PASSes or routes. A `MANUSCRIPT` repair target is a resource stop, not
@@ -524,11 +528,11 @@ report-construction-input
 
 Before initial construction, and again whenever `pending_action` is
 `BRIEF_REBUILD_REQUIRED`, call `report-construction-input`. In repair mode it
-carries the previous Brief plus neutral `problem`, `resolution_condition` and
-optional `location`. Preserve unaffected design and perform minimal sufficient
-reconstruction. If accepted research cannot support the required condition,
-Constructor may explicitly reopen Research; Fresh Reader never makes that
-sufficiency judgment.
+carries the previous Brief plus neutral `problem` and optional `location`.
+Preserve unaffected design and perform minimal sufficient reconstruction. If
+accepted research cannot support the required condition, Constructor may
+explicitly reopen Research; Fresh Reader never makes that sufficiency
+judgment.
 
 If Authoring cannot faithfully WRITE or REVISE without redesigning the current
 Brief, call `submit-brief-insufficient` with the existing neutral feedback

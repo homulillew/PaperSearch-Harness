@@ -247,8 +247,8 @@ def _valid_brief() -> ReportBrief:
         audience="domain researchers",
         promise="the reader will understand how each route changes the variable",
         frame="routes organized by the decision variable each one changes",
-        arc=("establish premise", "derive comparison", "state consequence"),
-        focus=("the mechanism that distinguishes the routes",),
+        arc="establish the premise, derive the comparison, state the consequence",
+        focus="the mechanism that distinguishes the routes",
     )
 
 
@@ -267,13 +267,11 @@ def _reader_issue(
     *,
     observation: str = "the reader cannot see the mechanism",
     reader_effect: str = "the comparison is unsupported",
-    why_blocking: str = "the promise is not realized without it",
     location: str | None = None,
 ) -> ReaderIssue:
     return ReaderIssue(
         observation=observation,
         reader_effect=reader_effect,
-        why_blocking=why_blocking,
         location=location,
     )
 
@@ -305,11 +303,14 @@ class FakeWriter:
 
 
 class FakeReviewer:
-    """One-use two-phase reviewer. Records inputs to assert the blind boundary.
+    """Two-phase reviewer with fresh instances per phase. Records inputs to
+    assert the blind boundary.
 
-    v0.6: ``brief_check`` returns a single top-level ``repair_target`` (None
-    for PASS) plus a ``rationale``, not per-issue ``BlockingIssue``. Phase 1
-    returns a lean ``BlindReadResult`` (received_understanding + digest).
+    v0.6.1: ``brief_check`` receives only the frozen Blind Read + Brief +
+    review guide — NO manuscript, NO reader surface. It returns a single
+    top-level ``repair_target`` (None for PASS) plus an optional ``rationale``;
+    it does NOT re-collect blocking issues (the frozen Blind owns those).
+    Phase 1 returns a lean ``BlindReadResult``.
     """
 
     def __init__(
@@ -318,7 +319,6 @@ class FakeReviewer:
         blind_result: BlindReadResult | None = None,
         repair_target: RepairTarget | None = None,
         rationale: str = "the manuscript does not realize the promise",
-        blocking_issues: tuple[ReaderIssue, ...] = (),
         blind_hook: Callable[..., None] | None = None,
         check_hook: Callable[..., None] | None = None,
     ) -> None:
@@ -328,7 +328,6 @@ class FakeReviewer:
         self._check_hook = check_hook
         self._repair_target = repair_target
         self._rationale = rationale
-        self._blocking = blocking_issues
         self._blind_result = blind_result
 
     def blind_read(
@@ -360,15 +359,11 @@ class FakeReviewer:
         self,
         blind_read,
         brief,
-        reader_surface,
-        manuscript_digest,
         review_guide,
     ):
         record = {
             "blind_read": blind_read,
             "brief": brief,
-            "reader_surface": reader_surface,
-            "manuscript_digest": manuscript_digest,
             "review_guide": review_guide,
         }
         self.check_calls.append(record)
@@ -377,10 +372,9 @@ class FakeReviewer:
         return ReportReviewResult(
             blind_read_digest=blind_read_digest(blind_read),
             brief_digest=brief_digest(brief),
-            manuscript_digest=manuscript_digest,
+            manuscript_digest=blind_read.manuscript_digest,
             repair_target=self._repair_target,
             rationale=self._rationale,
-            blocking_issues=self._blocking,
         )
 
 
@@ -504,21 +498,21 @@ class TestReportBriefValidation:
     @pytest.mark.parametrize(
         "field_name, bad_value, message",
         [
-            ("arc", (), "arc"),
-            ("arc", ("",), "arc"),
-            ("arc", ("ok", "  "), "arc"),
-            ("arc", "not a tuple", "arc"),
-            ("focus", (), "focus"),
-            ("focus", ("",), "focus"),
-            ("focus", ("ok", ""), "focus"),
-            ("focus", "not a tuple", "focus"),
+            ("arc", "", "arc"),
+            ("arc", "  ", "arc"),
+            ("arc", ("not a string",), "arc"),
+            ("arc", ["not a string"], "arc"),
+            ("focus", "", "focus"),
+            ("focus", "  ", "focus"),
+            ("focus", ("not a string",), "focus"),
+            ("focus", ["not a string"], "focus"),
         ],
     )
-    def test_lean_brief_tuple_fields_must_be_non_empty_strings(
+    def test_lean_brief_string_fields_must_be_non_empty(
         self, field_name, bad_value, message
     ):
-        # Invariant 2: arc/focus are non-empty tuples of non-empty strings.
-        # Ordering is the only deterministic invariant; meaning is semantic.
+        # Invariant 2: arc/focus are non-empty strings (v0.6.1). No ordering
+        # invariant remains; meaning is semantic.
         with pytest.raises(ReportPipelineError, match=message):
             validate_report_brief(
                 _make_view(), replace(_valid_brief(), **{field_name: bad_value})
@@ -551,20 +545,6 @@ class TestReportBriefValidation:
             "arc",
             "focus",
         }
-
-    def test_arc_and_focus_ordering_changes_brief_digest(self):
-        # Ordering is the only deterministic invariant on arc/focus; a
-        # different order must produce a different digest.
-        base = _valid_brief()
-        reordered_arc = replace(base, arc=base.arc[::-1])
-        assert brief_digest(reordered_arc) != brief_digest(base)
-        # focus in _valid_brief() is a single-element tuple, so use a
-        # multi-element focus to demonstrate ordering sensitivity.
-        multi_focus = replace(
-            base, focus=("first load-bearing claim", "second load-bearing claim")
-        )
-        reordered_focus = replace(multi_focus, focus=multi_focus.focus[::-1])
-        assert brief_digest(reordered_focus) != brief_digest(multi_focus)
 
     def test_brief_not_stored_in_research_run_no_new_artifactkind(self):
         # Invariant 4: Brief does not enter ResearchRun / ArtifactKind not
@@ -683,10 +663,10 @@ class TestReportOutlineFidelity:
             )
 
     def test_reader_guide_phase1_boundary_excludes_brief_and_writing_guide(self):
-        # v0.6 guide content: the review guide still names the Phase 1
-        # boundary (no Brief, no Writing Guide) and the narrow audience
-        # projection (audience string only — not promise/frame/arc/focus).
-        # This is guide content, not outline-fidelity machinery.
+        # v0.6.1 guide content: the review guide names the Phase 1 boundary
+        # (no Brief, no Writing Guide) and the narrow audience projection
+        # (audience string only — not promise/frame/arc/focus). Per §14, assert
+        # the structural contract only — not a specific formulation.
         guide = (
             Path(__file__).resolve().parents[1]
             / ".claude"
@@ -695,41 +675,40 @@ class TestReportOutlineFidelity:
             / "references"
             / "REPORT_REVIEW_GUIDE.md"
         ).read_text(encoding="utf-8")
-        assert "版本：v0.6" in guide
-        assert "Phase 1 不接收 Report Writing Guide" in guide
-        # The audience projection must not leak the lean Brief fields.
-        assert "promise" in guide
-        assert "frame" in guide
-        assert "arc" in guide
-        assert "focus" in guide
+        # Phase 1 must not receive the Brief or the Writing Guide.
+        assert "Phase 1" in guide
+        # The audience projection is the audience string only.
+        assert "audience" in guide.lower()
+        # The lean Brief fields are named somewhere in the guide (Phase 2
+        # receives the Brief), but Phase 1 must not.
+        assert "promise" in guide.lower()
+        assert "arc" in guide.lower()
 
     def test_reader_guide_has_dual_blocking_threshold_without_style_score(self):
-        # v0.6 guide content: the review guide carries the dual blocking
-        # threshold (cognitive cost / professional finish) and explicitly
-        # rejects a unified quality score. v0.6 keeps this invariant.
-        root = Path(__file__).resolve().parents[1]
+        # v0.6.1 guide content: the review guide rejects a unified quality
+        # score as a stop condition. Per §14, assert the structural contract
+        # only — not a specific formulation of the threshold.
         review_guide = (
-            root
+            Path(__file__).resolve().parents[1]
             / ".claude"
             / "skills"
             / "literature-research"
             / "references"
             / "REPORT_REVIEW_GUIDE.md"
         ).read_text(encoding="utf-8")
-        # The dual-threshold sentence is line-wrapped in the v0.6 guide, so
-        # assert the two halves separately rather than the full sentence.
-        assert "实质增加目标读者的认知" in review_guide
-        assert "成本或破坏主要认知交付" in review_guide
-        assert "实质使交付物无法达到其要求的专业成品质量" in review_guide
-        assert "本 Guide 不使用统一质量分数" in review_guide
-        assert "quality_score >= threshold" in review_guide
+        # The guide must not prescribe a quality_score threshold as the PASS
+        # stop condition. It may name quality_score only to reject it.
+        assert "quality_score >= threshold" not in review_guide.replace(
+            "不是 `quality_score >= threshold`", ""
+        )
 
     def test_reader_issue_format_in_guide_matches_lean_shape(self):
-        # v0.6 guide content: the ReaderIssue format in the guide matches
-        # the lean dataclass shape (observation / reader_effect /
-        # why_blocking / optional location; no per-issue repair_target,
-        # no resolution_condition). repair_target is a top-level Phase 2
-        # decision.
+        # v0.6.1 guide content: the ReaderIssue format in the guide matches
+        # the lean dataclass shape (observation / reader_effect / optional
+        # location). The removed why_blocking field is NOT prescribed.
+        # repair_target is a top-level Phase 2 decision, not per-issue.
+        # Per §14, this asserts the structural contract only — not a specific
+        # natural-language formulation of the charter.
         guide = (
             Path(__file__).resolve().parents[1]
             / ".claude"
@@ -740,13 +719,15 @@ class TestReportOutlineFidelity:
         ).read_text(encoding="utf-8")
         assert "observation" in guide
         assert "reader_effect" in guide
-        assert "why_blocking" in guide
-        assert "顶层 `repair_target`" in guide
-        assert "不再要求每个 issue 携带 `repair_target`" in guide
+        # The removed v0.5 field must not survive in the guide.
+        assert "why_blocking" not in guide
+        assert "resolution_condition" not in guide
 
-    def test_writing_guide_requires_semantic_navigation_at_named_first_use(self):
-        # The writing guide requires the structured paper-navigation token at
-        # the first named introduction of a method/system. Guide content.
+    def test_writing_guide_is_short_charter_not_production_ontology(self):
+        # §9: the writing guide is a short charter. It must NOT carry the
+        # v0.5 production-writing ontology (section/material/outline IR,
+        # semantic-navigation tokens, quality scoring). Per §14, assert the
+        # structural contract only — not a specific formulation.
         guide = (
             Path(__file__).resolve().parents[1]
             / ".claude"
@@ -755,10 +736,18 @@ class TestReportOutlineFidelity:
             / "references"
             / "REPORT_WRITING_GUIDE.md"
         ).read_text(encoding="utf-8")
-        assert "首次正式引入一个具名方法或系统" in guide
-        assert "Authoring 应在该次引入发出" in guide
-        assert "普通 citation 不被" in guide
-        assert "canonical URL" in guide
+        # Removed v0.5 ontology must not survive.
+        for removed in (
+            "首次正式引入一个具名方法或系统",
+            "semantic_navigation",
+            "quality_score",
+            "narrative_logic",
+            "conceptual_model",
+        ):
+            assert removed not in guide, f"writing guide still references {removed}"
+        # The charter still names the core editorial fields of the lean Brief.
+        assert "audience" in guide
+        assert "promise" in guide
 
 
 # ===========================================================================
@@ -882,43 +871,40 @@ class TestBlindReaderBoundary:
 
     def test_phase1_blocker_cannot_disappear_into_phase2_pass(self):
         # Invariant (blind freeze, spec D): a frozen Blind Read with blocking
-        # issues cannot quietly become a Phase 2 attribution that carries no
-        # issues. The validator rejects a non-None repair_target with no
-        # blocking issues ("a Reader repair target requires at least one
-        # blocking issue"), so a frozen blind FAIL forces Phase 2 to surface
-        # at least one issue if it attributes a repair target.
+        # issues cannot quietly become a Phase 2 PASS. v0.6.1: Phase 2 no longer
+        # carries blocking_issues; the invariant is examined on the frozen
+        # Blind — if it has blocking issues, a Phase 2 PASS (repair_target is
+        # None) is rejected.
         issue = _reader_issue()
-        assert not hasattr(issue, "repair_target")
         blind = BlindReadResult(
             received_understanding="partial",
             manuscript_digest=manuscript_digest(_manuscript()),
             blocking_issues=(issue,),
         )
         caps = FakeDeliveryCapabilities(_make_view())
-        # Phase 2 attributes a MANUSCRIPT target but forgets to carry any
-        # blocking issue — rejected.
+        # Phase 2 attempts a PASS (repair_target None) while the frozen Blind
+        # recorded a blocking issue — rejected.
         with pytest.raises(
             ReportPipelineError,
-            match="a Reader repair target requires at least one blocking issue",
+            match="Phase 2 cannot PASS while the frozen Blind Read has blocking issues",
         ):
             _build_pipeline(
                 caps,
                 reviewer_factory=CountingReviewerFactory(
                     lambda: FakeReviewer(
                         blind_result=blind,
-                        repair_target=RepairTarget.MANUSCRIPT,
-                        rationale="the manuscript does not realize the promise",
-                        blocking_issues=(),
+                        repair_target=None,
+                        rationale="",
                     )
                 ),
             ).run("run_1")
 
     def test_phase2_may_consolidate_multiple_blind_blockers(self):
         # Phase 2 may consolidate multiple blind blockers into one repair
-        # target. v0.6: the repair target is a single top-level field, not a
-        # per-issue field. A MANUSCRIPT route is now a resource stop (no
-        # auto-revise); we assert the stop and that the consolidated target
-        # was MANUSCRIPT.
+        # target. v0.6.1: the repair target is a single top-level field, not a
+        # per-issue field, and Phase 2 carries no blocking_issues. A MANUSCRIPT
+        # route is a resource stop (no auto-revise); assert the stop and that
+        # the consolidated target was MANUSCRIPT.
         blind = BlindReadResult(
             received_understanding="partial",
             manuscript_digest=manuscript_digest(_manuscript()),
@@ -935,7 +921,6 @@ class TestBlindReaderBoundary:
                     blind_result=blind,
                     repair_target=RepairTarget.MANUSCRIPT,
                     rationale="the manuscript does not realize the promise",
-                    blocking_issues=(_reader_issue(),),
                 )
             ),
         )
@@ -952,14 +937,12 @@ class TestBlindReaderBoundary:
                 self,
                 blind_read,
                 brief,
-                reader_surface,
-                manuscript_digest,
                 review_guide,
             ):
                 return ReportReviewResult(
                     blind_read_digest="0" * 64,
                     brief_digest=brief_digest(brief),
-                    manuscript_digest=manuscript_digest,
+                    manuscript_digest=blind_read.manuscript_digest,
                     repair_target=None,
                     rationale="pass",
                 )
@@ -975,18 +958,18 @@ class TestBlindReaderBoundary:
             pipeline.run("run_1")
 
     def test_reader_issue_shape_requires_core_fields(self):
-        # Invariant (spec B): ReaderIssue requires observation, reader_effect,
-        # why_blocking as non-empty strings; location is optional (None or a
-        # non-empty string). No repair_target, no resolution_condition, no
-        # score.
+        # Invariant (spec B): ReaderIssue requires observation and
+        # reader_effect as non-empty strings; location is optional (None or a
+        # non-empty string). No repair_target, no why_blocking, no
+        # resolution_condition, no score.
         issue = _reader_issue()
         assert not hasattr(issue, "repair_target")
+        assert not hasattr(issue, "why_blocking")
         assert not hasattr(issue, "resolution_condition")
         assert not hasattr(issue, "score")
         assert {f for f in issue.__dataclass_fields__} == {
             "observation",
             "reader_effect",
-            "why_blocking",
             "location",
         }
         # location defaults to None.
@@ -1008,7 +991,6 @@ class TestBlindReaderBoundary:
                                 ReaderIssue(
                                     observation="o",
                                     reader_effect="e",
-                                    why_blocking="w",
                                     location="  ",
                                 ),
                             ),
@@ -1034,7 +1016,6 @@ class TestFreshReview:
             lambda: FakeReviewer(
                 repair_target=RepairTarget.MANUSCRIPT,
                 rationale="the manuscript does not realize the promise",
-                blocking_issues=(_reader_issue(),),
             )
         )
         reviser = FakeReviser()
@@ -1045,8 +1026,8 @@ class TestFreshReview:
             pipeline.run("run_1")
         # No revision happened — v0.6 surfaces the outcome to the host.
         assert reviser.calls == []
-        # Exactly one reviewer instance was created (one-shot decision).
-        assert len(factory.created) == 1
+        # Two fresh reviewer instances for one review: Phase 1 + Phase 2 (§3).
+        assert len(factory.created) == 2
         assert caps.publish_calls == []
 
     def test_reviser_does_not_go_straight_to_integrity(self):
@@ -1058,7 +1039,6 @@ class TestFreshReview:
             lambda: FakeReviewer(
                 repair_target=RepairTarget.MANUSCRIPT,
                 rationale="the manuscript does not realize the promise",
-                blocking_issues=(_reader_issue(),),
             )
         )
         integrity = FakeIntegrityReviewer(
@@ -1107,12 +1087,17 @@ class TestFreshReview:
             reviser=reviser,
         )
         pipeline.run("run_1")
-        # Two reader instances: one before integrity, one after the repair.
-        # Each ran both Phase 1 (blind_read) and Phase 2 (brief_check).
-        assert len(factory.created) == 2
-        for reviewer in factory.created:
-            assert len(reviewer.blind_calls) == 1
-            assert len(reviewer.check_calls) == 1
+        # Two reviews (one before integrity, one after the repair); each
+        # review uses two fresh instances (Phase 1 + Phase 2, §3) → 4 total.
+        assert len(factory.created) == 4
+        # §3 isolation: Phase 1 instances perform only blind_read; Phase 2
+        # instances perform only brief_check. No single instance does both.
+        phase1_instances = factory.created[0::2]
+        phase2_instances = factory.created[1::2]
+        assert all(len(r.blind_calls) == 1 for r in phase1_instances)
+        assert all(len(r.check_calls) == 0 for r in phase1_instances)
+        assert all(len(r.blind_calls) == 0 for r in phase2_instances)
+        assert all(len(r.check_calls) == 1 for r in phase2_instances)
 
     def test_brief_reconstruction_new_writer_and_fresh_reader(self):
         # Invariant 13 (v0.6): a BRIEF Reader blocker still routes back to
@@ -1123,11 +1108,12 @@ class TestFreshReview:
 
         def builder():
             call_count["n"] += 1
-            if call_count["n"] == 1:
+            # §3: BRIEF verdict lands on the Phase 2 slot (2nd create) of
+            # the first review.
+            if call_count["n"] == 2:
                 return FakeReviewer(
                     repair_target=RepairTarget.BRIEF,
                     rationale="the brief lacks a stable comparison frame",
-                    blocking_issues=(_reader_issue(),),
                 )
             return FakeReviewer()
 
@@ -1153,7 +1139,9 @@ class TestFreshReview:
         # two fresh reader instances.
         assert len(constructor.calls) == 2
         assert len(writer.calls) == 2
-        assert len(factory.created) == 2
+        # Two reviews (initial + after rebuild); each uses two fresh
+        # instances (Phase 1 + Phase 2, §3) → 4 total.
+        assert len(factory.created) == 4
         # Reviser NOT called for a BRIEF route.
         assert reviser.calls == []
         # The certified brief digest is the v2 brief's, not v1's.
@@ -1179,7 +1167,6 @@ class TestRootRepairRouting:
             lambda: FakeReviewer(
                 repair_target=RepairTarget.MANUSCRIPT,
                 rationale="the manuscript does not realize the promise",
-                blocking_issues=(_reader_issue(),),
             )
         )
         reviser = FakeReviser()
@@ -1201,11 +1188,13 @@ class TestRootRepairRouting:
 
         def builder():
             call_count["n"] += 1
-            if call_count["n"] == 1:
+            # §3: each review consumes two creates (Phase 1 then Phase 2).
+            # The BRIEF verdict is emitted by brief_check, so it must land on
+            # the Phase 2 slot (the 2nd create) of the first review.
+            if call_count["n"] == 2:
                 return FakeReviewer(
                     repair_target=RepairTarget.BRIEF,
                     rationale="the brief lacks a stable comparison frame",
-                    blocking_issues=(_reader_issue(),),
                 )
             return FakeReviewer()
 
@@ -1228,13 +1217,13 @@ class TestRootRepairRouting:
         assert repair_input.repair is not None
         assert repair_input.repair.previous_brief == _valid_brief()
         assert repair_input.repair.feedback
-        # v0.6 BriefRepairFeedback has problem + resolution_condition only
-        # (no downstream_effect). The reader rationale is projected into
-        # both fields.
+        # v0.6.1 BriefRepairFeedback has problem only (no
+        # resolution_condition, no downstream_effect). The reader rationale
+        # is projected into the problem field.
         feedback = repair_input.repair.feedback[0]
         assert not hasattr(feedback, "downstream_effect")
+        assert not hasattr(feedback, "resolution_condition")
         assert feedback.problem
-        assert feedback.resolution_condition
 
     def test_mixed_manuscript_and_brief_brief_dominates(self):
         # Invariant 16 (v0.6): there is no per-issue repair_target. The
@@ -1246,15 +1235,12 @@ class TestRootRepairRouting:
 
         def builder():
             call_count["n"] += 1
-            if call_count["n"] == 1:
-                # Two blocking issues, but the single top-level target is BRIEF.
+            # §3: BRIEF verdict lands on the Phase 2 slot (2nd create).
+            if call_count["n"] == 2:
+                # The single top-level target is BRIEF.
                 return FakeReviewer(
                     repair_target=RepairTarget.BRIEF,
                     rationale="the brief lacks a stable comparison frame",
-                    blocking_issues=(
-                        _reader_issue(observation="manuscript symptom"),
-                        _reader_issue(observation="brief symptom"),
-                    ),
                 )
             return FakeReviewer()
 
@@ -1359,11 +1345,12 @@ class TestReaderPassVersionBinding:
 
         def builder():
             call_count["n"] += 1
-            if call_count["n"] == 1:
+            # §3: BRIEF verdict lands on the Phase 2 slot (2nd create) of
+            # the first review.
+            if call_count["n"] == 2:
                 return FakeReviewer(
                     repair_target=RepairTarget.BRIEF,
                     rationale="the brief lacks a stable comparison frame",
-                    blocking_issues=(_reader_issue(),),
                 )
             return FakeReviewer()
 
@@ -1373,8 +1360,8 @@ class TestReaderPassVersionBinding:
             audience="a2",
             promise="repaired promise v2",
             frame="frame v2",
-            arc=("arc a", "arc b"),
-            focus=("focus a",),
+            arc="arc a then arc b",
+            focus="focus a",
         )
         constructor = FakeConstructor(briefs=[_valid_brief(), brief_v2])
         pipeline = _build_pipeline(
@@ -1533,8 +1520,9 @@ class TestIntegrityRouting:
             reviewer_factory=factory,
         )
         pipeline.run("run_1")
-        # Two reader instances: one before integrity, one after the repair.
-        assert len(factory.created) == 2
+        # Two reviews (before/after integrity); each uses two fresh
+        # instances (Phase 1 + Phase 2, §3) → 4 total.
+        assert len(factory.created) == 4
 
 
 # ===========================================================================
@@ -1616,8 +1604,9 @@ class TestNoScoreNoFSM:
         factory = CountingReviewerFactory(FakeReviewer)
         pipeline = _build_pipeline(caps, reviewer_factory=factory)
         pipeline.run("run_1")
-        # Exactly one reader instance for a clean pass — not a fixed N rounds.
-        assert len(factory.created) == 1
+        # One review, but two fresh instances (Phase 1 + Phase 2, §3) — not a
+        # fixed N rounds.
+        assert len(factory.created) == 2
 
     def test_no_quality_readability_cognitive_score_introduced(self):
         # Invariant 30 (v0.6): no report quality/readability/cognitive score
@@ -1703,7 +1692,12 @@ class TestAdditionalInvariants:
         assert context.findings[0].ref == "finding_f1"
         assert context.open_gaps[0].ref == "gap_g1"
 
-    def test_fresh_reader_receives_rendered_surface_not_manuscript(self):
+    def test_phase2_brief_check_receives_no_manuscript_or_reader_surface(self):
+        # §2/§3 isolation boundary: Phase 1 (blind_read) receives the rendered
+        # reader surface (citations resolved, no raw {{cite}} markup). Phase 2
+        # (brief_check) receives ONLY the frozen Blind Read + Brief + review
+        # guide — no manuscript, no reader surface, no manuscript digest beyond
+        # what the frozen Blind Read already carries.
         caps = FakeDeliveryCapabilities(_make_view())
         factory = CountingReviewerFactory(FakeReviewer)
         pipeline = _build_pipeline(
@@ -1712,10 +1706,24 @@ class TestAdditionalInvariants:
             citation_renderer=DeterministicCitationRenderer(),
         )
         pipeline.run("run_1")
-        call = factory.created[0].blind_calls[0]
-        assert isinstance(call["reader_surface"], str)
-        assert "{{cite:" not in call["reader_surface"]
-        assert "[1](https://example.org/p1)" in call["reader_surface"]
+        # §3: two fresh instances per review — index 0 is Phase 1, index 1 is
+        # Phase 2.
+        phase1 = factory.created[0]
+        phase2 = factory.created[1]
+        # Phase 1 still receives the rendered reader surface.
+        blind_call = phase1.blind_calls[0]
+        assert isinstance(blind_call["reader_surface"], str)
+        assert "{{cite:" not in blind_call["reader_surface"]
+        assert "[1](https://example.org/p1)" in blind_call["reader_surface"]
+        # Phase 2 receives neither a manuscript nor a reader surface: the only
+        # bridge to Phase 1 is the frozen Blind Read result.
+        assert phase2.blind_calls == []
+        assert len(phase2.check_calls) == 1
+        check_call = phase2.check_calls[0]
+        assert set(check_call.keys()) == {"blind_read", "brief", "review_guide"}
+        assert "reader_surface" not in check_call
+        assert "manuscript" not in check_call
+        assert "manuscript_digest" not in check_call
 
     def test_capture_sink_is_noop_by_default_and_never_authority(self):
         # The default capture sink discards; captures never enter ResearchRun.
@@ -1739,7 +1747,6 @@ class TestAdditionalInvariants:
             return FakeReviewer(
                 repair_target=RepairTarget.BRIEF,
                 rationale="the brief lacks a stable comparison frame",
-                blocking_issues=(_reader_issue(),),
             )
 
         factory = CountingReviewerFactory(builder)

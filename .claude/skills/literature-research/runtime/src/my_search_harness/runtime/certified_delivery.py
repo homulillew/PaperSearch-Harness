@@ -98,7 +98,7 @@ class ReaderPreviewResult:
 class CertifiedReportDelivery:
     """Production orchestrator for Claude-driven staged report delivery."""
 
-    _SCHEMA_VERSION = 5
+    _SCHEMA_VERSION = 6
     _OLDER_SCHEMA_MESSAGE = (
         "report delivery session uses an older schema and must rebuild "
         "the Report Brief"
@@ -590,9 +590,29 @@ class CertifiedReportDelivery:
             _PendingAction.RESEARCH_REOPEN_REQUIRED: set(),
         }[pending]
         if allowed is None or command in allowed:
+            # Blind→Phase 2 staged lock: once a Blind Read is frozen and
+            # before the matching Reader Review is submitted, no semantic
+            # mutation may proceed — the frozen Blind must reach Phase 2.
+            # Implemented on existing session facts; no new pending stage.
+            if cls._blind_phase2_locked(session) and command not in {
+                "submit-reader-review",
+                "render-reader-preview",
+            }:
+                raise CertifiedDeliveryError(
+                    f"{command} is blocked: a frozen Blind Read requires "
+                    "submit-reader-review to complete Phase 2"
+                )
             return
         raise CertifiedDeliveryError(
             f"{command} is blocked by pending action {pending.value}"
+        )
+
+    @staticmethod
+    def _blind_phase2_locked(session: Mapping[str, object]) -> bool:
+        """True when a frozen Blind Read exists but no Reader Review yet."""
+        return (
+            session.get("blind_read") is not None
+            and session.get("reader_review") is None
         )
 
     @staticmethod
@@ -625,10 +645,7 @@ class CertifiedReportDelivery:
             if reader.get("repair_target") == RepairTarget.BRIEF.value:
                 rationale = _mapping_string(reader, "rationale")
                 return (
-                    BriefRepairFeedback(
-                        problem=rationale,
-                        resolution_condition=rationale,
-                    ),
+                    BriefRepairFeedback(problem=rationale),
                 )
 
         integrity = session.get("integrity_review")
@@ -641,13 +658,7 @@ class CertifiedReportDelivery:
             issues = _strings_from(raw_issues, "Integrity issues")
             if issues:
                 return tuple(
-                    BriefRepairFeedback(
-                        problem=issue,
-                        resolution_condition=(
-                            "The rebuilt Report Brief must represent the accepted "
-                            "research semantics within its evidence boundary"
-                        ),
-                    )
+                    BriefRepairFeedback(problem=issue)
                     for issue in issues
                 )
         raise CertifiedDeliveryError(
@@ -804,7 +815,6 @@ def _brief_repair_feedback_from(value: object) -> BriefRepairFeedback:
         raise CertifiedDeliveryError("stored BriefRepairFeedback is invalid")
     return BriefRepairFeedback(
         problem=_mapping_string(value, "problem"),
-        resolution_condition=_mapping_string(value, "resolution_condition"),
         location=_optional_stored_string(value, "location"),
     )
 
@@ -840,8 +850,8 @@ def _brief_from(value: Mapping[str, object]) -> ReportBrief:
         audience=_mapping_string(value, "audience"),
         promise=_mapping_string(value, "promise"),
         frame=_mapping_string(value, "frame"),
-        arc=_nonempty_strings_from(value.get("arc"), "arc"),
-        focus=_nonempty_strings_from(value.get("focus"), "focus"),
+        arc=_mapping_string(value, "arc"),
+        focus=_mapping_string(value, "focus"),
     )
 
 
@@ -878,7 +888,6 @@ def _blind_read_from(value: Mapping[str, object]) -> BlindReadResult:
             ReaderIssue(
                 observation=_mapping_string(raw, "observation"),
                 reader_effect=_mapping_string(raw, "reader_effect"),
-                why_blocking=_mapping_string(raw, "why_blocking"),
                 location=_optional_stored_string(raw, "location"),
             )
         )

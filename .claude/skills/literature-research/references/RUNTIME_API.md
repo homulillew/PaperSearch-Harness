@@ -229,21 +229,19 @@ cross the artifact boundary without matching current Reader and
 Integrity certifications.
 
 `put-report-brief` accepts the Lean Report Brief schema. Required fields are
-`audience`, `promise`, `frame` (non-empty strings) and `arc`, `focus`
-(non-empty arrays of non-empty strings). The Brief is an editorial-intent
-declaration: it carries no section list, no heading text, no outline depth, no
-semantic moves, no material economy audit. Accepting a new Brief binds it to
-the current `DeliveryBasis` and invalidates all downstream work. These fields
-have no compatibility migration.
+`audience`, `promise`, `frame`, `arc`, `focus` — each a non-empty string. The
+Brief is an editorial-intent declaration: it carries no section list, no
+heading text, no outline depth, no semantic moves, no material economy audit.
+Accepting a new Brief binds it to the current `DeliveryBasis` and invalidates
+all downstream work. These fields have no compatibility migration.
 
 `report-construction-input` is the Constructor's default production input. Its
 `context` contains Contract and accepted approach/finding/open-problem/gap semantics
 with stable refs, but excludes paper inventory, representative-paper refs and source
 inventories. Its optional `repair` is non-null only for a pending BRIEF rebuild and
-contains the previous Brief plus neutral `problem`, `resolution_condition`, and
-optional `location`. Call it before initial construction and again before rebuilding a
-Brief. Targeted evidence remains available through `delivery-inspect` and
-`delivery-read-source`.
+contains the previous Brief plus neutral `problem` and optional `location`. Call it
+before initial construction and again before rebuilding a Brief. Targeted evidence
+remains available through `delivery-inspect` and `delivery-read-source`.
 
 `report-authoring-context` is Authoring's read-only production input. It returns a
 thin `ReportAuthoringContext` projection of the current run: `state_revision`,
@@ -262,14 +260,13 @@ cannot be faithfully realized. It requires an existing current Brief and accepts
   "feedback": [
     {
       "problem": "The comparison boundary is not realizable",
-      "resolution_condition": "The Brief supplies a realizable comparison boundary",
       "location": "Comparison"
     }
   ]
 }
 ```
 
-`location` is optional. Feedback describes required outcomes, not exact headings or a
+`location` is optional. Feedback describes the problem, not exact headings or a
 prescribed structure. The command preserves the current Brief, clears any Manuscript and
 all downstream review/render certification, and sets `BRIEF_REBUILD_REQUIRED`.
 `report-construction-input` then returns the previous Brief plus this neutral feedback.
@@ -312,7 +309,7 @@ no heading or outline check.
 
 `submit-blind-review` accepts `received_understanding`, `manuscript_digest`, and
 optional `blocking_issues`. Each blocking issue is a `ReaderIssue` with `observation`,
-`reader_effect`, `why_blocking`, and optional `location`; it has no repair target and no
+`reader_effect`, and optional `location`; it has no repair target and no
 resolution condition. An issue blocks only when it materially damages primary cognitive
 delivery or materially prevents the required professional finished-product quality;
 isolated wording preferences do not block. Python freezes the complete result and
@@ -320,18 +317,26 @@ returns `blind_read_digest`.
 
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
 current `manuscript_digest`, a top-level `repair_target` (`MANUSCRIPT`, `BRIEF`, or
-`null`), a non-empty `rationale`, and optional `blocking_issues` (each a `ReaderIssue`).
-A mismatched Blind digest is rejected. `repair_target = null` with no blocking issues is
-a Reader PASS; a non-null `repair_target` requires a non-empty `rationale` and at least
-one blocking issue. If the frozen Blind Read has blockers, Phase 2 must retain at least
-one blocker (consolidation is allowed): a frozen blind FAIL cannot become a Phase 2 PASS.
-A `MANUSCRIPT` or `BRIEF` repair target creates a pending repair obligation that only a
-changed digest at that layer can clear. v0.6 removes the automatic Reader convergence
-loop: a `MANUSCRIPT` target is a resource stop (re-author and re-run), not an auto-revise.
-Reader cannot attribute RESEARCH. A condition missing from Brief routes to BRIEF;
-Constructor then decides whether accepted semantics support a rebuild or Research must
-be reopened. When both targets could apply, BRIEF wins and stale Manuscript blockers do
-not become obligations for the new Brief/manuscript pair.
+`null`), and a `rationale` (which may be empty for a PASS). Phase 2 carries no
+`blocking_issues` — the frozen Blind Read owns the blockers. A mismatched Blind digest
+is rejected. `repair_target = null` is a Reader PASS (rationale may be empty); a non-null
+`repair_target` requires a non-empty `rationale`. If the frozen Blind Read has blockers,
+Phase 2 cannot PASS: the guard examines the frozen Blind Read, not a Phase-2 issue
+collection. A `MANUSCRIPT` or `BRIEF` repair target creates a pending repair obligation
+that only a changed digest at that layer can clear. v0.6 removes the automatic Reader
+convergence loop: a `MANUSCRIPT` target is a resource stop (re-author and re-run), not
+an auto-revise. Reader cannot attribute RESEARCH. A condition missing from Brief routes
+to BRIEF; Constructor then decides whether accepted semantics support a rebuild or
+Research must be reopened. When both targets could apply, BRIEF wins and stale
+Manuscript blockers do not become obligations for the new Brief/manuscript pair.
+
+Once a Blind Read is frozen and before the matching Reader Review is submitted, no
+semantic mutation may proceed — the frozen Blind must reach Phase 2. `put-report-brief`,
+`put-report-manuscript`, `submit-brief-insufficient`, `submit-integrity-review`,
+`render-certified-report`, and `publish-certified-report` are blocked until
+`submit-reader-review` completes (read-only inspection and `submit-reader-review` itself
+remain allowed). This is implemented on existing session facts; no new persisted stage
+is introduced.
 
 `submit-integrity-review` accepts `disposition`, `issues`, and optional `revise_target`.
 It requires a matching current Reader PASS. `PASS` creates the version-bound Integrity
@@ -352,11 +357,11 @@ but no Research semantic authority, never enters `state.json` / `ResearchRun` or
 remain removable at `workspace/scratch/<run_id>/captures/report/`. Validate the
 published artifact before closing.
 
-`report_session.json` uses schema version 5. Any older Delivery session cannot continue
+`report_session.json` uses schema version 6. Any older Delivery session cannot continue
 as a current certified session because its Brief, Blind Read, and Reader Review lack
-the v0.6 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing semantic
-values are not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis` are not
-migrated or changed.
+the v0.6.1 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing
+semantic values are not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis`
+are not migrated or changed.
 
 ## Wiki projection and publication
 

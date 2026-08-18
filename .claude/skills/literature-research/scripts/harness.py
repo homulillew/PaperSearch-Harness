@@ -431,8 +431,8 @@ def _report_brief(value: Mapping[str, object]) -> ReportBrief:
         audience=_string(value["audience"], "audience"),
         promise=_string(value["promise"], "promise"),
         frame=_string(value["frame"], "frame"),
-        arc=_strings(value["arc"], "arc"),
-        focus=_strings(value["focus"], "focus"),
+        arc=_string(value["arc"], "arc"),
+        focus=_string(value["focus"], "focus"),
     )
 
 
@@ -441,14 +441,11 @@ def _brief_repair_feedback(value: object) -> BriefRepairFeedback:
         raise AdapterInputError("feedback entries must be objects")
     _shape(
         value,
-        required=frozenset({"problem", "resolution_condition"}),
+        required=frozenset({"problem"}),
         optional=frozenset({"location"}),
     )
     return BriefRepairFeedback(
         problem=_string(value["problem"], "feedback.problem"),
-        resolution_condition=_string(
-            value["resolution_condition"], "feedback.resolution_condition"
-        ),
         location=_optional_string(value.get("location"), "feedback.location"),
     )
 
@@ -468,13 +465,12 @@ def _reader_issue(value: object) -> ReaderIssue:
         raise AdapterInputError("blocking_issues entries must be objects")
     _shape(
         value,
-        required=frozenset({"observation", "reader_effect", "why_blocking"}),
+        required=frozenset({"observation", "reader_effect"}),
         optional=frozenset({"location"}),
     )
     return ReaderIssue(
         observation=_string(value["observation"], "observation"),
         reader_effect=_string(value["reader_effect"], "reader_effect"),
-        why_blocking=_string(value["why_blocking"], "why_blocking"),
         location=_optional_string(value.get("location"), "location"),
     )
 
@@ -506,14 +502,10 @@ def _report_review(value: Mapping[str, object]) -> ReportReviewResult:
                 "brief_digest",
                 "manuscript_digest",
                 "repair_target",
-                "rationale",
             }
         ),
-        optional=frozenset({"blocking_issues"}),
+        optional=frozenset({"rationale"}),
     )
-    raw_issues = value.get("blocking_issues", [])
-    if not isinstance(raw_issues, list):
-        raise AdapterInputError("blocking_issues must be an array")
     raw_target = value["repair_target"]
     if raw_target is None:
         target: RepairTarget | None = None
@@ -522,13 +514,18 @@ def _report_review(value: Mapping[str, object]) -> ReportReviewResult:
             target = RepairTarget(_string(raw_target, "repair_target"))
         except ValueError as exc:
             raise AdapterInputError("repair_target is invalid") from exc
+    # rationale is optional and may be empty (a PASS need not carry one).
+    raw_rationale = value.get("rationale", "")
+    if raw_rationale is None:
+        raw_rationale = ""
+    if not isinstance(raw_rationale, str):
+        raise AdapterInputError("rationale must be a string")
     return ReportReviewResult(
         blind_read_digest=_string(value["blind_read_digest"], "blind_read_digest"),
         brief_digest=_string(value["brief_digest"], "brief_digest"),
         manuscript_digest=_string(value["manuscript_digest"], "manuscript_digest"),
         repair_target=target,
-        rationale=_string(value["rationale"], "rationale"),
-        blocking_issues=tuple(_reader_issue(item) for item in raw_issues),
+        rationale=raw_rationale,
     )
 
 

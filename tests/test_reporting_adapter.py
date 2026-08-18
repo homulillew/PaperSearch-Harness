@@ -82,15 +82,15 @@ def _invoke(harness, workspace: Path, *args: str) -> tuple[int, dict[str, object
 
 
 # ---------------------------------------------------------------------------
-# Lean v0.6 payload helpers
+# Lean v0.6.1 payload helpers
 # ---------------------------------------------------------------------------
 #
 # The Report Brief is the lean editorial design: audience, promise, frame,
-# arc, focus. It carries no section list, no heading text, no outline depth,
-# no semantic moves, no material. The Reader issue has no per-issue repair
-# target or resolution condition; the repair target is a Phase 2 top-level
-# decision. Brief repair feedback carries problem / resolution_condition /
-# location and no downstream_effect.
+# arc, focus — all non-empty strings. It carries no section list, no heading
+# text, no outline depth, no semantic moves, no material. The Reader issue
+# has no per-issue repair target or why_blocking; the repair target is a
+# Phase 2 top-level decision. Brief repair feedback carries problem /
+# optional location only (no resolution_condition, no downstream_effect).
 
 
 def _brief(*, promise: str = "explain the result") -> dict[str, object]:
@@ -98,8 +98,8 @@ def _brief(*, promise: str = "explain the result") -> dict[str, object]:
         "audience": "technical reader",
         "promise": promise,
         "frame": "premise and consequence form one causal model",
-        "arc": ("establish the premise", "derive the consequence"),
-        "focus": ("the consequence follows from the premise",),
+        "arc": "establish the premise, then derive the consequence",
+        "focus": "the consequence follows from the premise",
     }
 
 
@@ -113,13 +113,11 @@ def _reader_issue(
     *,
     observation: str = "a key transition is missing",
     reader_effect: str = "the reader cannot connect premise and result",
-    why_blocking: str = "the main conclusion cannot be reconstructed",
     location: str | None = "Result",
 ) -> dict[str, object]:
     issue: dict[str, object] = {
         "observation": observation,
         "reader_effect": reader_effect,
-        "why_blocking": why_blocking,
     }
     if location is not None:
         issue["location"] = location
@@ -131,9 +129,6 @@ def _brief_repair_feedback() -> dict[str, object]:
         "feedback": [
             {
                 "problem": "the current comparison cannot be realized faithfully",
-                "resolution_condition": (
-                    "the Brief supplies a realizable comparison boundary"
-                ),
                 "location": "Result",
             }
         ]
@@ -195,7 +190,6 @@ def _reader_review(
     manuscript_digest: str,
     repair_target: str | None,
     rationale: str,
-    blocking_issues: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     return {
         "blind_read_digest": blind_read_digest,
@@ -203,7 +197,6 @@ def _reader_review(
         "manuscript_digest": manuscript_digest,
         "repair_target": repair_target,
         "rationale": rationale,
-        "blocking_issues": blocking_issues or [],
     }
 
 
@@ -218,12 +211,12 @@ def _reader_pass(
     blind_issues: list[dict[str, object]] | None = None,
     repair_target: str | None = None,
     rationale: str = "the report delivers the promised understanding",
-    reader_issues: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     """Run Phase 1 (blind) then Phase 2 (attribution) and return the envelope.
 
-    v0.6: a PASS is ``repair_target is None`` with no blocking issues. A
-    non-None target requires a non-empty rationale and at least one issue.
+    v0.6.1: a PASS is ``repair_target is None`` (rationale may be empty). A
+    non-None target requires a non-empty rationale. Phase 2 no longer carries
+    blocking_issues; the frozen Blind Read owns the blockers.
     """
 
     blind_path = _input(
@@ -255,7 +248,6 @@ def _reader_pass(
             manuscript_digest=manuscript_digest,
             repair_target=repair_target,
             rationale=rationale,
-            blocking_issues=reader_issues,
         ),
     )
     code, envelope = _invoke(
@@ -409,10 +401,10 @@ def test_harness_has_one_certified_publication_path(tmp_path):
     session = workspace / "runs" / run_id / "delivery" / "report_session.json"
     assert session.is_file()
     session_value = json.loads(session.read_text(encoding="utf-8"))
-    # v0.6 schema migration: schema_version is 5, and the lean Brief carries
+    # v0.6.1 schema: schema_version is 6, and the lean Brief carries
     # only the five editorial fields — no sections, no semantic_moves, no
     # outline_depth, no material.
-    assert session_value["schema_version"] == 5
+    assert session_value["schema_version"] == 6
     assert set(session_value["brief"]) == {
         "audience",
         "promise",
@@ -730,7 +722,7 @@ def test_staged_presentation_preflight_rejects_bad_tokens_and_math(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Schema migration (ADR §5.1: schema v4 → v5 fail-closed)
+# Schema migration (ADR §5.1: older schema → fail-closed rebuild)
 # ---------------------------------------------------------------------------
 
 
@@ -767,7 +759,7 @@ def test_schema_v4_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
     )
     assert code == 0, envelope
     rebuilt = json.loads(session_path.read_text(encoding="utf-8"))
-    assert rebuilt["schema_version"] == 5
+    assert rebuilt["schema_version"] == 6
     assert rebuilt["manuscript"] is None
 
 
@@ -918,7 +910,6 @@ def test_reader_manuscript_blocker_requires_changed_manuscript_and_new_reader(tm
         m_digest,
         repair_target="MANUSCRIPT",
         rationale="a key transition is missing from the manuscript",
-        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
 
@@ -1051,9 +1042,11 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
     repair = construction["result"]["repair"]
     assert repair["previous_brief"]["promise"] == "explain the result"
     assert repair["feedback"] == feedback["feedback"]
-    # v0.6: Brief repair feedback carries no downstream_effect.
+    # v0.6.1: Brief repair feedback carries problem / optional location only
+    # (no downstream_effect, no resolution_condition).
     assert "downstream_effect" not in repair["feedback"][0]
-    assert set(repair["feedback"][0]) == {"problem", "resolution_condition", "location"}
+    assert "resolution_condition" not in repair["feedback"][0]
+    assert set(repair["feedback"][0]) == {"problem", "location"}
 
     same_path = _input(tmp_path, "same-authoring-brief.json", _brief())
     code, _ = _invoke(
@@ -1091,7 +1084,7 @@ def test_authoring_brief_insufficient_round_trips_feedback_without_research_muta
 
     session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
     session = json.loads(session_path.read_text(encoding="utf-8"))
-    assert session["schema_version"] == 5
+    assert session["schema_version"] == 6
     assert session["brief_repair_feedback"] is None
     assert state_path.read_bytes() == state_before
     view_after = _runtime(workspace).delivery.view(run_id)
@@ -1171,7 +1164,6 @@ def test_authoring_brief_insufficient_requires_brief_and_can_supersede_revise(
         m_digest,
         repair_target="MANUSCRIPT",
         rationale="a key transition is missing",
-        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
 
@@ -1207,7 +1199,6 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
         m_digest,
         repair_target="BRIEF",
         rationale="the Brief's arc has a cognitive gap",
-        reader_issues=[_reader_issue()],
     )
     assert blocked["result"]["pending_action"] == "BRIEF_REBUILD_REQUIRED"
 
@@ -1223,8 +1214,9 @@ def test_reader_brief_blocker_requires_changed_brief(tmp_path):
     assert repair["previous_brief"]["promise"] == "explain the result"
     assert repair["feedback"]
     assert repair["feedback"][0]["problem"]
-    assert repair["feedback"][0]["resolution_condition"]
-    # v0.6: no downstream_effect in the projected repair feedback.
+    # v0.6.1: no resolution_condition, no downstream_effect in the projected
+    # repair feedback — problem / optional location only.
+    assert "resolution_condition" not in repair["feedback"][0]
     assert "downstream_effect" not in repair["feedback"][0]
 
     same_path = _input(tmp_path, "same-brief.json", _brief())
@@ -1276,7 +1268,6 @@ def test_manuscript_blocker_does_not_create_brief_repair_context(tmp_path):
         m_digest,
         repair_target="MANUSCRIPT",
         rationale="a key transition is missing",
-        reader_issues=[_reader_issue()],
     )
     code, construction = _invoke(
         harness,
@@ -1480,13 +1471,11 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
     blind_issue = _reader_issue(
         observation="missing bridge between premise and result",
         reader_effect="the reader cannot connect premise and result",
-        why_blocking="the main conclusion cannot be reconstructed",
         location="section 1",
     )
     second_blind_issue = _reader_issue(
         observation="unstable comparison coordinate",
         reader_effect="the reader cannot compare the approaches",
-        why_blocking="the promised synthesis cannot be reconstructed",
         location="section 2",
     )
     blind_path = _input(
@@ -1519,14 +1508,15 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
             / f"blind_review_{m_digest[:12]}.json"
         ).read_text()
     )
-    # v0.6: a ReaderIssue has no per-issue repair_target and no
-    # resolution_condition. Attribution is a Phase 2 top-level decision.
+    # v0.6.1: a ReaderIssue has no per-issue repair_target and no
+    # why_blocking / resolution_condition. Attribution is a Phase 2 top-level
+    # decision; the frozen Blind Read owns the blockers.
     assert "repair_target" not in capture["blocking_issues"][0]
     assert "resolution_condition" not in capture["blocking_issues"][0]
+    assert "why_blocking" not in capture["blocking_issues"][0]
     assert set(capture["blocking_issues"][0]) == {
         "observation",
         "reader_effect",
-        "why_blocking",
         "location",
     }
 
@@ -1591,7 +1581,6 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
             manuscript_digest=m_digest,
             repair_target="MANUSCRIPT",
             rationale="the manuscript must add the missing bridge",
-            blocking_issues=[blind_issue],
         ),
     )
     code, envelope = _invoke(
@@ -1606,6 +1595,111 @@ def test_blind_failures_are_frozen_before_phase2_attribution(tmp_path):
     assert code == 0, envelope
     assert envelope["result"]["stage"] == "READER_BLOCKED"
     assert envelope["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
+
+
+def test_blind_to_phase2_staged_lock_blocks_mutation_until_review(tmp_path):
+    """§1 staged hole: once a Blind Read is frozen (blind_read is not None)
+    and the Phase 2 review has not been submitted (reader_review is None),
+    semantic mutation is blocked until ``submit-reader-review`` completes.
+
+    Concretely: put manuscript → submit blind → put a NEW manuscript must be
+    REJECTED, because the frozen Blind Read was bound to the old manuscript.
+    Only ``submit-reader-review`` (and read-only inspection) may proceed.
+    Implemented with existing session facts — no new persisted stage.
+    """
+    harness = _load_harness()
+    workspace = tmp_path / "workspace"
+    run_id, _, _ = _delivery_run(workspace)
+    b_digest, m_digest = _put_brief_and_manuscript(
+        harness, workspace, tmp_path, run_id
+    )
+
+    # Freeze a Blind Read against the first manuscript.
+    blind_path = _input(
+        tmp_path, "blind.json", _blind_read(m_digest, received_understanding="ok")
+    )
+    code, blind_env = _invoke(
+        harness,
+        workspace,
+        "submit-blind-review",
+        "--run-id",
+        run_id,
+        "--input",
+        str(blind_path),
+    )
+    assert code == 0, blind_env
+
+    # A new manuscript must be rejected while the Phase 2 review is pending.
+    new_manuscript = _input(
+        tmp_path,
+        "new-manuscript.json",
+        _manuscript("# Report\n\n## Result\n\nA different manuscript."),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(new_manuscript),
+    )
+    assert code == 2
+    assert "blind" in envelope["error"]["message"].lower()
+
+    # The staged lock blocks the other mutating commands too. A new Brief is
+    # rejected for the same reason.
+    new_brief = _input(
+        tmp_path, "new-brief.json", _brief(promise="a different promise")
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-brief",
+        "--run-id",
+        run_id,
+        "--input",
+        str(new_brief),
+    )
+    assert code == 2
+    assert "blind" in envelope["error"]["message"].lower()
+
+    # submit-reader-review is the one mutation that IS allowed: it completes
+    # the staged lock.
+    review_path = _input(
+        tmp_path,
+        "reader.json",
+        _reader_review(
+            blind_read_digest=blind_env["result"]["blind_read_digest"],
+            brief_digest=b_digest,
+            manuscript_digest=m_digest,
+            repair_target=None,
+            rationale="the report delivers the promised understanding",
+        ),
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "submit-reader-review",
+        "--run-id",
+        run_id,
+        "--input",
+        str(review_path),
+    )
+    assert code == 0, envelope
+
+    # After the review completes, mutation is allowed again: a new manuscript
+    # is now accepted (it clears the stale blind read for a fresh re-read).
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "put-report-manuscript",
+        "--run-id",
+        run_id,
+        "--input",
+        str(new_manuscript),
+    )
+    assert code == 0, envelope
 
 
 def test_reader_research_target_is_rejected(tmp_path):
@@ -1627,7 +1721,6 @@ def test_reader_research_target_is_rejected(tmp_path):
                 _reader_issue(
                     observation="support may be insufficient",
                     reader_effect="the claim cannot be trusted",
-                    why_blocking="a possible state-level gap",
                 )
             ],
         ),
@@ -1651,13 +1744,6 @@ def test_reader_research_target_is_rejected(tmp_path):
             manuscript_digest=m_digest,
             repair_target="POSSIBLE_RESEARCH_ISSUE",
             rationale="the support may be insufficient",
-            blocking_issues=[
-                _reader_issue(
-                    observation="support may be insufficient",
-                    reader_effect="the claim cannot be trusted",
-                    why_blocking="a possible state-level gap",
-                )
-            ],
         ),
     )
     code, envelope = _invoke(
@@ -1674,10 +1760,11 @@ def test_reader_research_target_is_rejected(tmp_path):
     assert _runtime(workspace).delivery.view(run_id).lifecycle is LifecycleMode.DELIVERY
 
 
-def test_reader_pass_requires_rationale_and_issue_when_target_set(tmp_path):
-    """v0.6: a non-None repair_target requires a non-empty rationale and at
-    least one blocking issue. A target with no rationale or no issues is
-    rejected. PASS (target is None) requires no blocking issues."""
+def test_reader_pass_requires_rationale_when_target_set(tmp_path):
+    """v0.6.1: a non-None repair_target requires a non-empty rationale. Phase 2
+    no longer carries blocking_issues (the frozen Blind Read owns the
+    blockers), so a non-PASS review needs only target + rationale. PASS
+    (target is None) may carry an empty rationale."""
     harness = _load_harness()
     workspace = tmp_path / "workspace"
     run_id, _, _ = _delivery_run(workspace)
@@ -1711,7 +1798,6 @@ def test_reader_pass_requires_rationale_and_issue_when_target_set(tmp_path):
             manuscript_digest=m_digest,
             repair_target="MANUSCRIPT",
             rationale="   ",
-            blocking_issues=[_reader_issue()],
         ),
     )
     code, envelope = _invoke(
@@ -1726,17 +1812,17 @@ def test_reader_pass_requires_rationale_and_issue_when_target_set(tmp_path):
     assert code == 2
     assert "rationale" in envelope["error"]["message"]
 
-    # Target with no blocking issues is rejected.
-    no_issues = _input(
+    # A non-PASS review with a non-empty rationale and NO blocking_issues
+    # is accepted: Phase 2 attributes only; the frozen Blind owns blockers.
+    target_only = _input(
         tmp_path,
-        "no-issues.json",
+        "target-only.json",
         _reader_review(
             blind_read_digest=frozen_digest,
             brief_digest=b_digest,
             manuscript_digest=m_digest,
             repair_target="MANUSCRIPT",
             rationale="a transition is missing",
-            blocking_issues=[],
         ),
     )
     code, envelope = _invoke(
@@ -1746,10 +1832,10 @@ def test_reader_pass_requires_rationale_and_issue_when_target_set(tmp_path):
         "--run-id",
         run_id,
         "--input",
-        str(no_issues),
+        str(target_only),
     )
-    assert code == 2
-    assert "blocking issue" in envelope["error"]["message"]
+    assert code == 0, envelope
+    assert envelope["result"]["pending_action"] == "MANUSCRIPT_REPAIR_REQUIRED"
 
 
 def test_confirmed_research_insufficiency_requires_explicit_reopen(tmp_path):
