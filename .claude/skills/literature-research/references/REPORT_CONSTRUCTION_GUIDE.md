@@ -1,6 +1,6 @@
 # Report Construction Guide
 
-> 版本：v0.6.1
+> 版本：v0.6.2
 > 适用角色：Report Constructor / Editorial Design Authority
 > 目标：把已接受的研究语义编译为可由 Authoring 实现的 Lean Report Brief
 
@@ -28,11 +28,11 @@ URL 或 raw evidence locators。需要细节时，先声明信息需要，再用
 Brief 只表达五个字段：
 
 ```text
-audience   目标读者是谁、带着什么前置知识
-promise    这篇报告向读者承诺建立什么认识
-frame      全文采用的稳定分析框架（比较坐标 / 分类依据）
-arc        认知推进的有序阶段（读者依次经过的主要认识台阶）
-focus      本篇主动聚焦的范围边界（不写什么、不比较什么）
+audience   报告写给谁，可以合理假设什么前置知识
+promise    读者应当从这篇报告获得什么重要认识
+frame      什么解释视角能让中心问题、主要路线及其取舍变得可理解
+arc        读者的认识应当如何从问题大致发展到最终判断
+focus      什么最值得读者关注，什么应当留在背景
 ```
 
 `arc` 与 `focus` 是非空字符串。它们是编辑意图的声明，不是段落计划、

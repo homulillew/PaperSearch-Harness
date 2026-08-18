@@ -1,6 +1,6 @@
 # Report Review Guide
 
-> 版本：v0.6.1
+> 版本：v0.6.2
 > 适用角色：Fresh Reader / Reader Acceptance Gate
 > 目标：验证最终稿是否真正作为面向目标读者的认知载体成立
 > 不负责：研究完成性判断、Research State 修改、Primary Evidence 最终核验、事实修复
@@ -41,12 +41,10 @@ Reviewer 应模拟真实专业读者，而不是逐句寻找问题。正常从�
 推断出某个缺失关系，不代表文章已经把该关系传递给读者——不得用 Reviewer 自身
 知识替正文补桥。
 
-完成阅读后，Reviewer 重建：全文核心认识（这篇报告最终告诉了我什么）、领域
-心智模型、报告实际使用的稳定比较坐标。检查认知连续性（认知跳步、认知重启、
-认知债务、论证孤岛）、论证完整性、材料经济性、信息呈现、专业中文。只有当
-语言问题**实质增加目标读者的认知成本或破坏主要认知交付**，或**实质使交付物
-无法达到要求的专业成品质量**时才报告——孤立的措辞偏好、单句可优化或纯审美
-差异不构成 blocker。
+完成阅读后，Reviewer 记录实际形成的整体理解。只报告**实质阻止报告作为
+成品专业文章成立**，或**实质阻止在合理阅读成本下形成清晰高层理解**的问题。
+孤立的措辞偏好、单句可优化或纯审美差异不构成 blocker。Reviewer 不做
+checklist 式质量审计，也不对文章做逆向分析。
 
 Phase 1 只诊断，不归因：只回答哪里发生了真实理解失败或足以阻止专业成品成立
 的系统性缺陷，不在这一阶段决定 `MANUSCRIPT` / `BRIEF` 修复目标。先诊断，
@@ -54,23 +52,21 @@ Phase 1 只诊断，不归因：只回答哪里发生了真实理解失败或足
 
 ## Phase 2 — Brief Check
 
-Phase 2 在 Blind Read 记录冻结后才接收 `Report Brief`。Phase 2 只接收：冻结的
-Blind Read 结果、Report Brief、Report Review Guide——**不接收 Manuscript，不
-接收 reader surface**。Phase 1 与 Phase 2 使用各自新鲜的 Reviewer instance；
-唯一的桥梁是冻结的 Blind Read 结果。
+Phase 2 在 Blind Read 记录冻结后才接收 `Report Brief` 与 `Contract`。Phase 2
+只接收：冻结的 Blind Read 结果、Report Brief、Contract、Report Review
+Guide——**不接收 Manuscript，不接收 reader surface**。Phase 1 与 Phase 2
+使用各自新鲜的 Reviewer instance；唯一的桥梁是冻结的 Blind Read 结果。
+Contract 让 Phase 2 能发现内部自洽但遗漏了 Contract 要求的交付关注点的
+Brief——这是 Phase 2 归因 `BRIEF` 的依据之一。
 
 Reviewer 不应修改 Phase 1 的原始阅读结论来迎合 Brief。Phase 1 回答“实际读
-到了什么”，Phase 2 回答“这和设计目标有什么差异”。比较 Brief 的
-`promise` / `arc` 与 Blind Read 实际复述结果，比较 Brief 的 `frame` 与 Blind
-Read 实际使用的比较坐标。
+到了什么”，Phase 2 回答“这和设计目标、Contract 要求有什么差异”。
 
 Reviewer 产出单一的顶层 `repair_target`，定位最早错误层：
 
-- `MANUSCRIPT`：一个关键过渡没有写出、某段同时承担多个认知任务、限制条件被
-  正文弱化、Brief 已明确比较坐标但 Authoring 没有贯彻——路由到 Authoring。
-- `BRIEF`：全文没有稳定比较框架、章节设计导致持续认知重启、Brief 的 `arc`
-  本身存在认知跳步、`focus` 错误导致关键认知环节缺失——路由到 Report
-  Constructor。
+- `MANUSCRIPT`：正文未实现 Brief 已声明的意图——路由到 Authoring。
+- `BRIEF`：Brief 本身不足以覆盖 Contract 要求的交付关注点，或与 Blind Read
+  实际形成的理解存在结构性差异——路由到 Report Constructor。
 
 Reader 的 `repair_target` 只有 `MANUSCRIPT | BRIEF`，不归因 `RESEARCH`。如果
 正文需要的认知条件在 Brief 中不存在，归因 `BRIEF`；由能看到 accepted research

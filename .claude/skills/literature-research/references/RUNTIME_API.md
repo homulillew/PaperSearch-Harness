@@ -317,8 +317,11 @@ returns `blind_read_digest`.
 
 `submit-reader-review` accepts the returned `blind_read_digest`, current `brief_digest`,
 current `manuscript_digest`, a top-level `repair_target` (`MANUSCRIPT`, `BRIEF`, or
-`null`), and a `rationale` (which may be empty for a PASS). Phase 2 carries no
-`blocking_issues` — the frozen Blind Read owns the blockers. A mismatched Blind digest
+`null`), and a `rationale` (which may be empty for a PASS). Phase 2 receives the
+frozen Blind Read result, the current Brief, the Contract, and the review guide —
+it does not receive the manuscript or reader surface. The Contract lets Phase 2
+detect a Brief that is internally coherent but omits a required delivery concern.
+Phase 2 carries no `blocking_issues` — the frozen Blind Read owns the blockers. A mismatched Blind digest
 is rejected. `repair_target = null` is a Reader PASS (rationale may be empty); a non-null
 `repair_target` requires a non-empty `rationale`. If the frozen Blind Read has blockers,
 Phase 2 cannot PASS: the guard examines the frozen Blind Read, not a Phase-2 issue
@@ -359,7 +362,7 @@ published artifact before closing.
 
 `report_session.json` uses schema version 6. Any older Delivery session cannot continue
 as a current certified session because its Brief, Blind Read, and Reader Review lack
-the v0.6.1 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing
+the v0.6 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing
 semantic values are not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis`
 are not migrated or changed.
 

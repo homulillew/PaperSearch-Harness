@@ -359,11 +359,13 @@ class FakeReviewer:
         self,
         blind_read,
         brief,
+        contract,
         review_guide,
     ):
         record = {
             "blind_read": blind_read,
             "brief": brief,
+            "contract": contract,
             "review_guide": review_guide,
         }
         self.check_calls.append(record)
@@ -749,6 +751,85 @@ class TestReportOutlineFidelity:
         assert "audience" in guide
         assert "promise" in guide
 
+    def test_review_guide_no_production_quality_ontology(self):
+        # §3/§6-D: the review guide must not carry the v0.5 production quality
+        # ontology (cognitive-jump/restart/debt, argument island, material
+        # economy, domain mental model, stable comparison coordinates). Assert
+        # the structural contract only — the deleted terms are gone.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_REVIEW_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        for removed in (
+            "认知跳步",
+            "认知重启",
+            "认知债务",
+            "论证孤岛",
+            "材料经济性",
+            "领域心智模型",
+            "稳定比较坐标",
+            "论证完整性",
+        ):
+            assert removed not in guide, f"review guide still references {removed}"
+
+    def test_review_guide_phase2_names_contract(self):
+        # §1/§6-D: the review guide must state Phase 2 receives the Contract.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_REVIEW_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        assert "Contract" in guide
+        assert "Phase 2" in guide
+
+    def test_construction_guide_does_not_nudge_structured_lists(self):
+        # §2/§6-D: the construction guide must not describe frame as comparison
+        # coordinates / taxonomy, arc as a stage list / section order, or focus
+        # as an exclusion checklist. Assert the structural contract only.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_CONSTRUCTION_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        for removed in (
+            "比较坐标",
+            "分类依据",
+            "有序阶段",
+            "认知台阶",
+            "不写什么",
+            "不比较什么",
+        ):
+            assert removed not in guide, f"construction guide still references {removed}"
+
+    def test_skill_does_not_claim_authoring_context_carries_paper_identity(self):
+        # §4/§6-D: SKILL must not claim ReportAuthoringContext carries paper
+        # identity or title. Concrete paper/source detail comes through
+        # targeted delivery-inspect / delivery-read-source.
+        skill = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        # The old claim that the authoring context "carries paper identity and
+        # title" must be gone.
+        assert "carries paper identity" not in skill
+        # The corrected rule: AuthoringContext exposes high-level semantics
+        # only; concrete detail comes via delivery-inspect / delivery-read-source.
+        assert "delivery-inspect" in skill
+        assert "delivery-read-source" in skill
+
 
 # ===========================================================================
 # Blind Reader boundary (invariants 5-9)
@@ -937,6 +1018,7 @@ class TestBlindReaderBoundary:
                 self,
                 blind_read,
                 brief,
+                contract,
                 review_guide,
             ):
                 return ReportReviewResult(
@@ -1692,13 +1774,16 @@ class TestAdditionalInvariants:
         assert context.findings[0].ref == "finding_f1"
         assert context.open_gaps[0].ref == "gap_g1"
 
-    def test_phase2_brief_check_receives_no_manuscript_or_reader_surface(self):
-        # §2/§3 isolation boundary: Phase 1 (blind_read) receives the rendered
-        # reader surface (citations resolved, no raw {{cite}} markup). Phase 2
-        # (brief_check) receives ONLY the frozen Blind Read + Brief + review
-        # guide — no manuscript, no reader surface, no manuscript digest beyond
-        # what the frozen Blind Read already carries.
-        caps = FakeDeliveryCapabilities(_make_view())
+    def test_phase2_brief_check_receives_contract_not_manuscript(self):
+        # §1/§2/§3 boundary: Phase 1 (blind_read) receives the rendered reader
+        # surface (citations resolved, no raw {{cite}} markup). Phase 2
+        # (brief_check) receives ONLY the frozen Blind Read + Brief + Contract
+        # + review guide — no manuscript, no reader surface, no manuscript
+        # digest beyond what the frozen Blind Read already carries. The
+        # Contract lets Phase 2 detect a Brief that omits a required delivery
+        # concern; it is not a manuscript-derived representation.
+        view = _make_view()
+        caps = FakeDeliveryCapabilities(view)
         factory = CountingReviewerFactory(FakeReviewer)
         pipeline = _build_pipeline(
             caps,
@@ -1720,10 +1805,19 @@ class TestAdditionalInvariants:
         assert phase2.blind_calls == []
         assert len(phase2.check_calls) == 1
         check_call = phase2.check_calls[0]
-        assert set(check_call.keys()) == {"blind_read", "brief", "review_guide"}
+        # §1: Phase 2 receives blind_read + brief + contract + review_guide.
+        assert set(check_call.keys()) == {
+            "blind_read",
+            "brief",
+            "contract",
+            "review_guide",
+        }
         assert "reader_surface" not in check_call
         assert "manuscript" not in check_call
         assert "manuscript_digest" not in check_call
+        # The Contract is the view's contract (the delivery requirements), not
+        # a manuscript-derived representation.
+        assert check_call["contract"] is view.contract
 
     def test_capture_sink_is_noop_by_default_and_never_authority(self):
         # The default capture sink discards; captures never enter ResearchRun.

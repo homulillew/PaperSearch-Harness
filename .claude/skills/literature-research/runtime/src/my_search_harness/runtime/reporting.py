@@ -44,6 +44,7 @@ from my_search_harness.domain.model import DeliveryBasis, SourceLocator
 
 from .capabilities import DeliveryCapabilities
 from .context import (
+    ContractContext,
     DeliveryView,
     InspectResult,
     ReportAuthoringContext,
@@ -507,11 +508,13 @@ class ReportReviewer(Protocol):
 
     Phase 1 (Blind Read) receives deliverable/audience/review guide/reader
     surface/manuscript digest — never the Brief or Writing Guide. Phase 2
-    (Brief Check) receives only the frozen Blind Read result plus the Brief
-    and the review guide — never the manuscript or reader surface. The
-    runtime runs each phase on a fresh instance so Phase 2 cannot confirm
-    "I see you fixed what I asked" instead of re-reading cold; the only
-    bridge between the two phases is the frozen Blind Read result.
+    (Brief Check) receives the frozen Blind Read result, the Brief, the
+    Contract, and the review guide — never the manuscript or reader surface.
+    The Contract lets Phase 2 detect a Brief that is internally coherent but
+    omits a required delivery concern. The runtime runs each phase on a fresh
+    instance so Phase 2 cannot confirm "I see you fixed what I asked" instead
+    of re-reading cold; the only bridge between the two phases is the frozen
+    Blind Read result.
     """
 
     def blind_read(
@@ -527,6 +530,7 @@ class ReportReviewer(Protocol):
         self,
         blind_read: BlindReadResult,
         brief: ReportBrief,
+        contract: ContractContext,
         review_guide: str,
     ) -> ReportReviewResult: ...
 
@@ -891,11 +895,14 @@ class ReportPipeline:
         )
         # Phase 2 — Brief Check. Only after Phase 1 is frozen. Fresh instance:
         # the only bridge to Phase 1 is the frozen Blind Read result. Phase 2
-        # receives NO manuscript and NO reader surface.
+        # receives NO manuscript and NO reader surface. It receives the
+        # Contract so it can detect a Brief that is internally coherent but
+        # omits a required delivery concern.
         phase2 = self._reviewer_factory.create()
         result = phase2.brief_check(
             blind_read=blind,
             brief=brief,
+            contract=view.contract,
             review_guide=self._review_guide,
         )
         b_digest = brief_digest(brief)

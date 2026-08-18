@@ -7,6 +7,8 @@ import io
 import json
 from pathlib import Path
 
+import pytest
+
 from my_search_harness.domain.model import (
     ArtifactKind,
     CompletionVerdict,
@@ -726,14 +728,22 @@ def test_staged_presentation_preflight_rejects_bad_tokens_and_math(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_schema_v4_requires_brief_rebuild_and_put_brief_rebuilds(tmp_path):
+@pytest.mark.parametrize("old_version", [4, 5])
+def test_schema_older_version_requires_brief_rebuild_and_put_brief_rebuilds(
+    tmp_path, old_version
+):
+    # §5: every schema version below 6 must fail closed with the older-schema
+    # error and rebuild to a schema-6 session via put-report-brief. Schema 5
+    # is the direct predecessor of 6; a v5 session stores arc/focus as arrays
+    # and carries why_blocking/blocking_issues/resolution_condition, so the
+    # strict v6 deserializers cannot silently reuse it.
     harness = _load_harness()
     workspace = tmp_path / "workspace"
     run_id, _, _ = _delivery_run(workspace)
     _put_brief_and_manuscript(harness, workspace, tmp_path, run_id)
     session_path = workspace / "runs" / run_id / "delivery" / "report_session.json"
     session = json.loads(session_path.read_text(encoding="utf-8"))
-    session["schema_version"] = 4
+    session["schema_version"] = old_version
     session_path.write_text(json.dumps(session), encoding="utf-8")
 
     code, envelope = _invoke(

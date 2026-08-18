@@ -473,7 +473,7 @@ ReportConstructionContext → Report Constructor → Lean Report Brief
                        — NO Brief, NO Writing Guide
    → frozen BlindReadResult (received_understanding + manuscript_digest
                              + blocking_issues as ReaderIssue; no repair target)
-   Phase 2 Brief Check: frozen blind_read + Brief + review guide
+   Phase 2 Brief Check: frozen blind_read + Brief + Contract + review guide
                         — NO manuscript, NO reader surface (fresh instance)
    → ReportReviewResult{repair_target, rationale}
    ├─ repair_target = None  → Reader PASS (brief_digest + manuscript_digest)
@@ -493,7 +493,9 @@ re-reads cold against the frozen Blind and cannot confirm "you fixed what I
 asked." Phase 1 is frozen before Phase 2 sees the Brief; the only bridge
 between the two phases is the frozen Blind Read result. Phase 2 must not
 rewrite or reinterpret the blind read, and receives no manuscript or reader
-surface. The Reader makes a single decision: `repair_target` is top-level on
+surface. Phase 2 does receive the Contract, so it can detect a Brief that is
+internally coherent but omits a required delivery concern. The Reader makes a
+single decision: `repair_target` is top-level on
 `ReportReviewResult`, not per-issue. Reader targets are only
 `MANUSCRIPT | BRIEF`; BRIEF wins when both occur. Python routes mechanically
 and does not rank semantic quality.
@@ -587,13 +589,18 @@ When the report first formally introduces a named method/system whose retained
 primary paper has canonical navigation, Authoring should emit
 `{{paper:citation_id|Method Name}}` beside the corresponding structured
 citation. The deterministic Presentation renderer resolves the paper to its
-canonical URL; Authoring's narrow authoring context carries paper identity and
-title, not URLs. When no navigation token is present, Presentation links the
-first rendered citation instead; Python does not guess whether prose names a
-method, and ordinary citations are not required to carry method-navigation
-tokens. Authoring must not copy URLs or hand-build the bibliography. Navigation
-never replaces a structured citation close to the technical judgment it
-supports.
+canonical URL; URLs remain Presentation/runtime-owned and Authoring must not
+hand-build them. `ReportAuthoringContext` exposes accepted high-level
+semantics only — it deliberately does not carry paper inventory, paper
+identity, title, or representative paper refs. When Authoring needs a concrete
+paper identity, title, exact number, experiment condition, equation, or
+source detail, it obtains it through targeted `delivery-inspect` /
+`delivery-read-source`, not from the authoring context. When no navigation
+token is present, Presentation links the first rendered citation instead;
+Python does not guess whether prose names a method, and ordinary citations
+are not required to carry method-navigation tokens. Authoring must not copy
+URLs or hand-build the bibliography. Navigation never replaces a structured
+citation close to the technical judgment it supports.
 
 Paragraph rhythm, natural Chinese, terminology, title density, and appropriate
 table use are semantic editorial criteria. Do not ask the Harness to encode
