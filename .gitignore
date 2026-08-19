@@ -42,6 +42,13 @@ coverage.xml
 # --- Jupyter ---
 .ipynb_checkpoints/
 
+# --- Node ---
+# The math renderability preflight installs MathJax under
+# runtime/src/my_search_harness/runtime/math/node_modules via setup.py
+# (mirroring the Skill-local Python .venv). It is never committed; the
+# packager also excludes it.
+node_modules/
+
 # --- IDE / Editor ---
 .idea/
 .vscode/

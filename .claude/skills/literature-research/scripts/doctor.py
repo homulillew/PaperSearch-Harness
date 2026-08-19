@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -68,6 +69,28 @@ def _workspace_writable(workspace: Path) -> bool:
         return False
 
 
+def _math_renderer_status(skill: Path) -> dict[str, object]:
+    """Probe the MathJax validator used by the math renderability preflight."""
+    math_dir = (
+        skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
+    )
+    validator = math_dir / "validate.js"
+    node = shutil.which("node")
+    node_ok = node is not None
+    script_ok = validator.is_file()
+    mathjax_ok = (math_dir / "node_modules" / "mathjax-full").is_dir()
+    # The renderer is usable only when all three are present. When math is
+    # absent from a manuscript the preflight short-circuits, but the doctor
+    # still reports full readiness so operators know the dependency is healthy.
+    ok = bool(node_ok and script_ok and mathjax_ok)
+    return {
+        "ok": ok,
+        "node": node_ok,
+        "script": script_ok,
+        "mathjax": mathjax_ok,
+    }
+
+
 def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
     skill = _skill_dir() if skill is None else skill
     _bootstrap_runtime(skill)
@@ -111,6 +134,7 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
             "exists": reference_results["RESEARCH_INTEGRITY_GUIDE.md"]
         },
         "references": reference_results,
+        "math_renderer": _math_renderer_status(skill),
     }
     ok = (
         checks["python"]["ok"]  # type: ignore[index]
@@ -119,6 +143,7 @@ def run_checks(workspace: Path, skill: Path | None = None) -> dict[str, object]:
         and checks["deepxiv_token"]["present"]  # type: ignore[index]
         and checks["workspace"]["writable"]  # type: ignore[index]
         and all(reference_results.values())
+        and checks["math_renderer"]["ok"]  # type: ignore[index]
     )
     return {"healthy": bool(ok), "checks": checks}
 

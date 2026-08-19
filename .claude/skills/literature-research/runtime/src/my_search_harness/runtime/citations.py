@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 from my_search_harness.domain.model import SourceLocator
 
+from . import math_preflight
 from .context import DeliveryView, PaperIndexEntry
 from .reporting import CitationReference, ReportManuscript
 
@@ -70,6 +71,7 @@ class DeterministicCitationRenderer:
                 "bibliography must be produced by deterministic citation rendering"
             )
         self._validate_presentation_structure(manuscript.markdown)
+        self._validate_math_renderability(manuscript.markdown)
         if not isinstance(manuscript.citations, tuple):
             raise CitationValidationError("citations must be a tuple")
 
@@ -268,6 +270,29 @@ class DeterministicCitationRenderer:
                 raise CitationValidationError(
                     f"report contains unmatched {label} math delimiters"
                 )
+
+    @staticmethod
+    def _validate_math_renderability(markdown: str) -> None:
+        """Reject math the target renderer cannot render.
+
+        Delegates to the real MathJax renderer (via :mod:`math_preflight`) so
+        that a manuscript cannot reach the Reader or publication with TeX the
+        renderer rejects. This is mechanical renderability only — it never
+        judges mathematical meaning, style, or fidelity, and never rewrites
+        prose. Manuscripts without math spans short-circuit (no renderer call).
+        """
+
+        try:
+            rejections = math_preflight.renderability_report(markdown)
+        except math_preflight.MathRendererUnavailable as err:
+            raise CitationValidationError(str(err)) from err
+        if rejections:
+            raise CitationValidationError(
+                "report contains math the target renderer rejects: "
+                + "; ".join(
+                    f"{r.expression!r} ({r.error})" for r in rejections
+                )
+            )
 
     @staticmethod
     def _markdown_link_destination(value: str) -> str:

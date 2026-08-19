@@ -910,8 +910,194 @@ class TestReportOutlineFidelity:
 
 
 # ===========================================================================
+# Math renderability preflight (mechanical TeX renderability only)
+# ===========================================================================
+
+
+def _math_renderer_available() -> bool:
+    """True when the real MathJax validator is installed and runnable.
+
+    Renderer-exercising tests are skipped in node-less environments so the
+    suite stays green there; locally the renderer is installed and these run
+    against the real MathJax.
+    """
+    from my_search_harness.runtime import math_preflight
+
+    available, _ = math_preflight._renderer_available()
+    return available
+
+
+@pytest.fixture()
+def _math_view():
+    return _make_view()
+
+
+class TestMathRenderabilityPreflight:
+    """Pin only the expressions the real renderer deterministically rejects.
+
+    Per the spec, every case here was first verified against the actual
+    MathJax renderer. Borderline-but-valid notation (``R^(\\lambda)``,
+    ``x^10``, ``A_tree``) is asserted to PASS — the preflight must not add
+    semantic LaTeX lint. Math inside code is ignored. Validation runs before
+    the Reader.
+    """
+
+    @pytest.mark.skipif(
+        not _math_renderer_available(), reason="MathJax renderer not installed"
+    )
+    def test_preflight_accepts_valid_and_borderline_expressions(self, _math_view):
+        # These are syntactically valid TeX the renderer accepts — including
+        # borderline notation the spec forbids rejecting.
+        markdown = (
+            "# Report\n\n## Section 1\n\nbody {{cite:c1}}\n\n"
+            "$R^{(\\lambda)}$ and $x^10$ and $A_tree$ and "
+            "$$\\begin{matrix}a & b \\\\ c & d \\end{matrix}$$ and "
+            "$\\frac{a}{b}$ and $\\alpha + \\beta$."
+        )
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        # Must not raise: every expression is renderable.
+        DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+    @pytest.mark.skipif(
+        not _math_renderer_available(), reason="MathJax renderer not installed"
+    )
+    @pytest.mark.parametrize(
+        "markdown, message",
+        [
+            # The observed E2E failure: ^_ with no braces.
+            (
+                "# Report\n\n## S\n\n{{cite:c1}}\n\n$$A^_tree=A^_Intra+A^_Inter$$",
+                "open brace",
+            ),
+            # Dangling superscript with no argument.
+            (
+                "# Report\n\n## S\n\n{{cite:c1}}\n\n$x^$",
+                "superscript",
+            ),
+            # \frac missing its second argument.
+            (
+                "# Report\n\n## S\n\n{{cite:c1}}\n\n$\\frac{a}$",
+                "frac",
+            ),
+            # Unclosed group inside math.
+            (
+                "# Report\n\n## S\n\n{{cite:c1}}\n\n$\\frac{a}{b$",
+                "close brace",
+            ),
+        ],
+    )
+    def test_preflight_rejects_renderer_rejected_math(
+        self, _math_view, markdown, message
+    ):
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        with pytest.raises(CitationValidationError, match=message):
+            DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+    def test_preflight_ignores_math_inside_fenced_code(self, _math_view):
+        # Math inside a fenced code block is verbatim prose, not rendered math.
+        markdown = (
+            "# Report\n\n## S\n\n{{cite:c1}}\n\n"
+            "```text\n$A^_tree=A^_Intra+A^_Inter$\n```\n"
+            "after the block."
+        )
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        # Even with the renderer unavailable this must pass: no math was
+        # extracted, so no renderer call is made.
+        DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+    def test_preflight_ignores_math_inside_inline_code(self, _math_view):
+        markdown = (
+            "# Report\n\n## S\n\n{{cite:c1}}\n\n"
+            "see `$x^$` in the snippet."
+        )
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+    @pytest.mark.skipif(
+        not _math_renderer_available(), reason="MathJax renderer not installed"
+    )
+    def test_preflight_reports_only_the_bad_expression(self, _math_view):
+        # One valid and one invalid expression in the same manuscript: the
+        # rejection names the invalid one, not the valid one.
+        markdown = (
+            "# Report\n\n## S\n\n{{cite:c1}}\n\n"
+            "$\\frac{a}{b}$ is fine but $x^$ is not."
+        )
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        with pytest.raises(CitationValidationError) as exc:
+            DeterministicCitationRenderer().audit(_math_view, manuscript)
+        message = str(exc.value)
+        assert "x^" in message
+        assert "\\frac{a}{b}" not in message
+
+    def test_preflight_skips_when_no_math(self, _math_view, monkeypatch):
+        # A math-free manuscript must short-circuit: no Node subprocess is
+        # spawned. We assert this by patching the subprocess call to fail
+        # loudly if it were ever invoked.
+        from my_search_harness.runtime import math_preflight
+
+        def _explode(*args, **kwargs):
+            raise AssertionError("renderer must not be called for math-free text")
+
+        monkeypatch.setattr(math_preflight.subprocess, "run", _explode)
+        markdown = "# Report\n\n## Section 1\n\nbody {{cite:c1}} with no math."
+        manuscript = ReportManuscript(
+            markdown=markdown,
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+    @pytest.mark.skipif(
+        not _math_renderer_available(), reason="MathJax renderer not installed"
+    )
+    def test_pipeline_rejects_bad_math_before_reader(self, _math_view):
+        # The real renderer is injected into the pipeline. A bad-math
+        # manuscript must be rejected in _reader_surface (which calls
+        # render -> audit) BEFORE the Reader is ever consulted. We drive
+        # _fresh_review directly because _write_then_review authors its own
+        # manuscript; the point is that the Presentation boundary fires
+        # before any reviewer is created.
+        caps = FakeDeliveryCapabilities(_make_view())
+        reviewer_factory = CountingReviewerFactory(FakeReviewer)
+        pipeline = _build_pipeline(
+            caps,
+            reviewer_factory=reviewer_factory,
+            citation_renderer=DeterministicCitationRenderer(),
+        )
+        brief = _valid_brief()
+        manuscript = ReportManuscript(
+            markdown=(
+                "# Report\n\n## Section 1\n\nbody {{cite:c1}}\n\n"
+                "$$A^_tree=A^_Intra+A^_Inter$$"
+            ),
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        with pytest.raises(CitationValidationError):
+            pipeline._fresh_review("run-1", _make_view(), brief, manuscript)
+        # The Reader must never have been consulted: _reader_surface throws
+        # before the first reviewer is created.
+        assert len(reviewer_factory.created) == 0
+
+
+# ===========================================================================
 # Blind Reader boundary (invariants 5-9)
 # ===========================================================================
+
 
 
 class TestBlindReaderBoundary:

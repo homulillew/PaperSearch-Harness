@@ -1,0 +1,10 @@
+{
+  "name": "literature-research-math-validator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mechanical TeX renderability preflight for report manuscripts. Loads MathJax once and validates a batch of expressions against the target renderer.",
+  "license": "SEE LICENSE IN ../../../../../../LICENSE",
+  "dependencies": {
+    "mathjax-full": "3.2.1"
+  }
+}

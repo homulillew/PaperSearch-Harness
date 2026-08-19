@@ -38,7 +38,8 @@ Authoring **不得**：改变 Brief 的 audience / promise / frame；偏离 `arc
 Research 流程——不出现 coverage / confidence score、agent iteration、search
 round history、内部 refs。引用落在实际证据位置；citation token 与
 bibliography 由确定性 Presentation 统一解析，不要手写 References。时间敏感
-表述结合本次检索截止日与 scope，不写死在本 Guide 中。
+表述结合本次检索截止日与 scope，不写死在本 Guide 中。数学表达式使用目标
+渲染器可接受的标准 TeX；无法渲染的 TeX 在读者审查前被拒绝。
 
 ## 文风
 
