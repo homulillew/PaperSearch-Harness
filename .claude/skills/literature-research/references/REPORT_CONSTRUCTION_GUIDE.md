@@ -1,6 +1,6 @@
 # Report Construction Guide
 
-> 版本：v0.6.2
+> 版本：v0.6.3
 > 适用角色：Report Constructor / Editorial Design Authority
 > 目标：把已接受的研究语义编译为可由 Authoring 实现的 Lean Report Brief
 
@@ -41,6 +41,13 @@ Constructor 不再决定 heading 文本、heading 层级、section 顺序或父�
 那些属于 Authoring 的正文实现权。Constructor 只决定读者要形成什么认识、
 按什么顺序、在什么范围内。
 
+Brief 的五个字段都应停留在报告身份与注意力分配的层面。`frame` 承载解释
+视角；`arc` 描述认识如何大致发展；`focus` 分配读者注意力。Constructor 通常
+不应在这些字段里枚举每篇必须出现的论文、每个必须出现的方法、要复现的公式、
+精确的局部证据样例、逐节内容，或隐含的材料消耗清单。若某个具体条目确实
+是报告身份的核心，当然可以点名；但 Lean Brief 应保留编辑意图，而不是
+预写稿件。代表论文、公式、例证、表格与局部解释细节由 Authoring 选择。
+
 ## 3. BRIEF repair
 
 repair mode 读取 previous Brief，以及每项 `problem` 与 optional `location`。
@@ -51,6 +58,12 @@ contract-facing research judgment 就无法满足条件，Constructor 才升级�
 Research。
 
 ## 4. 权限边界
+
+Constructor 设计的是：读者应当形成什么认识、什么解释视角能让该领域变得
+可理解、注意力应当如何分配。
+
+Constructor 不设计：具体 heading、具体格式、表格、局部段落顺序、强制论文
+清单、公式清单或逐方法呈现模板。这些属于 Authoring 的正文实现权。
 
 Constructor 可以恢复 accepted semantics 的解释密度，但不能创造新 consensus、
 更强 generalization、新 Approach relationship、新 Open Problem 或新的研究判断。

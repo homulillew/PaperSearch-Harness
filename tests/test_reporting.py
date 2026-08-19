@@ -811,6 +811,84 @@ class TestReportOutlineFidelity:
         ):
             assert removed not in guide, f"construction guide still references {removed}"
 
+    def test_writing_guide_owns_presentation_form_and_idea_before_paper(self):
+        # v0.6.3 authoring calibration: the writing guide must (a) make
+        # Authoring own the prose/list/table choice based on information shape,
+        # and (b) carry the idea-before-paper principle. Assert the structural
+        # contract only — not a specific formulation, example, or column set.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_WRITING_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        # Authoring owns presentation-form choice; paragraphs are not the default.
+        assert "表格" in guide
+        assert "列表" in guide
+        # The idea-before-paper principle is present (in either phrasing).
+        assert "论文应当例示解释" in guide or "论文应当实例化" in guide
+
+    def test_writing_guide_has_no_mandatory_format_counts_or_fixed_template(self):
+        # v0.6.3: the authoring calibration must not reintroduce mandatory
+        # table/list counts as POSITIVE requirements. Negated mentions (e.g.
+        # "不要求每节必有表格") are the desired anti-checklist stance and are
+        # not matched here; only unambiguous positive-mandate phrasings count.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_WRITING_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        for removed in (
+            "至少一个表格",
+            "至少一张表",
+            "至少 N 个列表",
+        ):
+            assert removed not in guide, f"writing guide reintroduced {removed}"
+
+    def test_construction_guide_does_not_own_headings_or_paper_inventory(self):
+        # v0.6.3: Constructor designs understanding and attention allocation,
+        # not exact headings / tables / paper inventory / formula inventory.
+        # Assert the structural contract only — not a specific formulation.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_CONSTRUCTION_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        # The charter names what Constructor does NOT design.
+        assert "heading" in guide.lower()
+        assert "表格" in guide
+        # The lean-brief-as-checklist anti-pattern is explicitly discouraged.
+        assert "预写稿件" in guide or "材料消耗清单" in guide
+
+    def test_reader_guide_authority_unchanged_by_authoring_calibration(self):
+        # v0.6.3: the authoring calibration is upstream of the Reader. The
+        # review guide must NOT gain checks for AI-like headings, missing
+        # tables, method-first exposition, or paragraph density. Assert these
+        # enforcement concepts stay absent from the review guide.
+        guide = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "REPORT_REVIEW_GUIDE.md"
+        ).read_text(encoding="utf-8")
+        for removed in (
+            "AI 措辞检测",
+            "missing table",
+            "method-first",
+            "段落密度",
+        ):
+            assert removed not in guide, f"review guide gained style check {removed}"
+
     def test_skill_does_not_claim_authoring_context_carries_paper_identity(self):
         # §4/§6-D: SKILL must not claim ReportAuthoringContext carries paper
         # identity or title. Concrete paper/source detail comes through
