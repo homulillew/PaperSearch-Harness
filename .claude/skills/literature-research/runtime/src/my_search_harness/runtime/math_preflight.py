@@ -109,15 +109,17 @@ def _strip_code_and_fences(markdown: str) -> str:
     return prose
 
 
-def _extract_dollar_spans(prose: str) -> list[str]:
+def _extract_dollar_spans(prose: str) -> list[tuple[int, str]]:
     """Extract the inner TeX from $...$ and $$...$$ spans in prose.
 
     Display ($$) delimiters are paired first, then inline ($) delimiters over
     the residue, so a display span is never mis-split into two inline spans.
-    Escaped delimiters (\\$) are ignored.
+    Escaped delimiters (\\$) are ignored. Each result is ``(start, inner)`` —
+    the start position of the opening delimiter — so callers can merge
+    results from other delimiter families into true document order.
     """
 
-    expressions: list[str] = []
+    found: list[tuple[int, str]] = []
 
     def _pair(delimiter: str) -> list[tuple[int, int]]:
         spans: list[tuple[int, int]] = []
@@ -143,7 +145,7 @@ def _extract_dollar_spans(prose: str) -> list[str]:
     for start, end in display_spans:
         inner_start = start + 2
         inner_end = end
-        expressions.append(prose[inner_start:inner_end].strip())
+        found.append((start, prose[inner_start:inner_end].strip()))
         consumed.append((start, end + 2))
 
     # Inline $ spans, skipping any range overlapped by a display span.
@@ -169,31 +171,34 @@ def _extract_dollar_spans(prose: str) -> list[str]:
         if any(s <= end < e for s, e in consumed):
             pos = start + 1
             continue
-        expressions.append(prose[start + 1 : end].strip())
+        found.append((start, prose[start + 1 : end].strip()))
         pos = end + 1
 
-    return expressions
+    return found
 
 
 def extract_math_expressions(markdown: str) -> list[str]:
     """Extract the TeX content of every math span in ``markdown``.
 
     Covers ``$...$``, ``$$...$$``, ``\\(...\\)``, and ``\\[...\\]``. Math inside
-    fenced code blocks or inline code spans is ignored. The order is
-    document order; duplicates are preserved (the same expression may appear
-    more than once in a manuscript and each occurrence is validated).
+    fenced code blocks or inline code spans is ignored. Results are in true
+    document order (the start position of each span), even when delimiter
+    families are mixed; duplicates are preserved (the same expression may
+    appear more than once in a manuscript and each occurrence is validated).
     """
 
     prose = _strip_code_and_fences(markdown)
-    expressions: list[str] = []
-    expressions.extend(_extract_dollar_spans(prose))
-    expressions.extend(
-        match.group(1).strip() for match in _PAREN_INLINE.finditer(prose)
-    )
-    expressions.extend(
-        match.group(1).strip() for match in _BRACKET_DISPLAY.finditer(prose)
-    )
-    return [expr for expr in expressions if expr]
+    # Each family records (start_position, inner_tex). Merging by start
+    # position yields document order regardless of which delimiter family
+    # appears first in the prose.
+    found: list[tuple[int, str]] = []
+    found.extend(_extract_dollar_spans(prose))
+    for match in _PAREN_INLINE.finditer(prose):
+        found.append((match.start(), match.group(1).strip()))
+    for match in _BRACKET_DISPLAY.finditer(prose):
+        found.append((match.start(), match.group(1).strip()))
+    found.sort(key=lambda item: item[0])
+    return [expr for _pos, expr in found if expr]
 
 
 def _renderer_available() -> tuple[bool, str]:

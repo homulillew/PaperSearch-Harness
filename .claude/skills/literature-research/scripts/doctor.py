@@ -74,20 +74,25 @@ def _math_renderer_status(skill: Path) -> dict[str, object]:
     math_dir = (
         skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
     )
+    package_json = math_dir / "package.json"
     validator = math_dir / "validate.js"
     node = shutil.which("node")
     node_ok = node is not None
+    package_ok = package_json.is_file()
     script_ok = validator.is_file()
     mathjax_ok = (math_dir / "node_modules" / "mathjax-full").is_dir()
-    # The configured MathJax renderer is usable only when all three are
+    # The configured MathJax renderer is usable only when all components are
     # present. A manuscript without math short-circuits the preflight, but the
     # renderer is still a required dependency of a fully ready installation:
-    # the doctor reports unhealthy when it is missing, so operators know the
-    # math renderability preflight cannot certify math-bearing manuscripts.
-    ok = bool(node_ok and script_ok and mathjax_ok)
+    # the doctor reports unhealthy when it is missing (node, the bundled
+    # package.json/validate.js assets, or the installed mathjax-full), so
+    # operators know the math renderability preflight cannot certify
+    # math-bearing manuscripts. This mirrors setup.py's fail-closed contract.
+    ok = bool(node_ok and package_ok and script_ok and mathjax_ok)
     return {
         "ok": ok,
         "node": node_ok,
+        "package": package_ok,
         "script": script_ok,
         "mathjax": mathjax_ok,
     }

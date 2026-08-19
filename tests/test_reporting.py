@@ -1278,6 +1278,137 @@ class TestMathPreflightSupportedSurface:
         assert math_preflight.extract_math_expressions("plain prose, no math at all") == []
 
 
+class TestMathPreflightDocumentOrder:
+    """Mixed delimiter families must be returned in true document order.
+
+    The extractor gathers each delimiter family separately, so without
+    position-aware merging, ``\\(a\\) then $b$`` would surface as
+    ``["b", "a"]``. These tests pin that every supported form is ordered by
+    the start position of its opening delimiter, regardless of family.
+    """
+
+    def test_paren_before_dollar_is_document_order(self):
+        # \(a\) then $b$ -> ["a", "b"], not ["b", "a"].
+        assert math_preflight.extract_math_expressions(r"\(a\) then $b$") == ["a", "b"]
+
+    def test_dollar_before_bracket_before_paren(self):
+        # $a$ then \[b\] then \(c\) -> ["a", "b", "c"].
+        markdown = r"$a$ then \[b\] then \(c\)"
+        assert math_preflight.extract_math_expressions(markdown) == ["a", "b", "c"]
+
+    def test_display_dollar_before_paren_before_inline_dollar(self):
+        # $$a$$ then \(b\) then $c$ -> ["a", "b", "c"].
+        markdown = r"$$a$$ then \(b\) then $c$"
+        assert math_preflight.extract_math_expressions(markdown) == ["a", "b", "c"]
+
+    def test_all_four_forms_interleaved(self):
+        # Each of the four supported forms, in document order across separate
+        # spans: inline $, display $$, paren \(...\), bracket \[...\].
+        markdown = r"$a$ and $$b$$ and \(c\) and \[d\]"
+        assert math_preflight.extract_math_expressions(markdown) == ["a", "b", "c", "d"]
+
+    def test_repeated_expressions_preserve_order_and_duplicates(self):
+        markdown = r"$a$ then \(b\) then $a$ then \(b\)"
+        assert math_preflight.extract_math_expressions(markdown) == ["a", "b", "a", "b"]
+
+    def test_math_inside_fenced_code_remains_ignored_with_mixed_forms(self):
+        # Code-block math is verbatim and must not appear in the ordered
+        # result, even when real math surrounds the block.
+        markdown = "$a$\n```text\n\\(b\\) and $c$\n```\n\\[d\\]"
+        assert math_preflight.extract_math_expressions(markdown) == ["a", "d"]
+
+    def test_math_inside_inline_code_remains_ignored_with_mixed_forms(self):
+        markdown = r"see `\(b\) and $c$` then $a$"
+        assert math_preflight.extract_math_expressions(markdown) == ["a"]
+
+
+# ===========================================================================
+# Math preflight setup fail-closed (missing bundled renderer assets)
+# ===========================================================================
+
+
+class TestMathPreflightSetupFailClosed:
+    """setup._install_math_renderer must fail closed when the bundled math
+    renderer assets are missing, and succeed when they are present and Node is
+    available. These exercise the function directly (no venv re-creation).
+    """
+
+    def _load_setup_module(self):
+        import importlib.util
+
+        setup_path = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "scripts"
+            / "setup.py"
+        )
+        spec = importlib.util.spec_from_file_location("setup_mod", str(setup_path))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_missing_package_json_fails_closed(self, monkeypatch, tmp_path):
+        # A Skill build that expects the math renderer but is missing its
+        # package.json must not report success.
+        setup_mod = self._load_setup_module()
+        # Point the skill dir at a temp tree whose math dir lacks package.json.
+        skill = tmp_path / "skill"
+        math_dir = (
+            skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
+        )
+        math_dir.mkdir(parents=True)
+        # validate.js present but package.json absent.
+        (math_dir / "validate.js").write_text("// stub", encoding="utf-8")
+        monkeypatch.setattr(setup_mod, "_skill_dir", lambda: skill)
+        assert setup_mod._install_math_renderer(skill) is False
+
+    def test_missing_validator_fails_closed(self, monkeypatch, tmp_path):
+        setup_mod = self._load_setup_module()
+        skill = tmp_path / "skill"
+        math_dir = (
+            skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
+        )
+        math_dir.mkdir(parents=True)
+        # package.json present but validate.js absent.
+        (math_dir / "package.json").write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(setup_mod, "_skill_dir", lambda: skill)
+        assert setup_mod._install_math_renderer(skill) is False
+
+    def test_missing_node_fails_closed(self, monkeypatch, tmp_path):
+        # Assets present but Node/npm absent -> still fails closed.
+        setup_mod = self._load_setup_module()
+        skill = tmp_path / "skill"
+        math_dir = (
+            skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
+        )
+        math_dir.mkdir(parents=True)
+        (math_dir / "package.json").write_text("{}", encoding="utf-8")
+        (math_dir / "validate.js").write_text("// stub", encoding="utf-8")
+        monkeypatch.setattr(setup_mod, "_skill_dir", lambda: skill)
+        monkeypatch.setattr(setup_mod.shutil, "which", lambda _name: None)
+        assert setup_mod._install_math_renderer(skill) is False
+
+    def test_present_assets_and_node_succeeds(self, monkeypatch, tmp_path):
+        # The real Skill build has both assets; with Node present, provisioning
+        # succeeds (npm install is stubbed so no network is needed).
+        setup_mod = self._load_setup_module()
+        skill = tmp_path / "skill"
+        math_dir = (
+            skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
+        )
+        math_dir.mkdir(parents=True)
+        (math_dir / "package.json").write_text("{}", encoding="utf-8")
+        (math_dir / "validate.js").write_text("// stub", encoding="utf-8")
+        monkeypatch.setattr(setup_mod, "_skill_dir", lambda: skill)
+        monkeypatch.setattr(setup_mod.shutil, "which", lambda name: f"/usr/bin/{name}")
+        monkeypatch.setattr(
+            setup_mod.subprocess, "run", lambda *a, **k: None
+        )
+        assert setup_mod._install_math_renderer(skill) is True
+
+
 # ===========================================================================
 # Blind Reader boundary (invariants 5-9)
 # ===========================================================================

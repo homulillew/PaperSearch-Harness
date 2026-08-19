@@ -45,13 +45,25 @@ def _install_math_renderer(skill: Path) -> bool:
     without the configured MathJax renderer. If Node/npm are absent, this
     returns ``False`` so the caller reports a clear failure rather than
     claiming readiness. Installation stays binary — there is no "math-free
-    ready" tier.
+    ready" tier. A Skill build that expects the math renderer but is missing its
+    bundled assets (``package.json`` or ``validate.js``) is also a failure: the
+    renderer cannot be provisioned, so setup must not report success.
     """
     math_dir = (
         skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
     )
-    if not (math_dir / "package.json").is_file():
-        return True  # this Skill build carries no math renderer to provision
+    package_json = math_dir / "package.json"
+    validator = math_dir / "validate.js"
+    if not package_json.is_file() or not validator.is_file():
+        print(
+            "Bundled math renderer assets not found under "
+            f"{math_dir} (expected package.json and validate.js). "
+            "This Skill build expects the configured MathJax renderer but "
+            "cannot provision it; report math rendering validation cannot be "
+            "certified. Reinstall this Skill from a complete build.",
+            file=sys.stderr,
+        )
+        return False
     npm = shutil.which("npm")
     node = shutil.which("node")
     if npm is None or node is None:
