@@ -20,6 +20,7 @@ Run:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
@@ -75,6 +76,7 @@ from my_search_harness.runtime.citations import (
     CitationValidationError,
     DeterministicCitationRenderer,
 )
+from my_search_harness.runtime import math_preflight
 
 
 # ---------------------------------------------------------------------------
@@ -1092,6 +1094,188 @@ class TestMathRenderabilityPreflight:
         # The Reader must never have been consulted: _reader_surface throws
         # before the first reviewer is created.
         assert len(reviewer_factory.created) == 0
+
+
+# ===========================================================================
+# Math preflight result-protocol robustness (fail-closed on bad payloads)
+# ===========================================================================
+
+
+class TestMathPreflightResultProtocol:
+    """The renderer result payload is untrusted. Any contract violation fails
+    closed via ``MathRendererUnavailable`` — a truncated but valid-JSON result
+    must never silently leave expressions unchecked.
+
+    These tests mock the subprocess boundary (the Node validator call), never
+    the production validator or the production contract check. The renderer
+    availability guard is bypassed so the protocol check is reached without a
+    real Node install.
+    """
+
+    def _patch_renderer_available(self, monkeypatch):
+        monkeypatch.setattr(
+            math_preflight, "_renderer_available", lambda: (True, "")
+        )
+        # The validator path is resolved lazily; ensure node resolves so the
+        # subprocess.run call is reached (its result is mocked below).
+        monkeypatch.setattr(math_preflight.shutil, "which", lambda _name: "/usr/bin/node")
+
+    def _run_with_payload(self, monkeypatch, payload_text: str):
+        """Drive renderability_report with a mocked renderer stdout payload."""
+        self._patch_renderer_available(monkeypatch)
+
+        class _FakeCompleted:
+            returncode = 0
+            stdout = payload_text
+            stderr = ""
+
+        monkeypatch.setattr(
+            math_preflight.subprocess, "run", lambda *a, **k: _FakeCompleted()
+        )
+        # Manuscript with three math spans so cardinality mismatches are
+        # detectable against a known N.
+        markdown = "$a$ and $b$ and $c$."
+        return math_preflight.renderability_report(markdown)
+
+    def test_truncated_payload_with_fewer_results_fails_closed(self, monkeypatch):
+        # 3 expressions in, only 2 results out -> must fail closed, not zip.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(monkeypatch, json.dumps([{"ok": True}, {"ok": True}]))
+
+    def test_extra_results_fails_closed(self, monkeypatch):
+        # 3 expressions in, 4 results out -> cardinality mismatch fails closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(
+                monkeypatch,
+                json.dumps([{"ok": True}, {"ok": True}, {"ok": True}, {"ok": True}]),
+            )
+
+    def test_non_list_payload_fails_closed(self, monkeypatch):
+        # A valid-JSON object instead of a list -> fail closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(monkeypatch, json.dumps({"ok": True}))
+
+    def test_result_missing_ok_flag_fails_closed(self, monkeypatch):
+        # A result dict with only an error and no ok flag -> fail closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(
+                monkeypatch,
+                json.dumps([{"error": "bad"}, {"ok": True}, {"ok": True}]),
+            )
+
+    def test_non_bool_ok_fails_closed(self, monkeypatch):
+        # ok present but a string ("true") -> not a bool -> fail closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(
+                monkeypatch,
+                json.dumps([{"ok": "true"}, {"ok": True}, {"ok": True}]),
+            )
+
+    def test_rejection_without_error_message_fails_closed(self, monkeypatch):
+        # ok: false but no error string -> contract violation -> fail closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(
+                monkeypatch,
+                json.dumps([{"ok": False}, {"ok": True}, {"ok": True}]),
+            )
+
+    def test_empty_error_string_fails_closed(self, monkeypatch):
+        # ok: false with a whitespace-only error -> fail closed.
+        with pytest.raises(math_preflight.MathRendererUnavailable, match="invalid result payload"):
+            self._run_with_payload(
+                monkeypatch,
+                json.dumps([{"ok": False, "error": "   "}, {"ok": True}, {"ok": True}]),
+            )
+
+    def test_valid_contract_passes_with_null_error(self, monkeypatch):
+        # A well-formed payload: N dicts, bool ok, non-empty error on rejects.
+        # ok: true with error: null is the normal accept result.
+        report = self._run_with_payload(
+            monkeypatch,
+            json.dumps(
+                [
+                    {"ok": True, "error": None},
+                    {"ok": True, "error": None},
+                    {"ok": True, "error": None},
+                ]
+            ),
+        )
+        assert report == []
+
+    def test_valid_contract_reports_rejection_with_error(self, monkeypatch):
+        # ok: false with a real error -> a MathRejection naming that expression.
+        report = self._run_with_payload(
+            monkeypatch,
+            json.dumps(
+                [
+                    {"ok": False, "error": "Missing open brace for superscript"},
+                    {"ok": True, "error": None},
+                    {"ok": True, "error": None},
+                ]
+            ),
+        )
+        assert len(report) == 1
+        assert report[0].expression == "a"
+        assert "open brace" in report[0].error
+
+    def test_unparseable_output_fails_closed(self, monkeypatch):
+        # Non-JSON stdout -> fail closed (existing behavior, pinned here).
+        with pytest.raises(math_preflight.MathRendererUnavailable):
+            self._run_with_payload(monkeypatch, "not json at all")
+
+    def test_protocol_check_runs_before_reader(self, _math_view, monkeypatch):
+        # A malformed payload must fail closed at the audit boundary, before
+        # the Reader is ever consulted. This pins the pipeline placement of
+        # the protocol check (it lives in audit -> _reader_surface).
+        self._patch_renderer_available(monkeypatch)
+
+        class _FakeCompleted:
+            returncode = 0
+            # 2 results for 1 expression -> cardinality mismatch.
+            stdout = json.dumps([{"ok": True}, {"ok": True}])
+            stderr = ""
+
+        monkeypatch.setattr(
+            math_preflight.subprocess, "run", lambda *a, **k: _FakeCompleted()
+        )
+        manuscript = ReportManuscript(
+            markdown="# R\n\n## S\n\n{{cite:c1}}\n\n$a$",
+            citations=(CitationReference(citation_id="c1", paper_ref="paper_p1"),),
+        )
+        with pytest.raises(CitationValidationError, match="invalid result payload"):
+            DeterministicCitationRenderer().audit(_math_view, manuscript)
+
+
+class TestMathPreflightSupportedSurface:
+    """The supported math surface is explicit and intentionally small. These
+    tests pin that the extractor recognizes exactly the four supported forms
+    and does not claim to validate other GitHub Markdown math notation.
+    """
+
+    def test_extracts_inline_dollar(self):
+        assert math_preflight.extract_math_expressions("see $a + b$ here") == ["a + b"]
+
+    def test_extracts_display_dollar(self):
+        assert math_preflight.extract_math_expressions("$$a + b$$") == ["a + b"]
+
+    def test_extracts_paren_inline(self):
+        assert math_preflight.extract_math_expressions(r"see \(a + b\) here") == ["a + b"]
+
+    def test_extracts_bracket_display(self):
+        assert math_preflight.extract_math_expressions(r"see \[a + b\] here") == ["a + b"]
+
+    def test_fenced_math_block_is_not_supported(self):
+        # Fenced ```math blocks are deliberately not part of the supported
+        # surface. The fence is stripped as verbatim code, so its content is
+        # not extracted as math.
+        markdown = "```math\na + b\n```\n"
+        assert math_preflight.extract_math_expressions(markdown) == []
+
+    def test_math_inside_inline_code_is_not_extracted(self):
+        assert math_preflight.extract_math_expressions("see `a $b$ c` here") == []
+
+    def test_no_math_returns_empty(self):
+        assert math_preflight.extract_math_expressions("plain prose, no math at all") == []
 
 
 # ===========================================================================

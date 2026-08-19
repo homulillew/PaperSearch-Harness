@@ -32,36 +32,44 @@ def _venv_python(skill: Path) -> Path:
     return next(path for path in candidates if path.is_file())
 
 
-def _install_math_renderer(skill: Path) -> None:
+def _install_math_renderer(skill: Path) -> bool:
     """Provision the MathJax renderer used by the math renderability preflight.
 
     The validator script and its ``package.json`` live under
     ``runtime/src/my_search_harness/runtime/math``. ``node_modules`` is never
     shipped (the packager excludes it); consumers install it here, mirroring the
-    Python ``.venv`` pattern. If Node is absent, the runtime still serves
-    math-free reports — only math-bearing manuscripts fail-closed at preflight.
+    Python ``.venv`` pattern.
+
+    Node.js is a required dependency of a fully ready installation: report
+    manuscripts may contain math, and the preflight cannot certify renderability
+    without the configured MathJax renderer. If Node/npm are absent, this
+    returns ``False`` so the caller reports a clear failure rather than
+    claiming readiness. Installation stays binary — there is no "math-free
+    ready" tier.
     """
     math_dir = (
         skill / "runtime" / "src" / "my_search_harness" / "runtime" / "math"
     )
     if not (math_dir / "package.json").is_file():
-        return
+        return True  # this Skill build carries no math renderer to provision
     npm = shutil.which("npm")
     node = shutil.which("node")
     if npm is None or node is None:
         print(
-            "Node/npm not found on PATH. The math renderability preflight will "
-            "fail-closed for math-bearing reports (math-free reports are "
-            "unaffected). Install Node.js to enable full math validation.",
+            "Node.js/npm not found on PATH. The configured MathJax renderer "
+            "is required for report math rendering validation: manuscripts "
+            "containing math cannot be certified without it. Install Node.js "
+            "(https://nodejs.org) and re-run setup.",
             file=sys.stderr,
         )
-        return
+        return False
     subprocess.run(
         [npm, "install", "--production", "--no-audit", "--no-fund"],
         cwd=str(math_dir),
         check=True,
     )
     print("Math renderer (MathJax) installed for the math renderability preflight.")
+    return True
 
 
 def main() -> int:
@@ -87,7 +95,8 @@ def main() -> int:
         check=True,
     )
 
-    _install_math_renderer(skill)
+    if not _install_math_renderer(skill):
+        return 1
 
     print(
         "Standalone runtime ready. Configure the DeepXiv credential once with:\n"

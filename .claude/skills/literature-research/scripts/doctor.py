@@ -79,9 +79,11 @@ def _math_renderer_status(skill: Path) -> dict[str, object]:
     node_ok = node is not None
     script_ok = validator.is_file()
     mathjax_ok = (math_dir / "node_modules" / "mathjax-full").is_dir()
-    # The renderer is usable only when all three are present. When math is
-    # absent from a manuscript the preflight short-circuits, but the doctor
-    # still reports full readiness so operators know the dependency is healthy.
+    # The configured MathJax renderer is usable only when all three are
+    # present. A manuscript without math short-circuits the preflight, but the
+    # renderer is still a required dependency of a fully ready installation:
+    # the doctor reports unhealthy when it is missing, so operators know the
+    # math renderability preflight cannot certify math-bearing manuscripts.
     ok = bool(node_ok and script_ok and mathjax_ok)
     return {
         "ok": ok,

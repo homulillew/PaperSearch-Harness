@@ -273,13 +273,14 @@ class DeterministicCitationRenderer:
 
     @staticmethod
     def _validate_math_renderability(markdown: str) -> None:
-        """Reject math the target renderer cannot render.
+        """Reject math the configured MathJax renderer cannot render.
 
-        Delegates to the real MathJax renderer (via :mod:`math_preflight`) so
-        that a manuscript cannot reach the Reader or publication with TeX the
-        renderer rejects. This is mechanical renderability only — it never
-        judges mathematical meaning, style, or fidelity, and never rewrites
-        prose. Manuscripts without math spans short-circuit (no renderer call).
+        Delegates to the configured MathJax renderer (via
+        :mod:`math_preflight`) so that a manuscript cannot reach the Reader or
+        publication with TeX the renderer rejects. This is mechanical
+        renderability only — it never judges mathematical meaning, style, or
+        fidelity, and never rewrites prose. Manuscripts without supported math
+        spans short-circuit (no renderer call).
         """
 
         try:
@@ -288,7 +289,7 @@ class DeterministicCitationRenderer:
             raise CitationValidationError(str(err)) from err
         if rejections:
             raise CitationValidationError(
-                "report contains math the target renderer rejects: "
+                "report contains math the configured MathJax renderer rejects: "
                 + "; ".join(
                     f"{r.expression!r} ({r.error})" for r in rejections
                 )

@@ -1,18 +1,25 @@
-"""Mechanical math renderability preflight for report manuscripts.
+r"""Mechanical math renderability preflight for report manuscripts.
 
-The invariant: every mathematical expression in a report manuscript must be
-accepted by the target math renderer before the manuscript can proceed to
-Reader certification or publication.
+The invariant: every *supported* mathematical expression in a report manuscript
+must be accepted by the configured MathJax renderer before the manuscript can
+proceed to Reader certification or publication.
+
+The supported authoring surface is intentionally small and explicit:
+
+    $ ... $        inline math
+    $$ ... $$      display math
+    \( ... \)      LaTeX inline math
+    \[ ... \]      LaTeX display math
+
+Ordinary fenced code blocks and inline code spans are verbatim and are excluded
+from extraction. No other Markdown math notation is claimed to be supported.
 
 This module is deliberately *not* a TeX parser and *not* a semantic validator.
-It extracts the TeX content of math spans from Markdown, sends the batch to the
-real target renderer (MathJax, via the Node validator in ``math/validate.js``),
-and reports which expressions the renderer rejects. It never rewrites prose and
-never judges mathematical meaning, style, or fidelity — only mechanical
-renderability.
-
-Math spans inside fenced code blocks or inline code spans are ignored: those are
-verbatim prose/code, not rendered math.
+It extracts the TeX content of the supported math spans, sends the batch to the
+configured MathJax renderer (the locally pinned runtime, via the Node validator
+in ``math/validate.js``), and reports which expressions the renderer rejects.
+It never rewrites prose and never judges mathematical meaning, style, or
+fidelity — only mechanical renderability.
 """
 
 from __future__ import annotations
@@ -47,14 +54,14 @@ _VALIDATOR = Path(__file__).resolve().parent / "math" / "validate.js"
 
 @dataclass(slots=True, frozen=True)
 class MathRejection:
-    """A math expression the target renderer refused to render."""
+    """A math expression the configured MathJax renderer refused to render."""
 
     expression: str
     error: str
 
 
 class MathRendererUnavailable(RuntimeError):
-    """The target math renderer could not be located or run.
+    """The configured MathJax renderer could not be located or run.
 
     Raised fail-closed: if a manuscript contains math but the renderer cannot
     be exercised, renderability cannot be certified, so the manuscript must not
@@ -201,12 +208,13 @@ def _renderer_available() -> tuple[bool, str]:
 
 
 def renderability_report(markdown: str) -> list[MathRejection]:
-    """Return the math expressions in ``markdown`` the renderer rejects.
+    """Return the supported math expressions in ``markdown`` the renderer rejects.
 
-    Returns an empty list when the manuscript contains no math spans (no Node
-    call is made, so math-free manuscripts need no renderer installed). Raises
-    ``MathRendererUnavailable`` fail-closed when math is present but the
-    renderer cannot be exercised.
+    Returns an empty list when the manuscript contains no supported math spans
+    (no Node call is made, so math-free manuscripts need no renderer installed).
+    Raises ``MathRendererUnavailable`` fail-closed when math is present but the
+    configured MathJax renderer cannot be exercised, or when it returns a
+    payload that does not satisfy the result contract.
     """
 
     expressions = extract_math_expressions(markdown)
@@ -216,8 +224,8 @@ def renderability_report(markdown: str) -> list[MathRejection]:
     available, reason = _renderer_available()
     if not available:
         raise MathRendererUnavailable(
-            "report contains math but the target renderer is unavailable "
-            f"({reason}); renderability cannot be certified"
+            "report contains math but the configured MathJax renderer is "
+            f"unavailable ({reason}); renderability cannot be certified"
         )
 
     node = shutil.which("node")
@@ -233,16 +241,17 @@ def renderability_report(markdown: str) -> list[MathRejection]:
         )
     except subprocess.TimeoutExpired as err:
         raise MathRendererUnavailable(
-            "target math renderer timed out; renderability cannot be certified"
+            "configured MathJax renderer timed out; "
+            "renderability cannot be certified"
         ) from err
     except OSError as err:
         raise MathRendererUnavailable(
-            f"target math renderer could not be run: {err}"
+            f"configured MathJax renderer could not be run: {err}"
         ) from err
 
     if completed.returncode != 0:
         raise MathRendererUnavailable(
-            "target math renderer failed to start: "
+            "configured MathJax renderer failed to start: "
             f"{completed.stderr.strip() or completed.returncode}"
         )
 
@@ -250,17 +259,35 @@ def renderability_report(markdown: str) -> list[MathRejection]:
         results = json.loads(completed.stdout)
     except json.JSONDecodeError as err:
         raise MathRendererUnavailable(
-            "target math renderer produced unparseable output; "
+            "configured MathJax renderer produced unparseable output; "
             "renderability cannot be certified"
         ) from err
 
+    # Validate the complete response contract before consuming any result.
+    # The core rule is: N expressions in -> exactly N structurally valid
+    # validation results out. A truncated but valid-JSON payload (fewer
+    # results than expressions, or results missing the ``ok`` flag) must not
+    # silently leave expressions unchecked -- it fails closed.
+    invalid_payload = (
+        "configured MathJax renderer returned an invalid result payload; "
+        "renderability cannot be certified"
+    )
+    if not isinstance(results, list) or len(results) != len(expressions):
+        raise MathRendererUnavailable(invalid_payload)
+    for result in results:
+        if not isinstance(result, dict) or not isinstance(result.get("ok"), bool):
+            raise MathRendererUnavailable(invalid_payload)
+        # A rejection must carry a non-empty error message; a result that says
+        # ``ok: false`` with no usable error is itself a contract violation.
+        if not result["ok"]:
+            error = result.get("error")
+            if not isinstance(error, str) or not error.strip():
+                raise MathRendererUnavailable(invalid_payload)
+
     rejections: list[MathRejection] = []
     for expression, result in zip(expressions, results):
-        if isinstance(result, dict) and not result.get("ok", True):
+        if not result["ok"]:
             rejections.append(
-                MathRejection(
-                    expression=expression,
-                    error=str(result.get("error") or "rejected by renderer"),
-                )
+                MathRejection(expression=expression, error=result["error"])
             )
     return rejections
