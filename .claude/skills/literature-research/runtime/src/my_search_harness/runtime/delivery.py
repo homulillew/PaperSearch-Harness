@@ -66,6 +66,11 @@ class CloseRunResult:
     outcome: RunOutcome
 
 
+@dataclass(slots=True, frozen=True, kw_only=True)
+class ReopenDeliveryResult:
+    state_revision: int
+
+
 class DeliveryCommands:
     """Thin authority boundary over artifact mechanics and run persistence."""
 
@@ -186,6 +191,42 @@ class DeliveryCommands:
             state_revision=proposed.state_revision,
             outcome=outcome,
         )
+
+    def reopen_delivery(
+        self, run_id: str, expected_revision: int
+    ) -> ReopenDeliveryResult:
+        # Reopen an already CLOSED run into DELIVERY, reusing the accepted
+        # Research State and the existing DeliveryBasis. Only Delivery work is
+        # rerun; Research is not reopened and no new CompletionCheck is created.
+        # The basis is preserved (not cleared) so the prior accepted
+        # Completion/Partial authorization remains the authoritative basis for
+        # the new Delivery pass.
+        current = self._load_expected(run_id, expected_revision)
+        self._require_lifecycle(current, LifecycleMode.CLOSED, "reopen_delivery")
+        basis = current.delivery_basis
+        if basis is None:
+            raise CommandRejectedError("reopen_delivery requires a delivery basis")
+        outcome = current.outcome
+        if outcome not in (RunOutcome.COMPLETE, RunOutcome.PARTIAL):
+            raise CommandRejectedError(
+                "reopen_delivery requires a closed COMPLETE or PARTIAL outcome"
+            )
+        # The stored basis must still be able to support Delivery under the
+        # existing invariants. If it is invalid, reject rather than repair.
+        self._validate_delivery(current)
+
+        proposed = deepcopy(current)
+        proposed.state_revision = current.state_revision + 1
+        proposed.lifecycle = LifecycleMode.DELIVERY
+        proposed.outcome = None
+        # delivery_basis is intentionally preserved.
+        self._repository.save(proposed, expected_revision)
+        self._append_audit(
+            proposed,
+            action="delivery_reopened",
+            details={"outcome": outcome.value},
+        )
+        return ReopenDeliveryResult(state_revision=proposed.state_revision)
 
     def _validate_delivery(self, run: ResearchRun) -> DeliveryValidationResult:
         current_contract_revision = run.contract.current_revision

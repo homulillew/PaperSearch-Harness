@@ -47,6 +47,7 @@ from .delivery import (
     DeliveryValidationResult,
     PublishReportResult,
     _ReportPublicationAuthorization,
+    ReopenDeliveryResult,
     ReopenResearchResult,
 )
 from .paper_search import (
@@ -527,6 +528,13 @@ class DeliveryCapabilities:
         expected_revision: int,
     ) -> CloseRunResult:
         return self._commands.close_run(run_id, expected_revision)
+
+    def reopen_delivery(
+        self,
+        run_id: str,
+        expected_revision: int,
+    ) -> ReopenDeliveryResult:
+        return self._commands.reopen_delivery(run_id, expected_revision)
 
     def _require_delivery(self, run_id: str) -> None:
         _require_lifecycle(

@@ -304,6 +304,35 @@ def _certify(
     return b_digest, m_digest
 
 
+def _publish_certified(
+    harness,
+    workspace: Path,
+    tmp_path: Path,
+    run_id: str,
+    delivery_revision: int,
+) -> int:
+    """Render and publish the certified report, returning the post-publish
+    state revision (unchanged: publish writes the artifact, not run state)."""
+
+    _certify(harness, workspace, tmp_path, run_id)
+    code, rendered = _invoke(
+        harness, workspace, "render-certified-report", "--run-id", run_id
+    )
+    assert code == 0, rendered
+    code, published = _invoke(
+        harness,
+        workspace,
+        "publish-certified-report",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(delivery_revision),
+    )
+    assert code == 0, published
+    assert published["result"]["artifact_kind"] == "REPORT"
+    return delivery_revision
+
+
 # ---------------------------------------------------------------------------
 # Certified publication path
 # ---------------------------------------------------------------------------
@@ -1919,3 +1948,411 @@ def test_confirmed_research_insufficiency_requires_explicit_reopen(tmp_path):
     assert (
         _runtime(workspace).researcher.view(run_id).lifecycle is LifecycleMode.RESEARCH
     )
+
+
+# ---------------------------------------------------------------------------
+# reopen-delivery: CLOSED -> DELIVERY lifecycle capability
+# ---------------------------------------------------------------------------
+#
+# A CLOSED run may re-enter DELIVERY without reopening Research. The accepted
+# Research State and the existing DeliveryBasis are reused; only Delivery work
+# is rerun. delivery_basis is preserved (not cleared), no new CompletionCheck is
+# created, and outcome is reset to None. The command is `reopen-delivery`.
+
+
+def _closed_delivery_run(workspace: Path) -> tuple[str, int]:
+    """A run closed COMPLETE via the certified publication path.
+
+    Returns ``(run_id, closed_revision)`` where ``closed_revision`` is the
+    state revision after close-run (the revision a reopen-delivery must use).
+    """
+
+    harness = _load_harness()
+    run_id, delivery_revision, _requirement_ref = _delivery_run(workspace)
+    _publish_certified(harness, workspace, workspace, run_id, delivery_revision)
+    code, closed = _invoke(
+        harness,
+        workspace,
+        "close-run",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(delivery_revision),
+    )
+    assert code == 0, closed
+    return run_id, closed["result"]["state_revision"]
+
+
+def _load_run(workspace: Path, run_id: str):
+    """Load the raw ResearchRun aggregate for invariant assertions."""
+
+    from my_search_harness.runtime.persistence import JsonResearchRunRepository
+
+    return JsonResearchRunRepository(workspace / "runs").load(run_id)
+
+
+def test_reopen_delivery_complete_happy_path(tmp_path):
+    # Case A: a CLOSED COMPLETE run reopens into DELIVERY.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+
+    harness = _load_harness()
+    code, reopened = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0, reopened
+    new_revision = reopened["result"]["state_revision"]
+    assert new_revision == closed_revision + 1
+
+    run = _load_run(workspace, run_id)
+    assert run.lifecycle is LifecycleMode.DELIVERY
+    assert run.outcome is None
+    # delivery_basis is preserved, not cleared.
+    assert run.delivery_basis is not None
+
+
+def test_reopen_delivery_partial_happy_path(tmp_path):
+    # Case B: a CLOSED PARTIAL run reopens into DELIVERY. A PARTIAL closure is
+    # produced by authorizing partial delivery from RESEARCH, then closing.
+    # ``authorize_partial_delivery`` lives on ResearchCommands (not yet surfaced
+    # as a CLI command), so we reach it through the capability's commands object.
+    from my_search_harness.runtime.commands import CreateRunRequest
+
+    workspace = tmp_path / "workspace"
+    runtime = _runtime(workspace)
+    created = runtime.researcher.create_run(
+        CreateRunRequest(
+            mission="partial delivery reopen",
+            requirements=("explain the result",),
+            scope="test scope",
+            deliverable_description="certified report",
+            required_artifacts=frozenset({ArtifactKind.REPORT}),
+        )
+    )
+    authorized = runtime.researcher._commands.authorize_partial_delivery(
+        created.run_id, created.state_revision, "partial is acceptable"
+    )
+    harness = _load_harness()
+    _publish_certified(harness, workspace, workspace, created.run_id, authorized.state_revision)
+    code, closed = _invoke(
+        harness,
+        workspace,
+        "close-run",
+        "--run-id",
+        created.run_id,
+        "--expected-revision",
+        str(authorized.state_revision),
+    )
+    assert code == 0, closed
+    closed_revision = closed["result"]["state_revision"]
+    assert closed["result"]["outcome"] == "PARTIAL"
+
+    code, reopened = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        created.run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0, reopened
+    run = _load_run(workspace, created.run_id)
+    assert run.lifecycle is LifecycleMode.DELIVERY
+    assert run.outcome is None
+    assert run.delivery_basis is not None
+
+
+@pytest.mark.parametrize(
+    "lifecycle_command",
+    [
+        "request_completion_check",  # RESEARCH -> COMPLETION_CHECK
+    ],
+)
+def test_reopen_delivery_rejects_wrong_lifecycle(tmp_path, lifecycle_command):
+    # Case C: reopen-delivery is rejected unless the source is CLOSED. A run
+    # still in RESEARCH (never closed) cannot reopen delivery.
+    workspace = tmp_path / "workspace"
+    runtime = _runtime(workspace)
+    created = runtime.researcher.create_run(
+        CreateRunRequest(
+            mission="not closed",
+            requirements=("explain the result",),
+            scope="test scope",
+            deliverable_description="certified report",
+            required_artifacts=frozenset({ArtifactKind.REPORT}),
+        )
+    )
+    harness = _load_harness()
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        created.run_id,
+        "--expected-revision",
+        str(created.state_revision),
+    )
+    assert code == 2
+    assert envelope["error"]["type"] == "CommandRejectedError"
+    assert "CLOSED" in envelope["error"]["message"]
+
+
+def test_reopen_delivery_rejects_delivery_and_completion_sources(tmp_path):
+    # Case C (cont.): a run in DELIVERY and one in COMPLETION_CHECK are also
+    # rejected — only CLOSED may reopen delivery.
+    workspace = tmp_path / "workspace"
+    run_id, delivery_revision, _ = _delivery_run(workspace)
+    harness = _load_harness()
+
+    # DELIVERY source (not yet closed).
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(delivery_revision),
+    )
+    assert code == 2
+    assert envelope["error"]["type"] == "CommandRejectedError"
+
+    # COMPLETION_CHECK source.
+    runtime = _runtime(workspace)
+    created = runtime.researcher.create_run(
+        CreateRunRequest(
+            mission="completion check source",
+            requirements=("explain the result",),
+            scope="test scope",
+            deliverable_description="certified report",
+            required_artifacts=frozenset({ArtifactKind.REPORT}),
+        )
+    )
+    requested = runtime.researcher.request_completion_check(
+        created.run_id, created.state_revision, "ready"
+    )
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        created.run_id,
+        "--expected-revision",
+        str(requested.state_revision),
+    )
+    assert code == 2
+    assert envelope["error"]["type"] == "CommandRejectedError"
+
+
+def test_reopen_delivery_rejects_revision_conflict(tmp_path):
+    # Case E: a stale expected-revision is rejected with RevisionConflictError.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    harness = _load_harness()
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision - 1),
+    )
+    assert code == 2
+    assert envelope["error"]["type"] == "RevisionConflictError"
+
+
+def test_reopen_delivery_emits_audit_event(tmp_path):
+    # Case F: reopening delivery appends a delivery_reopened audit event whose
+    # state_revision reflects the post-transition revision.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    harness = _load_harness()
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0
+    code, history = _invoke(harness, workspace, "audit-history", "--run-id", run_id)
+    assert code == 0, history
+    events = history["result"]["events"]
+    reopened = [e for e in events if e["action"] == "delivery_reopened"]
+    assert len(reopened) == 1
+    assert reopened[0]["state_revision"] == closed_revision + 1
+    assert reopened[0]["actor"] == "delivery"
+    assert reopened[0]["details"]["outcome"] == "COMPLETE"
+
+
+def test_reopen_delivery_immediately_usable(tmp_path):
+    # Case G: after reopen-delivery, Delivery capabilities are immediately
+    # usable — view, report_construction_context, report_authoring_context all
+    # succeed with no Research/Completion command in between.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    harness = _load_harness()
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0
+
+    code, view = _invoke(harness, workspace, "delivery-view", "--run-id", run_id)
+    assert code == 0, view
+    assert view["result"]["lifecycle"] == "DELIVERY"
+    assert view["result"]["delivery_basis"] is not None
+
+    code, construction = _invoke(
+        harness, workspace, "report-construction-input", "--run-id", run_id
+    )
+    assert code == 0, construction
+
+    code, authoring = _invoke(
+        harness, workspace, "report-authoring-context", "--run-id", run_id
+    )
+    assert code == 0, authoring
+
+
+def test_reopen_delivery_preserves_research_state(tmp_path):
+    # Case H: reopening delivery does not rerun Research. No new CompletionCheck
+    # is created, the existing check is unchanged, and the CompletionPassBasis
+    # still references the original check.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    before = _load_run(workspace, run_id)
+    before_checks = dict(before.completion_checks)
+    before_basis = before.delivery_basis
+    before_papers = dict(before.papers)
+    before_gaps = dict(before.investigation_gaps)
+
+    harness = _load_harness()
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0
+    after = _load_run(workspace, run_id)
+    # No new CompletionCheck; the same checks, unchanged.
+    assert after.completion_checks == before_checks
+    # The basis still references the original PASS check.
+    from my_search_harness.domain.model import CompletionPassBasis
+
+    assert isinstance(after.delivery_basis, CompletionPassBasis)
+    assert after.delivery_basis == before_basis
+    # Research State (papers, gaps) untouched.
+    assert after.papers == before_papers
+    assert after.investigation_gaps == before_gaps
+
+
+def test_reopen_delivery_fresh_report_attempt(tmp_path):
+    # Case I: after reopen-delivery, a fresh Brief + Manuscript is accepted on
+    # the same run; the stale Reader/Integrity PASS cannot publish the new
+    # manuscript; a normal new Reader -> Integrity -> publish path works.
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    harness = _load_harness()
+    code, _ = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 0
+    reopened_revision = closed_revision + 1
+
+    # A fresh Brief + Manuscript with different content is accepted. put_brief
+    # resets the session, so the old certified PASS is invalidated.
+    b_digest, m_digest = _put_brief_and_manuscript(
+        harness,
+        workspace,
+        workspace,
+        run_id,
+        promise="explain the revised result",
+        markdown="# Report\n\n## Result\n\nRevised certified content.",
+    )
+
+    # The stale rendered report (if any) cannot publish the new manuscript:
+    # render-certified-report fails because no fresh Reader/Integrity PASS
+    # exists for the new digests.
+    code, _ = _invoke(
+        harness, workspace, "render-certified-report", "--run-id", run_id
+    )
+    assert code == 2
+
+    # The normal new certification path works end to end.
+    _reader_pass(harness, workspace, workspace, run_id, b_digest, m_digest)
+    _integrity_pass(harness, workspace, workspace, run_id)
+    code, rendered = _invoke(
+        harness, workspace, "render-certified-report", "--run-id", run_id
+    )
+    assert code == 0, rendered
+    code, published = _invoke(
+        harness,
+        workspace,
+        "publish-certified-report",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(reopened_revision),
+    )
+    assert code == 0, published
+    assert published["result"]["artifact_kind"] == "REPORT"
+
+
+def test_reopen_delivery_rejects_missing_basis(tmp_path):
+    # Case D: a CLOSED run with delivery_basis=None is rejected. This cannot
+    # arise through the normal state machine (close-run requires a basis), so
+    # we construct it by directly corrupting the persisted state. The domain
+    # validator (validate_run, invoked on load) rejects CLOSED + no basis
+    # before reopen_delivery's own precondition runs — the transition never
+    # gets to act on a malformed closed run. This is the intended "reject
+    # rather than repair" behavior.
+    from my_search_harness.runtime.persistence import JsonResearchRunRepository
+
+    workspace = tmp_path / "workspace"
+    run_id, closed_revision = _closed_delivery_run(workspace)
+    # Corrupt the persisted state: clear the basis while keeping CLOSED+outcome.
+    import json as _json
+
+    state_path = workspace / "runs" / run_id / "state.json"
+    raw = _json.loads(state_path.read_text(encoding="utf-8"))
+    raw["delivery_basis"] = None
+    state_path.write_text(_json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+
+    harness = _load_harness()
+    code, envelope = _invoke(
+        harness,
+        workspace,
+        "reopen-delivery",
+        "--run-id",
+        run_id,
+        "--expected-revision",
+        str(closed_revision),
+    )
+    assert code == 2
+    assert "delivery basis" in envelope["error"]["message"]
+

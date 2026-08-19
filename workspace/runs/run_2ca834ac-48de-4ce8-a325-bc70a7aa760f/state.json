@@ -496,6 +496,7 @@
       "analysis": null,
       "id": "paper_05d6e6d0-933a-4139-b866-37a448b5d5b6",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2507.19823",
         "authors": [],
@@ -511,6 +512,7 @@
       "analysis": null,
       "id": "paper_0b7e9bf1-fb53-4372-93b2-31fa454d8279",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.11761",
         "authors": [],
@@ -559,6 +561,7 @@
       },
       "id": "paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.16002",
         "authors": [],
@@ -574,6 +577,7 @@
       "analysis": null,
       "id": "paper_0e60c220-f42d-4d0b-8175-ab38642389ef",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2504.15364",
         "authors": [],
@@ -589,6 +593,7 @@
       "analysis": null,
       "id": "paper_10aa6522-e95f-456a-ae26-d77802f73304",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2508.09442",
         "authors": [],
@@ -604,6 +609,7 @@
       "analysis": null,
       "id": "paper_19c94b93-7aca-4821-aa98-746f2ebe1c14",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.25080",
         "authors": [],
@@ -619,6 +625,7 @@
       "analysis": null,
       "id": "paper_21a69738-3f18-43e6-a029-44227768dff0",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.03143",
         "authors": [],
@@ -634,6 +641,7 @@
       "analysis": null,
       "id": "paper_21dd236b-317d-415f-b8c8-47cecad064b7",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.02888",
         "authors": [],
@@ -649,6 +657,7 @@
       "analysis": null,
       "id": "paper_22dfe71b-356f-439c-a2fd-88628495c97c",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2508.13231",
         "authors": [],
@@ -664,6 +673,7 @@
       "analysis": null,
       "id": "paper_265af396-cca5-4a01-9039-93a88a9b6ae3",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.06997",
         "authors": [],
@@ -679,6 +689,7 @@
       "analysis": null,
       "id": "paper_32b7ea94-793e-4bca-b702-ebe156e2cd9e",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2508.16134",
         "authors": [],
@@ -694,6 +705,7 @@
       "analysis": null,
       "id": "paper_32bd69c0-0f22-43c7-bde6-ac365b4dc3bd",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2407.18003",
         "authors": [],
@@ -709,6 +721,7 @@
       "analysis": null,
       "id": "paper_347083a9-b748-47b3-9f4a-94a2b5014ab2",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.10238",
         "authors": [],
@@ -757,6 +770,7 @@
       },
       "id": "paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2512.05916",
         "authors": [],
@@ -772,6 +786,7 @@
       "analysis": null,
       "id": "paper_38ea4a74-ba40-4d17-a16f-10073fa85adb",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.02905",
         "authors": [],
@@ -787,6 +802,7 @@
       "analysis": null,
       "id": "paper_394cedf2-562a-4cfa-b54e-f82296361c75",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2506.15969",
         "authors": [],
@@ -802,6 +818,7 @@
       "analysis": null,
       "id": "paper_3a58b8de-8b18-4934-b4f4-ce8dc25e1246",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.26412",
         "authors": [],
@@ -817,6 +834,7 @@
       "analysis": null,
       "id": "paper_3f50d954-aa2c-45ab-953f-f8a48eb6001a",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.25475",
         "authors": [],
@@ -832,6 +850,7 @@
       "analysis": null,
       "id": "paper_4477571f-208d-45f4-a494-aaa310b58996",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2503.10337",
         "authors": [],
@@ -847,6 +866,7 @@
       "analysis": null,
       "id": "paper_44aaa40d-dfe0-478f-9ce6-2b4b6272c83e",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.07234",
         "authors": [],
@@ -862,6 +882,7 @@
       "analysis": null,
       "id": "paper_44bd36a6-963e-4a89-af3a-fa8eca3dd718",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2603.23049",
         "authors": [],
@@ -877,6 +898,7 @@
       "analysis": null,
       "id": "paper_44e27e30-625f-4fa8-88c3-84c726305749",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.13556",
         "authors": [],
@@ -892,6 +914,7 @@
       "analysis": null,
       "id": "paper_4a5ef094-74f7-453c-93bb-4224464e4ac3",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2503.08879",
         "authors": [],
@@ -907,6 +930,7 @@
       "analysis": null,
       "id": "paper_4c508572-697c-435c-800f-2baf0f1d3f3f",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2603.15569",
         "authors": [],
@@ -922,6 +946,7 @@
       "analysis": null,
       "id": "paper_4d9558d0-bae6-4008-bb94-034c55a1e581",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2509.00202",
         "authors": [],
@@ -969,6 +994,7 @@
       },
       "id": "paper_4e8f6440-1612-4d3e-8db8-f6448a37a481",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2503.12491",
         "authors": [],
@@ -1014,6 +1040,7 @@
       },
       "id": "paper_50caf2c8-6053-435a-b7f3-126ca2ec3769",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.06676",
         "authors": [],
@@ -1029,6 +1056,7 @@
       "analysis": null,
       "id": "paper_5607493a-f09d-498d-a3dc-288668a5b5d6",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.06766",
         "authors": [],
@@ -1044,6 +1072,7 @@
       "analysis": null,
       "id": "paper_5f693dda-7e4e-45f5-8b70-bf05561688e9",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2603.27467",
         "authors": [],
@@ -1059,6 +1088,7 @@
       "analysis": null,
       "id": "paper_683c1513-2fd8-480e-a196-690f0be0f1cb",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.06370",
         "authors": [],
@@ -1074,6 +1104,7 @@
       "analysis": null,
       "id": "paper_6b32d6f5-bf47-4e6f-bb8b-a9dca866763a",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.07115",
         "authors": [],
@@ -1089,6 +1120,7 @@
       "analysis": null,
       "id": "paper_6dee8f13-0c24-4c85-8e84-c918dff24413",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2503.01586",
         "authors": [],
@@ -1104,6 +1136,7 @@
       "analysis": null,
       "id": "paper_6f3b4226-dc1a-444a-bebb-356640d91fd4",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.04420",
         "authors": [],
@@ -1155,6 +1188,7 @@
       },
       "id": "paper_73ca1a25-eebf-4359-af53-ef40a6855748",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.14051",
         "authors": [],
@@ -1170,6 +1204,7 @@
       "analysis": null,
       "id": "paper_7a58f39a-1e4a-408b-b287-7da315b3bbcc",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2508.15099",
         "authors": [],
@@ -1185,6 +1220,7 @@
       "analysis": null,
       "id": "paper_7b5dc7ce-563e-42de-ab41-8eb27e7d69dc",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.24168",
         "authors": [],
@@ -1200,6 +1236,7 @@
       "analysis": null,
       "id": "paper_7d0e0cd0-5065-4eec-9a7e-b83c39304f90",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2601.22379",
         "authors": [],
@@ -1247,6 +1284,7 @@
       },
       "id": "paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.10424",
         "authors": [],
@@ -1262,6 +1300,7 @@
       "analysis": null,
       "id": "paper_81c566d8-5919-4a47-95a9-ce88e99fa3d6",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2412.19442",
         "authors": [],
@@ -1277,6 +1316,7 @@
       "analysis": null,
       "id": "paper_8800f36b-ed8e-4040-b47e-4086e9e0a718",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.24022",
         "authors": [],
@@ -1292,6 +1332,7 @@
       "analysis": null,
       "id": "paper_89f605e5-cd4f-4bd7-9aca-97e465c733b1",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2506.18879",
         "authors": [],
@@ -1340,6 +1381,7 @@
       },
       "id": "paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2510.07019",
         "authors": [],
@@ -1355,6 +1397,7 @@
       "analysis": null,
       "id": "paper_8c6512b6-2996-425d-9551-d7fb8bf10764",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.07223",
         "authors": [],
@@ -1370,6 +1413,7 @@
       "analysis": null,
       "id": "paper_93d049ae-4874-469f-a54b-c923d38dd44a",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2603.20397",
         "authors": [],
@@ -1385,6 +1429,7 @@
       "analysis": null,
       "id": "paper_94fbb444-9f99-4f2c-8f3e-2b7c979e67ba",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.03216",
         "authors": [],
@@ -1400,6 +1445,7 @@
       "analysis": null,
       "id": "paper_a0f8e985-4e28-490b-9965-ec6519b337b3",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.11501",
         "authors": [],
@@ -1415,6 +1461,7 @@
       "analysis": null,
       "id": "paper_aaa641fb-1d88-4a8d-9326-b9a119f960f2",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.17613",
         "authors": [],
@@ -1464,6 +1511,7 @@
       },
       "id": "paper_b4920f81-b210-4a71-9646-35e3b2691c4e",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2510.09665",
         "authors": [],
@@ -1479,6 +1527,7 @@
       "analysis": null,
       "id": "paper_b8f3a9bb-9f52-41ee-9d2d-55ef8c587ee2",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2512.16391",
         "authors": [],
@@ -1494,6 +1543,7 @@
       "analysis": null,
       "id": "paper_bd79e18a-2b6f-4c3c-9efd-1c898ff3b81c",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.27740",
         "authors": [],
@@ -1509,6 +1559,7 @@
       "analysis": null,
       "id": "paper_ca867b25-031a-4bf1-b098-6e238f03035c",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2604.13226",
         "authors": [],
@@ -1524,6 +1575,7 @@
       "analysis": null,
       "id": "paper_ce0ba187-94d6-4fce-96ed-b46b586e1597",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2605.09649",
         "authors": [],
@@ -1539,6 +1591,7 @@
       "analysis": null,
       "id": "paper_d3f81f2f-54b1-4a9f-8762-ff7e5ea59842",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.09725",
         "authors": [],
@@ -1554,6 +1607,7 @@
       "analysis": null,
       "id": "paper_e8ea6216-c27b-4ba2-a979-bc39fa86a21e",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2512.00504",
         "authors": [],
@@ -1569,6 +1623,7 @@
       "analysis": null,
       "id": "paper_e95ad573-3261-4632-b731-b359138a2d0d",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2510.00636",
         "authors": [],
@@ -1584,6 +1639,7 @@
       "analysis": null,
       "id": "paper_ecd9a53d-f07f-4c1e-9077-6013ad448f1e",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2602.05191",
         "authors": [],
@@ -1630,6 +1686,7 @@
       },
       "id": "paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2603.16435",
         "authors": [],
@@ -1676,6 +1733,7 @@
       },
       "id": "paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2502.11089",
         "authors": [],
@@ -1691,6 +1749,7 @@
       "analysis": null,
       "id": "paper_fa7d4129-b5ab-4deb-8f6e-26bc82995a35",
       "research_status": "ACTIVE",
+      "retirement_reason": null,
       "source": {
         "arxiv_id": "2507.14204",
         "authors": [],
@@ -1711,5 +1770,5 @@
       "source_read_attempts": 29
     }
   },
-  "state_revision": 88
+  "state_revision": 90
 }

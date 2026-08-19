@@ -1,6 +1,6 @@
 {
   "artifact_kind": "REPORT",
-  "content_sha256": "fc727bda708e3fc08cd7e1375ce23ff7f295b8ebbcbebe845f919b1dfd39ffed",
+  "content_sha256": "8c63ddf8a27095d4613d542aa5262942c1a94709f04b3b0a4e8ce5c3b317f0fb",
   "delivery_basis": {
     "completion_check_ref": "check_b7fb57de-b32a-45ae-aad3-838ef0d586d4",
     "type": "completion_pass"

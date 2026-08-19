@@ -689,7 +689,7 @@ def _parser() -> argparse.ArgumentParser:
     validate = commands.add_parser("validate-delivery")
     validate.add_argument("--run-id", required=True)
 
-    for name in ("reopen-research", "close-run"):
+    for name in ("reopen-research", "reopen-delivery", "close-run"):
         item = commands.add_parser(name)
         _add_run_revision(item)
 
@@ -991,6 +991,8 @@ def _delivery_dispatch(args: argparse.Namespace, runtime: LocalV1Runtime) -> obj
         return delivery.validate_delivery(args.run_id)
     if args.command == "reopen-research":
         return delivery.reopen_research(args.run_id, args.expected_revision)
+    if args.command == "reopen-delivery":
+        return delivery.reopen_delivery(args.run_id, args.expected_revision)
     if args.command == "close-run":
         return delivery.close_run(args.run_id, args.expected_revision)
     raise AdapterInputError(f"unsupported delivery command: {args.command}")
@@ -1116,6 +1118,7 @@ _DELIVERY_COMMANDS = {
     "publish-certified-report",
     "validate-delivery",
     "reopen-research",
+    "reopen-delivery",
     "close-run",
 }
 _EXTERNAL_COMMANDS = {
