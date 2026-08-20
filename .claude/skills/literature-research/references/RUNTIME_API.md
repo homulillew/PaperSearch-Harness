@@ -220,6 +220,7 @@ render-certified-report --run-id RUN
 publish-certified-report --run-id RUN --expected-revision REV
 validate-delivery --run-id RUN
 reopen-research --run-id RUN --expected-revision REV
+reopen-delivery --run-id RUN --expected-revision REV
 close-run --run-id RUN --expected-revision REV
 ```
 
@@ -365,6 +366,15 @@ as a current certified session because its Brief, Blind Read, and Reader Review 
 the v0.6 lean shapes; rebuild the Report Brief with `put-report-brief`. Missing
 semantic values are not fabricated. `ResearchRun`, `state.json`, and `DeliveryBasis`
 are not migrated or changed.
+
+`reopen-delivery` returns a CLOSED run directly to DELIVERY, reusing the already
+accepted Research State and the existing `DeliveryBasis`. It preserves the basis,
+preserves Research State, and clears `outcome`; it does not reopen Research, does not
+create a new `CompletionCheck`, and does not re-run the current Completion policy. A
+new Brief and Manuscript still require fresh Reader and Integrity certification
+through the normal digest-bound Delivery path before `close-run`. Reopening validates
+the stored `DeliveryBasis` (not the old report artifact being regenerated); a valid
+current REPORT artifact remains required to `validate-delivery` and `close-run`.
 
 ## Wiki projection and publication
 

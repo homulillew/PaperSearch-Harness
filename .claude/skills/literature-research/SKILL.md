@@ -612,6 +612,15 @@ then call `publish-certified-report`. Both commands revalidate the current
 version bindings; neither accepts arbitrary report content. Only close after
 `validate-delivery` succeeds.
 
+If the user wants to regenerate or improve the report from an already CLOSED run
+and the accepted Research itself does not need revision, use `reopen-delivery`
+instead of reopening Research. `reopen-delivery` reuses the existing accepted
+`DeliveryBasis` and does not re-certify Research under today's Completion rules.
+Then continue from `report-construction-input` → a new Brief → Authoring → Reader
+→ Integrity → Publish → `close-run`. A new Brief resets the old downstream
+Delivery certification (Reader/Integrity/rendered), so the normal digest-bound
+path must run again before closure.
+
 ## Wiki orchestration after closure
 
 After a run closes COMPLETE, project accepted cross-run knowledge into the Wiki. The

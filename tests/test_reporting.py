@@ -910,6 +910,41 @@ class TestReportOutlineFidelity:
         assert "delivery-inspect" in skill
         assert "delivery-read-source" in skill
 
+    def test_runtime_api_documents_reopen_delivery(self):
+        # §12: RUNTIME_API must surface the reopen-delivery command so callers
+        # know a CLOSED run can return to DELIVERY without reopening Research.
+        api = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "references"
+            / "RUNTIME_API.md"
+        ).read_text(encoding="utf-8")
+        assert "reopen-delivery --run-id RUN --expected-revision REV" in api
+        # The prose must state it preserves the accepted basis and does not
+        # re-run Completion, and that a new report still needs fresh Reader /
+        # Integrity certification.
+        assert "reopen-delivery" in api
+        assert "DeliveryBasis" in api
+
+    def test_skill_tells_when_to_reopen_delivery(self):
+        # §12: SKILL must tell Claude when a CLOSED run can reuse accepted
+        # Research via reopen-delivery (regenerate/improve report without
+        # reopening Research).
+        skill = (
+            Path(__file__).resolve().parents[1]
+            / ".claude"
+            / "skills"
+            / "literature-research"
+            / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "reopen-delivery" in skill
+        # It must point at the CLOSED-run report-regeneration use case and
+        # clarify that it does not re-certify Research under today's rules.
+        assert "CLOSED" in skill
+        assert "reopen-delivery" in skill
+
 
 # ===========================================================================
 # Math renderability preflight (mechanical TeX renderability only)

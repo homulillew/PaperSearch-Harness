@@ -211,9 +211,26 @@ class DeliveryCommands:
             raise CommandRejectedError(
                 "reopen_delivery requires a closed COMPLETE or PARTIAL outcome"
             )
-        # The stored basis must still be able to support Delivery under the
-        # existing invariants. If it is invalid, reject rather than repair.
-        self._validate_delivery(current)
+        # Enforce outcome <-> basis consistency. A CLOSED run must carry a basis
+        # whose type matches its recorded outcome; a corrupted CLOSED state
+        # (e.g. CompletionPassBasis + PARTIAL) is rejected rather than repaired.
+        if isinstance(basis, CompletionPassBasis):
+            if outcome is not RunOutcome.COMPLETE:
+                raise CommandRejectedError(
+                    "reopen_delivery: CompletionPassBasis requires outcome COMPLETE"
+                )
+        elif isinstance(basis, PartialAuthorizationBasis):
+            if outcome is not RunOutcome.PARTIAL:
+                raise CommandRejectedError(
+                    "reopen_delivery: PartialAuthorizationBasis requires outcome PARTIAL"
+                )
+        else:
+            raise CommandRejectedError("reopen_delivery found an unknown delivery basis")
+        # The stored basis must still support Delivery under the existing
+        # invariants, but the OLD report artifact is NOT required here: the
+        # purpose of reopening is to regenerate the report. If the basis is
+        # invalid, reject rather than repair.
+        self._validate_delivery_basis(current)
 
         proposed = deepcopy(current)
         proposed.state_revision = current.state_revision + 1
@@ -228,16 +245,27 @@ class DeliveryCommands:
         )
         return ReopenDeliveryResult(state_revision=proposed.state_revision)
 
-    def _validate_delivery(self, run: ResearchRun) -> DeliveryValidationResult:
+    def _validate_delivery_basis(self, run: ResearchRun) -> None:
+        # Validate only the stored DeliveryBasis against the current
+        # ResearchRun / Contract invariants. This does NOT require the published
+        # report artifact: reopening Delivery is a valid way to regenerate a
+        # report whose old artifact is missing or corrupted. Malformed or
+        # unknown DeliveryBasis values are rejected rather than repaired.
         current_contract_revision = run.contract.current_revision
         basis = run.delivery_basis
-        basis_contract_revision: int | None = None
         if isinstance(basis, CompletionPassBasis):
+            if basis.completion_check_ref not in run.completion_checks:
+                raise CommandRejectedError(
+                    "delivery basis references an unknown completion check "
+                    f"{basis.completion_check_ref!r}"
+                )
             basis_contract_revision = run.completion_checks[
                 basis.completion_check_ref
             ].basis_contract_revision
         elif isinstance(basis, PartialAuthorizationBasis):
             basis_contract_revision = basis.basis_contract_revision
+        else:
+            raise CommandRejectedError("delivery basis has an unknown type")
 
         if (
             basis_contract_revision is not None
@@ -257,6 +285,20 @@ class DeliveryCommands:
             raise CommandRejectedError(
                 "current contract revision cannot be resolved for delivery"
             )
+
+    def _validate_delivery(self, run: ResearchRun) -> DeliveryValidationResult:
+        # Full Delivery validation: the stored basis must be valid, AND the
+        # required published artifacts must be present and intact. Used by
+        # validate_delivery and close_run, where a current report artifact is
+        # required. reopen_delivery uses _validate_delivery_basis only, so a
+        # missing old report artifact does not block reopening.
+        self._validate_delivery_basis(run)
+        current_contract_revision = run.contract.current_revision
+        current_contracts = [
+            revision.contract
+            for revision in run.contract.revisions
+            if revision.revision == current_contract_revision
+        ]
 
         validated: set[ArtifactKind] = set()
         for artifact_kind in current_contracts[0].deliverable.required_artifacts:
