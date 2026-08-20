@@ -1,0 +1,5 @@
+{
+  "received_understanding": "The report delivers a unified discriminative framework for 2025-2026 KV cache optimization: each of eight routes is characterized by which cache property it reduces (retained token count, per-element precision, subspace rank, query-dynamic selection, fixed recurrent memory, cache reuse, storage-tier migration) and by the mechanism differences, experimental evidence boundaries, and cross-route comparability of representative methods. The blind read confirms the manuscript's structure, its evidence-boundary statement (first-hand reading of 10 representative papers, search window Jan 2025 - Aug 2026, latest first-hand April 2026), and its cross-route judgments are internally coherent before attribution.",
+  "manuscript_digest": "96da0165ced31432b22ddcb460ccd2fa1708085d961731ea73bc35f92db91daa",
+  "blocking_issues": []
+}

@@ -1,0 +1,333 @@
+ok= True
+object count= 10
+
+========================================
+ref= paper_0d3c3604-20ad-40fd-bb00-a547e1e69e50
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Positional re-encoding: decouple KV states from RoPE rotations at storage time (store W_k x_i, W_v x_i), re-apply global rotations at concatenation, fixing the position mismatch of independently encoded segments at negligible cost.",
+      "Link tokens: K trainable tokens (e.g., K=1 or 5) appended per document with a customized attention map so each link token attends to all preceding documents' tokens plus its own document, implicitly reconnecting independently encoded segments; the LLM is fine-tuned jointly with these tokens.",
+      "Compressed KV cache linking: a modified AnLLMs that compresses fixed-length chunks into multiple anchor tokens (chunk size s=100) with chunk-local + preceding-anchor attention, reducing per-document cache storage while preserving the reuse interface.",
+      "Demonstrates that naive reuse (PromptCache) suffers up to ~35% relative accuracy drop, and that link tokens recover most of the gap to fine-tuned full-concatenation upper bound."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Methodology"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "Backbones: Llama-3.2-1B/3B-Instruct and Llama-3.1-8B-Instruct, fine-tuned 6,000 steps, batch 64, 8xH100.",
+      "On QA (NQ, 2WikiMQA, TriviaQA, HotpotQA, MuSiQue) and summarization (MultiNews, Samsum), KVLink5 consistently beats PromptCache, CacheBlend, and BlockAttention; e.g., on Llama-3.2-1B MuSiQue: KVLink5 19.2% vs BlockAttention 14.3% vs PromptCache 1.4%; approaches the fine-tuned full-concatenation upper bound (19.9%).",
+      "TTFT: reusing precomputed KV cache reduces time-to-first-token by 85%-96% vs standard decoding; at 5,000-token context, ~96% TTFT reduction (10 reused docs of varying length).",
+      "General capability (GSM8K, MMLU, IFEval, ARC, PiQA, SciQ, Winogrande, HellaSwag): KVLink stays within ~3 points of the fine-tuned model, preserving general reasoning/instruction-following.",
+      "With cache compression (Table 3, Llama-3.2-1B): modified AnLLMs compression beats LLMLingua; KVLink5 over BlockAttention adds ~1-3 points under 50%/75% compression (e.g., HotpotQA 52.4/55.4 vs 51.1/54.3 at 75%/50%).",
+      "Link-token count monotonically helps: KVLink0 < KVLink1 < KVLink5 on most QA tasks."
+    ],
+    "limitations": [
+      "Requires fine-tuning the LLM (6,000 steps) with the link-token attention mechanism ！ not 
+
+========================================
+ref= paper_3551a2c1-4ca1-45a9-b0db-6aa3f1a4f922
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Theorem 1: bounds the attention output approximation error by ||QK^T - Q K~^T|| (amplified by V W^O) plus ||V W^O - V~ W^O||, motivating compression of the interaction KQ^T rather than K alone.",
+      "Theorem 2: closed-form optimal rank-R factorization of KQ^T via its truncated SVD (Eckart-Young), with A = K^+ U_hat, B = K^T U_hat; stores only K A* in R x T.",
+      "Efficient O(T d^2) computation by SVD-ing K and Q separately then combining on a d x d matrix, avoiding a direct T x T SVD.",
+      "Extends the same query-aware projection idea to the value-output product (Appendix B).",
+      "Theorem 4 (verified in 6.2): KQ-SVD is invariant to K/Q scaling imbalance (beta), whereas Eigen degrades toward K-SVD as imbalance grows ！ a robustness advantage."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Methodology"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "Models: Llama2-7B/13B (no GQA), Llama3-8B and Mistral-7B-v0.3 (GQA); C4 dataset, 128 training sequences of 2048 tokens (T_huge=262,144), rank R chosen per layer to keep >=1-epsilon spectral energy (epsilon=0.1).",
+      "K-SVD gives the most accurate K approximation (as expected) but poor Q approximation, leading to higher attention-output error ！ especially in GQA models where shared K amplifies the error.",
+      "KQ-SVD matches Eigen on K/Q/V accuracy but is consistently more accurate on the attention score matrix KQ^T and on the MHA output, outperforming K-SVD and Eigen on all four models.",
+      "Unbalance experiment (Figure 2, Llama2-7B): KQ-SVD and K-SVD are scale-invariant (constant error across beta); Eigen converges to K-SVD's error as beta grows (e.g., beta=10), confirming Theorem 4 and exposing Eigen's fragility under K/Q imbalance.",
+      "Evaluation is on relative Frobenius error of K, Q, V, KQ^T, and MHA output, averaged across 32 validation sequences of 2048 tokens."
+    ],
+    "limitations": [
+      "Evaluation is matrix-approximation error (Frobenius), not end-to-end task accuracy or wall-clock/throughput on long-context benchmarks; the downstream quality and speedup implications are not directly reported.",
+      "Requires a calibration set of query vectors (128 sequences) to compute projections ！ training-free but not zero-overhead, and projections are static once learned.",
+      "Rank R is chosen per layer from spectral energy
+
+========================================
+ref= paper_4e8f6440-1612-4d3e-8db8-f6448a37a481
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Preference-prioritized adaptive allocation: a per-layer preference score P = H^(1/tau1) * V^(1/tau2) from attention entropy H and variance V over a recent observation window, normalized to distribute a global budget B_total across layers (Eq. 6-7).",
+      "Preference-guided cascading cache management: a stage-wise algorithm that maintains the budget during prefilling, reducing peak memory to the target; Theorem 1 proves it is equivalent to the optimal one-shot allocation, and Proposition 1 proves per-layer budgets decrease monotonically across stages.",
+      "Attention-shift tolerant eviction indicator: I[n] = Mean(A) + gamma*Var(A) for non-recent tokens (with a large Omega protecting the most recent W tokens), combining sustained importance and attention variability to avoid prematurely evicting fluctuating-but-important tokens.",
+      "Empirically demonstrates the allocation strategy is a generalizable framework that improves existing eviction indicators (H2O, SnapKV) when swapped in."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Methodology"
+      },
+      {
+        "kind": "section",
+        "value": "Experimentation"
+      }
+    ],
+    "key_results": [
+      "Evaluated on 5 LLMs (7B-70B, MHA and GQA: Llama2-Chat, Gemma-Instruct, Llama3-Instruct, Mistral-v0.3, Qwen2.5-Instruct) on LongBench (16 datasets) and NeedleBench, budgets 64L-2048L, on A100 80GB.",
+      "On LongBench at B_total=128L (Llama2-7B-Chat), CAKE averages 29.29 vs SnapKV 28.09 and PyramidKV 28.20; at 1024L, CAKE 32.98 vs SnapKV 32.50 and PyramidKV 32.55. CAKE matches full-cache performance once B_total > 512L.",
+      "On NeedleBench 32K, CAKE preserves 32K-context capability using only 3.2% of the cache and surpasses full cache on Single-Needle Retrieval; leads on Multi-Needle Retrieval.",
+      "Memory/throughput (Mistral-7B, B_total=1024L): ~48.63% peak-memory reduction vs full cache at 128K context; >10x decoding-latency speedup over full cache at 128K.",
+      "Ablation (Table 2): allocation strategies Avg ！ Uniform 28.36, Pyramid 28.69, Random 28.3+/-0.2, P2A 29.29. Eviction indicators (Table 3): Mean 28.82, Var 28.68, Mean*Var 28.6, Mean+Var 29.29 ！ additive combination best."
+    ],
+    "limitations": [
+      "Training-free but requires computing attention entropy and variance over a recent window S_w at prefilling, adding a profiling pass; the cascading algorithm mitigates but does not elim
+
+========================================
+ref= paper_50caf2c8-6053-435a-b7f3-126ca2ec3769
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "First end-to-end differentiable framework for KV cache eviction that jointly learns head-wise budgets and token selection, bypassing heuristic proxies entirely.",
+      "LKV-H: global 1D budget competition that flattens all L*H heads into a single Soft-TopK selection, enabling cross-layer budget transfer that rigid layer-wise heuristics cannot approximate.",
+      "LKV-T: matrix-free intrinsic token selection predicting utility from KV states alone, avoiding the chicken-and-egg problem of needing attention matrices to evaluate token importance.",
+      "Closed-form Soft-TopK operator with exact budget satisfaction, order preservation, and translation invariance, enabling stable end-to-end gradient flow."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Methodology"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "On LongBench with Llama-3.1-8B-Instruct at strict 15% KV budget, LKV achieves near-lossless performance, outperforming SnapKV, PyramidKV, DuoAttention, and AdaKV.",
+      "Also evaluated on Qwen3-8B (GQA), showing compatibility with grouped-query attention; adds only ~0.1% trainable parameters.",
+      "Training is cost-effective: <2 hours on 8xA100 GPUs via self-distillation on a ~23k sample Loom dataset.",
+      "Analysis identifies learned budgeting (LKV-H) as the dominant driver of fidelity over selection policies, demonstrating data-driven allocation is essential to overcome hand-crafted heuristics."
+    ],
+    "limitations": [
+      "Requires a training/distillation phase (not training-free), though lightweight (~0.1% params, <2 GPU-hours).",
+      "Learned budgets are static once trained (zero-overhead at inference but not dynamically adapted to per-input content); the global budget ratio R is fixed.",
+      "Evaluation limited to 8B-class models; scaling behavior to much larger models or extreme compression ratios below 15% is not reported in the main experiments."
+    ],
+    "relevance_to_run": "Representative of the 2026 frontier in learned KV cache eviction, directly addressing the contract's eviction/token-selection route and the training-free vs. training-aware trade-off. It explicitly contrasts itself against heuristic baselines (SnapKV, PyramidKV, DuoAttention, AdaKV), providing cross-route comparison evidence.",
+    "summary": "LKV formulates KV cache eviction as an end-to-end differe
+
+========================================
+ref= paper_73ca1a25-eebf-4359-af53-ef40a6855748
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Observation (Figure 2): across 200 qasper questions, max sequence length reaches 25K but unique Exact-TopK (k=256) indices only reach ~1200 ！ motivating two-stage eviction-then-selection to close the gap to oracle top-k attention.",
+      "Two-stage framework: coarse permanent eviction (SnapKV, per-group for GQA, pooling kernel 63) then fine dynamic selection (HSA) over the filtered set, where the reduced set makes top-k prediction far easier.",
+      "Hybrid Sparse Attention (HSA): two-dimensional reduction ！ page-wise element-wise max/min along the sequence (Quest-style) plus head-dimension magnitude sparsity (SparQ-style) ！ approximating top-k attention scores with both K_max and K_min and a sign-based fetch.",
+      "Adaptive compression decomposition: split factor r = min(0.2+0.06*log2(c), 0.8) balances the two stages; HSA evenly splits its ratio across sequence and head dims.",
+      "RocketKV-MT: multi-turn variant retaining full KV history across turns (no storage saving) but filtering per-turn for decode speed, eliminating permanent-eviction loss in multi-turn settings.",
+      "System integration: compatible with FlashAttention (prefill untouched), tensor parallelism, and disaggregated prefill/decode serving (reduces KV transfer traffic)."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Proposed Method: RocketKV"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "Evaluated on Llama3.1-8B-Ins, Mistral-7B-Ins-v0.2, LongChat-7B-v1.5 (GQA + MHA) on LongBench, NIAH, RULER, SCBench; token budgets 256-4096 (single-turn), 1024-16384 (SCBench multi-turn).",
+      "LongBench (Llama3.1-8B-Ins): RocketKV near-lossless at budget >=512, only 1.1% avg drop at 256; consistently beats SnapKV, Quest, SparQ, DuoAttention, with the gap widening at low budgets.",
+      "NIAH (Llama3.1-8B-Ins): 100% accuracy at 256-token budget = >400x compression at 109K max sequence length; SnapKV drops >20% on Mistral/LongChat even at 1024.",
+      "RULER: accuracy loss negligible at short lengths, growing beyond models' effective context; RocketKV's advantage over baselines widens at longer sequences.",
+      "SCBench (multi-turn): RocketKV-MT matches Exact-TopK across all budgets, fixing the multi-turn accuracy gap that plain RocketKV suffers vs SparQ at high budgets.",
+      "Efficiency (Llama3.1-8B-Ins FP16, batch 1): up to 3.7x en
+
+========================================
+ref= paper_7e0d8e58-d37d-4835-8a6b-c0600f7fc397
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Arithmetic-intensity / roofline analysis of prefill vs. decoding across (small/large batch) x (short/long context) regimes, classifying which regimes are weight-quantization-bound vs. KV-cache-quantization-bound.",
+      "Hierarchical INT4 KV cache: INT8 = 2^4 * C_U^INT4 + C_L^INT4, letting the draft model use the upper 4 bits and the target model reconstruct INT8 from both halves, removing the redundant draft KV copy.",
+      "Double full-precision buffer (2G) that keeps recent tokens in FP16 for high acceptance rate, defers quantization to every G steps, and cleanly supports speculative-decoding rollback by operating only on the second buffer.",
+      "Self-speculative decoding with shared architecture (draft = INT4 upper bits, target = INT8 reconstruction), improving acceptance rate over big-little speculative decoding."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "LLM Inference Bottlenecks"
+      },
+      {
+        "kind": "section",
+        "value": "Evaluation"
+      }
+    ],
+    "key_results": [
+      "INT8 KV cache perplexity on Llama-2-7B (WikiText2 6.4696 vs FP16 6.4595; C4 7.2620 vs 7.2617) ！ near-lossless, validating INT8 as the target precision.",
+      "On Llama-2-7B-32K-Instruct and LWM-Text-Chat-128k, QuantSpec achieves up to 2.49x speedup over autoregressive (AR) target generation, vs sparsity-based self-speculative baselines (StreamingLLM, SnapKV).",
+      "At 128k context (LWM-Text-Chat, Multi-LexSum), StreamingLLM and SnapKV hit OOM while QuantSpec runs at 61.22 GB peak memory with 94.31% acceptance and 2.49x speedup.",
+      "At 32k (Llama-2-7B, Multi-LexSum): QuantSpec 2.08x speedup, 25.84 GB vs StreamingLLM 1.84x/32.61GB and SnapKV 1.63x/33.96GB; acceptance 91.16%.",
+      "Quantization strategy: key cache quantized along channel axis, value cache along token axis (per-group, group size G = head dim), minimizing quantization error and maximizing acceptance."
+    ],
+    "limitations": [
+      "Self-speculative: the draft and target share architecture, so speedup is bounded by the acceptance rate and the INT4-vs-INT8 compute ratio; gains are largest in long-context memory-bound regimes.",
+      "The double full-precision buffer adds 2G tokens of FP16 KV per layer, partially offsetting the compression benefit.",
+      "Reported on Llama-2-7B-class models; scaling to much larger models and the interaction with GQA/MoE is not fully characterized.",
+      
+
+========================================
+ref= paper_8be2bb1a-cdb4-4b2c-b9dc-4b554916dba0
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Three-level hybrid design: (L1) architectural hybrid of RNN matrix memory + softmax attention; (L2) intra-layer hybrid concatenating long-term (m-slot gated RNN) and short-term (w-window) memory under a unified softmax; (L3) inter-layer hybrid by varying w per layer (w=0 pure linear, w=N full attention).",
+      "Unified softmax fusion over concatenated long+short memory, which gradient analysis shows couples gradient flow between the two memories better than output-level weighted fusion.",
+      "Chunkwise parallel form enabling efficient training (analogous to GSA's associative scan), with linear memory update + shifted sliding-window logits fused in one softmax.",
+      "Pretrained-LLM hybridization: replacing selected full-attention layers of Llama-3-8B / Qwen2.5-7B / Qwen3-30B-A3B with NHA modules + lightweight fine-tuning, reducing reliance on full attention."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Naive Hybrid Attention"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "Pretrained from scratch at 340M/15B tokens and 1.3B/100B tokens with 'one Transformer every 8 layers' stacking. At 1.3B, NHA averages 46.43 on recall-intensive tasks (FDA/SWDE/SQuAD/NQ/TriviaQA/Drop) vs GDN-H 44.88, GSA-H 44.99, Mamba2-H 44.18; and 52.89 commonsense avg, competitive with best hybrids.",
+      "RULER long-context (trained 2K, tested to 8K): NHA 81.4/51.8/21.6 on NIAH-MK (1K/2K/4K) vs GDN-H 59.6/29.4/15.0; strongest extrapolation among hybrids, though Transformer still leads in-length NIAH.",
+      "Pretrained-LLM hybridization: NHA-Llama-3-8B (4 full-attn layers) achieves best recall avg (57.64) among same-scale hybrids with the fewest full-attention layers, closely matching original Llama-3-8B (60.08).",
+      "Scaling to Qwen3-30B-A3B: NHA hybrid (47.25 avg) stays competitive with the original (44.60) on a broad benchmark suite including GPQA/IFVL/HEval/MaQA/MMLU.",
+      "Operator efficiency (H100): NHA scales near-linearly and matches GSA speed across lengths; FlashAttention is faster on short sequences but quadratic on long. NHA-Llama3-8B inference latency/memory grow much slower than Llama3-8B at 1K-token generation.",
+      "Ablation (Table 5): removing long-term memory drops recall 38.60->29.58; removing short-term 36.97; removing token shift 35.76; unified softmax (38.60) beats weighted-sum fusion varia
+
+========================================
+ref= paper_b4920f81-b210-4a71-9646-35e3b2691c4e
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "A standardized KV caching layer between inference engines and heterogeneous storage, compatible with vLLM and SGLang, exposing store/retrieve/lookup interfaces and a shared token pool for cross-instance cache awareness.",
+      "Chunk-level KV transfer (vs vLLM's page-by-page) using high-performance CUDA kernels, achieving 400 Gbps CPU loading bandwidth vs vLLM native 88 Gbps (Table 5).",
+      "Asynchronous, layer-wise KV loading overlapped with prefill/decode compute (request asynchronization), reducing end-to-end delay by 1.46x.",
+      "Adaptive KV-loading-vs-prefill decision: at low network bandwidth (32 Gbps) loading beats prefill only beyond 256K tokens; at 64/128 Gbps it wins across all lengths ！ a deployment-condition guideline.",
+      "Efficient PD disaggregation via chunked GPU-buffer transfer between prefetcher and decoder, improving tail TTFT over vLLM's native NIXL page-by-page transfer."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Overview of LMCACHE"
+      },
+      {
+        "kind": "section",
+        "value": "Evaluation"
+      }
+    ],
+    "key_results": [
+      "Models: Llama-3.1-8B/70B-Instruct, Qwen2.5-Coder-32B, Qwen2.5-72B, Qwen3-Coder-480B-A35B (FP8), Sao10K-L3-8B; hardware 8xH100 (GMI Cloud).",
+      "Single-node CPU offloading (multi-round Q&A, 10K-token queries, 500GB CPU DRAM): 1.9-8.1x smaller TTFT and 2.3-14x higher throughput than the strongest baseline across 5 models; 7-92% smaller ITL at QPS=1. Commercial options cannot host Qwen3-Coder-480B.",
+      "Real-trace (companies F and G): 3.7-6.8x smaller TTFT and 19-58% smaller ITL vs basic vLLM at high QPS.",
+      "Centralized remote storage (15 Gbps, TriviaQA): 1.3-3x throughput improvement; remote loading can exceed prefill delay for short contexts / small models, motivating adaptive loading.",
+      "PD disaggregation (8K input / 200 output): 1.53-1.84x lower mean TTFT and 1.12-1.66x lower mean ITL than vLLM native PD disaggregation; significantly better tail (p95) TTFT.",
+      "SGLang integration (Qwen3-32B, TP=2): higher throughput / lower TTFT than SGLang without offloading; comparable to SGLang native offloading but with hierarchical distributed backend support."
+    ],
+    "limitations": [
+      "Gains depend on cache hit ratio, which depends on workload prefix overlap; for low-overlap workloads the CPU/remote storage benefit shrinks.",
+      "Remote-backend loading is bandwidth-bo
+
+========================================
+ref= paper_f93ee025-14bd-4d0d-bf97-8bc19caaacfb
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Applies Residual Simple Vector Quantization (RSimVQ) ！ combining Residual VQ with SimVQ projection matrices ！ to KV cache, storing only codebook indices instead of full-precision vectors.",
+      "Integrates VQ compression into both prefilling (batch compression of the prompt KV) and decoding (per-token compression with a sliding local window of full-precision entries).",
+      "On-demand reconstruction from codebooks during attention, keeping codebooks resident while storing only integer codes for the bulk of the cache.",
+      "Achieves high compression ratios (~82-83%) with fidelity closer to full cache than feature-dimension-reduction and scalar-quantization baselines."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Compressing KV with Vector Quantization"
+      },
+      {
+        "kind": "section",
+        "value": "Experiment"
+      }
+    ],
+    "key_results": [
+      "Compression ratio of 82.8% on LLaMA3.1-8B and 82.4% on LLaMA3.2-3B.",
+      "On LongBench, VQKV achieves the closest performance to full-cache models among comparable-ratio methods, outperforming ASVD, Palu, KIVI, and SnapKV.",
+      "Codebook configuration for LLaMA3.1-8B: (N_k, N_v) = (56, 16) codebooks, sizes (S_k, S_v) = (1024, 512); for LLaMA3.2-3B: (N_k, N_v) = (56, 10), sizes (1024, 65536).",
+      "RSimVQ trained on 0.1% of OpenWebText with learning rate 0.001, batch size 65536; initial tokens L_init=4, local window L_local=1024.",
+      "Memory-efficiency test shows VQKV extends maximum generation length beyond full-cache under identical hardware."
+    ],
+    "limitations": [
+      "Requires offline training of RSimVQ codebooks (lightweight, on 0.1% of OpenWebText) ！ not purely training-free, though no LLM fine-tuning is needed.",
+      "Codebook size and count must be tuned per model and per K/V cache type, adding configuration complexity.",
+      "Reconstruction introduces lookup overhead; net wall-clock speedup depends on codebook residency and memory-bandwidth trade-offs not fully detailed in the experiment section."
+    ],
+    "relevance_to_run": "A 2026 frontier representative of the vector-quantization sub-route within KV cache compression, directly relevant to the contract's compression/quantization route and the lossless-vs-lossy trade-off. Contrasts scalar quantization (KIVI), low-rank approximation (ASVD, Palu), and eviction (SnapKV) under matched compression ratios.",
+    "summary": 
+
+========================================
+ref= paper_fa5091d7-cac6-4903-9ac5-0503228a0dc8
+keys= ['analysis', 'id', 'research_status', 'retirement_reason', 'source']
+{
+  "analysis": {
+    "contributions": [
+      "Hierarchical sparse attention combining three branches: compressed block-level attention (coarse), top-k selected block attention (fine), and sliding-window local attention, fused via learned gating.",
+      "Natively trainable: the sparse pattern is learned during pretraining rather than fixed at inference, so the model adapts to sparsity during training.",
+      "Hardware-aligned kernel design balancing arithmetic intensity so that decoding becomes memory-bandwidth-efficient, achieving real wall-clock speedup rather than theoretical-only FLOP reduction.",
+      "End-to-end pretraining at scale (27B total / 3B active GQA+MoE) demonstrating sparse attention can match or exceed full attention quality."
+    ],
+    "key_locators": [
+      {
+        "kind": "section",
+        "value": "Methodology"
+      },
+      {
+        "kind": "section",
+        "value": "Experiments"
+      }
+    ],
+    "key_results": [
+      "Backbone: 27B total / 3B active parameters, GQA (64 heads, 4 groups) + DeepSeekMoE (72 routed + 2 shared experts, top-6), 30 layers.",
+      "Pretrained on 270B tokens of 8k-length texts, then continued training + SFT on 32k-length texts with YaRN for long-context adaptation.",
+      "NSA consistently achieves lower pretraining loss than the Full Attention baseline trained to convergence under identical settings.",
+      "Matches or improves over Full Attention on general benchmarks (MMLU, MMLU-PRO, CMMLU, BBH, GSM8K, MATH, DROP, MBPP, HumanEval) and long-context benchmarks, while delivering substantial training and inference speedup.",
+      "Hyperparameters: compression block size 32, stride 16, selected block size 64, selected block count 16 (1 initial + 2 local fixed), sliding window 512."
+    ],
+    "limitations": [
+      "Requires natively training the model from scratch with the sparse attention mechanism; not a drop-in training-free method for existing pretrained LLMs.",
+      "The sparse pattern and gating are learned during pretraining, so the benefit is tied to models trained this way rather than retrofitted to off-the-shelf models like Llama/Qwen.",
+      "Reported at a specific 27B/3B MoE scale; transfer of the exact sparse configuration to dense models of other sizes is not fully characterized in the main text."
+    ],
+    "relevance_to_run": "A seminal 2025 work for the sparse-attention architectural route, co-designed with hardware to address the gap between theoretical sparsity and real

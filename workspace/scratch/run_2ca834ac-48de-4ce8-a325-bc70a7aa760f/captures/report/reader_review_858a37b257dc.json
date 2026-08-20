@@ -1,0 +1,7 @@
+{
+  "blind_read_digest": "c1e57c4108e6afed4427df11788c3a264eb81cb5f9b10a9c711f861bc8690b86",
+  "brief_digest": "45f1d534990c538ddf031cc455fb39cf254a3f01f5a7caa437d91d6f8f490a74",
+  "manuscript_digest": "858a37b257dcffc5dfbc16b24d3f3071b122988f80a43c35bc0d981063320233",
+  "rationale": "冻结的盲读未报告任何 blocker；盲读形成的整体理解（三条设计轴下的路线地图、各路线机制与带部署条件的实证结果、跨路线取舍、开放前沿、2026 前沿前置）与 Brief 声明的认知路径一致，且覆盖 Contract 的六项交付要求（保留部署条件与实证结果、对比竞争结果、覆盖主要路线族、主源证据、识别开放问题、2025–2026 窗口含最新 2026 工作）。未发现 Brief 遗漏 Contract 要求的交付关注点，亦未发现正文与 Brief 设计路径的结构性差异。",
+  "repair_target": null
+}
